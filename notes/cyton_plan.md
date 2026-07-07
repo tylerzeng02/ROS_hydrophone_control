@@ -42,3 +42,6 @@ For each joint find safe min/max positions
 
 Home/rest position 
 Make a function for this 
+
+etc. etc.
+change 1 2 3
