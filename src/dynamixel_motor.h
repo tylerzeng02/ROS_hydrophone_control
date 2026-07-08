@@ -2,6 +2,7 @@
 #define DYNAMIXEL_MOTOR_H
 
 #include <cstdint>
+#include <vector>
 #include "dynamixel_sdk/dynamixel_sdk.h"
 
 class DynamixelMotor
@@ -18,15 +19,32 @@ public:
     bool enableTorque(int motorId);
     bool disableTorque(int motorId);
 
-    bool setGoalPosition(int motorId, uint16_t position);
+   bool setGoalPosition(int motorId, uint16_t position);
     bool setMovingSpeed(int motorId, uint16_t speed);
-    
+
     bool moveJointSafely(
         int motorId,
         uint16_t targetPosition,
         uint16_t speed,
         int tolerance = 15,
         int timeoutSeconds = 8
+    );
+
+    bool moveJointsSafely(
+        const std::vector<int>& motorIds,
+        const std::vector<uint16_t>& targetPositions,
+        uint16_t speed,
+        int tolerance = 15,
+        int timeoutSeconds = 10,
+        bool holdTorque = false
+    );
+
+    bool moveToPose(
+        const std::vector<uint16_t>& targetPositions,
+        uint16_t speed,
+        int tolerance = 15,
+        int timeoutSeconds = 10,
+        bool holdTorque = false
     );
 
     bool readPosition(int motorId, uint16_t& position);

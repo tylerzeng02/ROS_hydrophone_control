@@ -57,25 +57,66 @@ int main()
 
     std::cout << "\nAll motors are inside safe ranges." << std::endl;
 
-    const int testMotorId = 5;
-    const uint16_t targetPosition = 2260;
-    const uint16_t movingSpeed = 50;
+    // Named poses.
+    // Motor order is always:
+    // {0, 1, 2, 3, 4, 5, 6, 7}
+
+    std::vector<uint16_t> homePose = {
+        2015,
+        857,
+        935,
+        3239,
+        989,
+        3087,
+        1967,
+        3077
+    };
+
+    std::vector<uint16_t> testPose1 = {
+       1700,
+       1157,
+       1180,
+       3000,
+       930,
+       3140,
+       1950,
+       2900
+    };
+
+    const uint16_t movingSpeed = 20;
+
+    std::cout << "\nNamed pose movement test." << std::endl;
+    std::cout << "Moving speed: " << movingSpeed << std::endl;
 
     std::cout << "\nMake sure the arm is clear and your hand is near the power switch." << std::endl;
-    std::cout << "Press Enter to move motor " << testMotorId << "...";
+    std::cout << "Press Enter to move to test pose 1...";
     std::cin.get();
 
-    bool success = motor.moveJointSafely(
-        testMotorId,
-        targetPosition,
-        movingSpeed
-    );
-
-    if (!success)
+    if (!motor.moveToPose(testPose1, movingSpeed, 25, 20, true))
     {
-        std::cerr << "Safe movement failed or was stopped." << std::endl;
+        std::cerr << "Failed to move to test pose 1." << std::endl;
         motor.disconnect();
         return 1;
+    }
+
+    std::cout << "\nPress Enter to move back to home pose...";
+    std::cin.get();
+
+    if (!motor.moveToPose(homePose, movingSpeed, 25, 20, true))
+    {
+        std::cerr << "Failed to move back to home pose." << std::endl;
+        motor.disconnect();
+        return 1;
+    }
+
+    std::cout << "\nHome pose reached." << std::endl;
+    std::cout << "Torque is still enabled and holding position." << std::endl;
+    std::cout << "Press Enter to disable torque and end program...";
+    std::cin.get();
+
+    for (int id : motorIds)
+    {
+        motor.disableTorque(id);
     }
 
     motor.disconnect();
