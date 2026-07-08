@@ -59,10 +59,8 @@ int main()
 
     std::cout << "\nAll motors are inside safe ranges." << std::endl;
 
-    // Small one-motor movement test.
-    // Motor 6 has full range 0–4095 and was near center in your last test.
-    const int testMotorId = 6;
-    const uint16_t targetPosition = 2050;
+    const int testMotorId = 5;
+    const uint16_t targetPosition = 1200;
     const uint16_t movingSpeed = 50;
 
     uint16_t startPosition = 0;
@@ -121,9 +119,9 @@ int main()
         return 1;
     }
 
-    std::cout << "Move command sent. Waiting 2 seconds..." << std::endl;
+    std::cout << "Move command sent. Waiting 5 seconds..." << std::endl;
 
-    std::this_thread::sleep_for(std::chrono::seconds(2));
+    std::this_thread::sleep_for(std::chrono::seconds(5));
 
     uint16_t finalPosition = 0;
     if (motor.readPosition(testMotorId, finalPosition))
