@@ -74,6 +74,40 @@ bool DynamixelMotor::checkCommResult(int commResult, uint8_t dxlError, int motor
     return true;
 }
 
+bool DynamixelMotor::isPositionWithinLimit(int motorId, uint16_t position) const
+{
+    switch (motorId)
+    {
+        case 0:
+            return position >= 0 && position <= 4095;
+
+        case 1:
+            return position >= 855 && position <= 3245;
+
+        case 2:
+            return position >= 855 && position <= 3245;
+
+        case 3:
+            return position >= 855 && position <= 3245;
+
+        case 4:
+            return position >= 855 && position <= 3245;
+
+        case 5:
+            return position >= 855 && position <= 3245;
+
+        case 6:
+            return position >= 0 && position <= 4095;
+
+        case 7:
+            return position >= 1578 && position <= 3172;
+
+        default:
+            std::cerr << "Unknown motor ID: " << motorId << std::endl;
+            return false;
+    }
+}
+
 bool DynamixelMotor::pingMotor(int motorId)
 {
     uint8_t dxlError = 0;
@@ -131,8 +165,16 @@ bool DynamixelMotor::setGoalPosition(int motorId, uint16_t position)
 {
     if (position > MAX_RAW_POSITION)
     {
-        std::cerr << "Goal position out of range: " << position
-                  << ". Valid range is 0 to " << MAX_RAW_POSITION << std::endl;
+        std::cerr << "Goal position out of full MX range: " << position
+                  << ". Valid full range is 0 to " << MAX_RAW_POSITION << std::endl;
+        return false;
+    }
+
+    if (!isPositionWithinLimit(motorId, position))
+    {
+        std::cerr << "Command cancelled. Goal position " << position
+                  << " is outside the safe joint range for motor ID "
+                  << motorId << std::endl;
         return false;
     }
 
@@ -261,38 +303,33 @@ double DynamixelMotor::rawPositionToRadians(uint16_t rawPosition) const
 
     const double PI = 3.14159265358979323846;
 
-    // AX-style Dynamixel motors commonly use 300 degrees of position range.
-    // 300 degrees = 5.23599 radians.
-    const double rangeRadians = 300.0 * PI / 180.0;
+    // MX position range:
+    // raw 0    -> about -pi radians
+    // raw 2048 -> about 0 radians
+    // raw 4095 -> about +pi radians
+    const double rangeRadians = 2.0 * PI;
 
-    double normalized = static_cast<double>(rawPosition) / static_cast<double>(MAX_RAW_POSITION);
+    double normalized =
+        static_cast<double>(rawPosition) / static_cast<double>(MAX_RAW_POSITION);
 
-    // Convert from raw range [0, 1023] to radians around center:
-    // raw 0    -> about -150 degrees
-    // raw 512  -> about 0 degrees
-    // raw 1023 -> about +150 degrees
-    return (normalized * rangeRadians) - (rangeRadians / 2.0);
+    return (normalized * rangeRadians) - PI;
 }
 
 uint16_t DynamixelMotor::radiansToRawPosition(double radians) const
 {
     const double PI = 3.14159265358979323846;
 
-    const double rangeRadians = 300.0 * PI / 180.0;
-    const double minRadians = -rangeRadians / 2.0;
-    const double maxRadians =  rangeRadians / 2.0;
-
-    if (radians < minRadians)
+    if (radians < -PI)
     {
-        radians = minRadians;
+        radians = -PI;
     }
 
-    if (radians > maxRadians)
+    if (radians > PI)
     {
-        radians = maxRadians;
+        radians = PI;
     }
 
-    double normalized = (radians - minRadians) / rangeRadians;
+    double normalized = (radians + PI) / (2.0 * PI);
     double raw = normalized * static_cast<double>(MAX_RAW_POSITION);
 
     return static_cast<uint16_t>(std::round(raw));

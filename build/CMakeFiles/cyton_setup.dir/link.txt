@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/cyton_setup.dir/src/main.cpp.o CMakeFiles/cyton_setup.dir/src/dynamixel_motor.cpp.o -o cyton_setup  -ldxl_x64_cpp

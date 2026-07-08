@@ -1,0 +1,22 @@
+cmake_minimum_required(VERSION 3.10)
+project(cyton_setup)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+include_directories(src)
+include_directories(external/DynamixelSDK/c++/include/dynamixel_sdk)
+
+add_executable(cyton_setup
+    src/main.cpp
+    src/dynamixel_motor.cpp
+)
+
+target_link_libraries(cyton_setup dxl_x64_cpp)
+
+add_executable(test_one_motor
+    src/test_one_motor.cpp
+)
+
+target_link_libraries(test_one_motor dxl_x64_cpp)
+

@@ -43,6 +43,8 @@ private:
 
     bool checkCommResult(int commResult, uint8_t dxlError, int motorId, const char* action);
 
+    bool isPositionWithinLimit(int motorId, uint16_t position) const;
+
     static const int ADDR_TORQUE_ENABLE = 24;
     static const int ADDR_GOAL_POSITION = 30;
     static const int ADDR_MOVING_SPEED = 32;
@@ -56,7 +58,7 @@ private:
     static const int TORQUE_DISABLE = 0;
 
     static const uint16_t MIN_RAW_POSITION = 0;
-    static const uint16_t MAX_RAW_POSITION = 1023;
+    static const uint16_t MAX_RAW_POSITION = 4095;
 };
 
 #endif
