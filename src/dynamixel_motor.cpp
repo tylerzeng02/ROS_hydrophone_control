@@ -108,6 +108,11 @@ bool DynamixelMotor::isPositionWithinLimit(int motorId, uint16_t position) const
     }
 }
 
+bool DynamixelMotor::isPositionSafe(int motorId, uint16_t position) const
+{
+    return isPositionWithinLimit(motorId, position);
+}
+
 bool DynamixelMotor::pingMotor(int motorId)
 {
     uint8_t dxlError = 0;

@@ -31,6 +31,7 @@ public:
 
     double rawPositionToRadians(uint16_t rawPosition) const;
     uint16_t radiansToRawPosition(double radians) const;
+    bool isPositionSafe(int motorId, uint16_t position) const;
 
 private:
     const char* deviceName_;
