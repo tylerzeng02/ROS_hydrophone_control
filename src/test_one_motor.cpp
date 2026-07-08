@@ -3,19 +3,13 @@
 
 int main()
 {
-    // modify according to dynamixel wizard
     const char* DEVICENAME = "/dev/ttyUSB0";
     const int BAUDRATE = 1000000;
-    const int DXL_ID = 1;
     const float PROTOCOL_VERSION = 1.0;
 
-    // control table addresses 
-    const int ADDR_TORQUE_ENABLE = 24;
-    const int ADDR_GOAL_POSITION = 30;
     const int ADDR_PRESENT_POSITION = 36;
 
-    const int TORQUE_ENABLE = 1;
-    const int TORQUE_DISABLE = 0;
+    int motorIds[] = {0, 1, 2, 3, 4, 5, 6, 7};
 
     dynamixel::PortHandler* portHandler =
         dynamixel::PortHandler::getPortHandler(DEVICENAME);
@@ -40,37 +34,37 @@ int main()
 
     std::cout << "Baud rate set successfully." << std::endl;
 
-    uint8_t dxl_error = 0;
-    int dxl_comm_result = COMM_TX_FAIL;
-
-    // Read current position first
-    uint16_t present_position = 0;
-
-    dxl_comm_result = packetHandler->read2ByteTxRx(
-        portHandler,
-        DXL_ID,
-        ADDR_PRESENT_POSITION,
-        &present_position,
-        &dxl_error
-    );
-
-    if (dxl_comm_result != COMM_SUCCESS)
+    for (int id : motorIds)
     {
-        std::cerr << "Read failed: "
-                  << packetHandler->getTxRxResult(dxl_comm_result)
-                  << std::endl;
-        portHandler->closePort();
-        return 1;
-    }
+        uint8_t dxl_error = 0;
+        uint16_t position = 0;
 
-    if (dxl_error != 0)
-    {
-        std::cerr << "Dynamixel error: "
-                  << packetHandler->getRxPacketError(dxl_error)
-                  << std::endl;
-    }
+        int dxl_comm_result = packetHandler->read2ByteTxRx(
+            portHandler,
+            id,
+            ADDR_PRESENT_POSITION,
+            &position,
+            &dxl_error
+        );
 
-    std::cout << "Current position: " << present_position << std::endl;
+        if (dxl_comm_result == COMM_SUCCESS && dxl_error == 0)
+        {
+            std::cout << "Motor " << id << " position: " << position << std::endl;
+        }
+        else
+        {
+            std::cout << "Failed to read motor " << id << ": "
+                      << packetHandler->getTxRxResult(dxl_comm_result)
+                      << std::endl;
+
+            if (dxl_error != 0)
+            {
+                std::cout << "Dynamixel error: "
+                          << packetHandler->getRxPacketError(dxl_error)
+                          << std::endl;
+            }
+        }
+    }
 
     portHandler->closePort();
     std::cout << "Closed port." << std::endl;
