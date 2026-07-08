@@ -1,17 +1,28 @@
 #ifndef DYNAMIXEL_MOTOR_H
 #define DYNAMIXEL_MOTOR_H
 
-class DynamixelMotor {
-private:
-    int id;
-    double currentAngle;
+#include <cstdint>
+#include "dynamixel_sdk/dynamixel_sdk.h"
 
+class DynamixelMotor
+{
 public:
-    DynamixelMotor(int motorId);
+    DynamixelMotor(const char* deviceName, int baudRate, float protocolVersion);
 
-    void moveToAngle(double radians);
-    double getAngle() const;
-    int getId() const;
+    bool connect();
+    void disconnect();
+
+    bool readPosition(int motorId, uint16_t& position);
+
+private:
+    const char* deviceName_;
+    int baudRate_;
+    float protocolVersion_;
+
+    dynamixel::PortHandler* portHandler_;
+    dynamixel::PacketHandler* packetHandler_;
+
+    static const int ADDR_PRESENT_POSITION = 36;
 };
 
 #endif
