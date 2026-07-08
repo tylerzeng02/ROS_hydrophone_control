@@ -20,6 +20,14 @@ public:
 
     bool setGoalPosition(int motorId, uint16_t position);
     bool setMovingSpeed(int motorId, uint16_t speed);
+    
+    bool moveJointSafely(
+        int motorId,
+        uint16_t targetPosition,
+        uint16_t speed,
+        int tolerance = 15,
+        int timeoutSeconds = 8
+    );
 
     bool readPosition(int motorId, uint16_t& position);
     bool readSpeed(int motorId, uint16_t& speed);
@@ -32,7 +40,7 @@ public:
     double rawPositionToRadians(uint16_t rawPosition) const;
     uint16_t radiansToRawPosition(double radians) const;
     bool isPositionSafe(int motorId, uint16_t position) const;
-
+    
 private:
     const char* deviceName_;
     int baudRate_;

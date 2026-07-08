@@ -1,6 +1,8 @@
 #include "dynamixel_motor.h"
 #include <iostream>
 #include <cmath>
+#include <thread>
+#include <chrono>
 
 DynamixelMotor::DynamixelMotor(const char* deviceName, int baudRate, float protocolVersion)
     : deviceName_(deviceName),
@@ -216,6 +218,123 @@ bool DynamixelMotor::setMovingSpeed(int motorId, uint16_t speed)
     );
 
     return checkCommResult(commResult, dxlError, motorId, "Set moving speed");
+}
+
+bool DynamixelMotor::moveJointSafely(
+    int motorId,
+    uint16_t targetPosition,
+    uint16_t speed,
+    int tolerance,
+    int timeoutSeconds
+)
+{
+    if (!isPositionWithinLimit(motorId, targetPosition))
+    {
+        std::cerr << "Target position " << targetPosition
+                  << " is outside the safe range for motor ID "
+                  << motorId << std::endl;
+        return false;
+    }
+
+    uint16_t startPosition = 0;
+    if (!readPosition(motorId, startPosition))
+    {
+        std::cerr << "Could not read starting position for motor ID "
+                  << motorId << std::endl;
+        return false;
+    }
+
+    if (!isPositionWithinLimit(motorId, startPosition))
+    {
+        std::cerr << "Starting position " << startPosition
+                  << " is outside the safe range for motor ID "
+                  << motorId << std::endl;
+        return false;
+    }
+
+    std::cout << "Motor " << motorId
+              << " starting position: " << startPosition << std::endl;
+
+    if (!enableTorque(motorId))
+    {
+        std::cerr << "Failed to enable torque on motor ID "
+                  << motorId << std::endl;
+        return false;
+    }
+
+    if (!setMovingSpeed(motorId, speed))
+    {
+        std::cerr << "Failed to set moving speed on motor ID "
+                  << motorId << std::endl;
+        disableTorque(motorId);
+        return false;
+    }
+
+    if (!setGoalPosition(motorId, targetPosition))
+    {
+        std::cerr << "Failed to set goal position on motor ID "
+                  << motorId << std::endl;
+        disableTorque(motorId);
+        return false;
+    }
+
+    std::cout << "Move command sent. Monitoring motor "
+              << motorId << "..." << std::endl;
+
+    auto startTime = std::chrono::steady_clock::now();
+
+    while (true)
+    {
+        uint16_t currentPosition = 0;
+
+        if (!readPosition(motorId, currentPosition))
+        {
+            std::cerr << "Failed to read position during movement. Stopping motor."
+                      << std::endl;
+            disableTorque(motorId);
+            return false;
+        }
+
+        if (!isPositionWithinLimit(motorId, currentPosition))
+        {
+            std::cerr << "SAFETY STOP: motor " << motorId
+                      << " moved outside safe range at position "
+                      << currentPosition << std::endl;
+
+            disableTorque(motorId);
+            return false;
+        }
+
+        int error = static_cast<int>(targetPosition) - static_cast<int>(currentPosition);
+
+        if (error < 0)
+        {
+            error = -error;
+        }
+
+        std::cout << "Current position: " << currentPosition
+                  << " | Error: " << error << std::endl;
+
+        if (error <= tolerance)
+        {
+            std::cout << "Target reached." << std::endl;
+            disableTorque(motorId);
+            return true;
+        }
+
+        auto now = std::chrono::steady_clock::now();
+        auto elapsedSeconds =
+            std::chrono::duration_cast<std::chrono::seconds>(now - startTime).count();
+
+        if (elapsedSeconds >= timeoutSeconds)
+        {
+            std::cerr << "Timeout: motor did not reach target in time." << std::endl;
+            disableTorque(motorId);
+            return false;
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
 }
 
 bool DynamixelMotor::readPosition(int motorId, uint16_t& position)

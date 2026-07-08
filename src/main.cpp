@@ -1,7 +1,5 @@
 #include <iostream>
 #include <vector>
-#include <thread>
-#include <chrono>
 #include "dynamixel_motor.h"
 
 int main()
@@ -60,77 +58,26 @@ int main()
     std::cout << "\nAll motors are inside safe ranges." << std::endl;
 
     const int testMotorId = 5;
-    const uint16_t targetPosition = 1200;
+    const uint16_t targetPosition = 2260;
     const uint16_t movingSpeed = 50;
 
-    uint16_t startPosition = 0;
-    if (!motor.readPosition(testMotorId, startPosition))
-    {
-        std::cerr << "Could not read starting position for motor "
-                  << testMotorId << std::endl;
-
-        motor.disconnect();
-        return 1;
-    }
-
-    std::cout << "\nMotor " << testMotorId
-              << " starting position: " << startPosition << std::endl;
-
-    if (!motor.isPositionSafe(testMotorId, targetPosition))
-    {
-        std::cerr << "Target position is not safe. Command cancelled." << std::endl;
-
-        motor.disconnect();
-        return 1;
-    }
-
-    std::cout << "Target position: " << targetPosition << std::endl;
-    std::cout << "Moving speed: " << movingSpeed << std::endl;
-
     std::cout << "\nMake sure the arm is clear and your hand is near the power switch." << std::endl;
-    std::cout << "Press Enter to enable torque and move motor "
-              << testMotorId << "...";
+    std::cout << "Press Enter to move motor " << testMotorId << "...";
     std::cin.get();
 
-    if (!motor.enableTorque(testMotorId))
-    {
-        std::cerr << "Failed to enable torque on motor "
-                  << testMotorId << std::endl;
+    bool success = motor.moveJointSafely(
+        testMotorId,
+        targetPosition,
+        movingSpeed
+    );
 
+    if (!success)
+    {
+        std::cerr << "Safe movement failed or was stopped." << std::endl;
         motor.disconnect();
         return 1;
     }
 
-    if (!motor.setMovingSpeed(testMotorId, movingSpeed))
-    {
-        std::cerr << "Failed to set moving speed." << std::endl;
-
-        motor.disableTorque(testMotorId);
-        motor.disconnect();
-        return 1;
-    }
-
-    if (!motor.setGoalPosition(testMotorId, targetPosition))
-    {
-        std::cerr << "Movement command rejected." << std::endl;
-
-        motor.disableTorque(testMotorId);
-        motor.disconnect();
-        return 1;
-    }
-
-    std::cout << "Move command sent. Waiting 5 seconds..." << std::endl;
-
-    std::this_thread::sleep_for(std::chrono::seconds(5));
-
-    uint16_t finalPosition = 0;
-    if (motor.readPosition(testMotorId, finalPosition))
-    {
-        std::cout << "Motor " << testMotorId
-                  << " final position: " << finalPosition << std::endl;
-    }
-
-    motor.disableTorque(testMotorId);
     motor.disconnect();
 
     return 0;

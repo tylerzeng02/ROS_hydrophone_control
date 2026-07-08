@@ -190,4 +190,10 @@ CMakeFiles/cyton_setup.dir/src/dynamixel_motor.cpp.o: \
  /usr/include/c++/12/tr1/modified_bessel_func.tcc \
  /usr/include/c++/12/tr1/poly_hermite.tcc \
  /usr/include/c++/12/tr1/poly_laguerre.tcc \
- /usr/include/c++/12/tr1/riemann_zeta.tcc
+ /usr/include/c++/12/tr1/riemann_zeta.tcc /usr/include/c++/12/thread \
+ /usr/include/c++/12/bits/std_thread.h \
+ /usr/include/c++/12/bits/unique_ptr.h \
+ /usr/include/c++/12/bits/this_thread_sleep.h \
+ /usr/include/c++/12/bits/chrono.h /usr/include/c++/12/ratio \
+ /usr/include/c++/12/ctime /usr/include/c++/12/bits/parse_numbers.h \
+ /usr/include/c++/12/chrono
