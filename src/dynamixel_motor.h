@@ -64,6 +64,26 @@ public:
     bool isPositionSafe(int motorId, uint16_t position) const;
 
     std::string getLastElectricalSnapshot() const;
+
+    bool moveTrajectory(
+        const std::vector<std::vector<uint16_t>>& trajectory,
+        uint16_t speed,
+        int tolerance = 15,
+        int timeoutSeconds = 10,
+        bool holdTorque = true
+    );
+
+    void emergencyShutdown(const std::vector<int>& motorIds);
+
+    int jointNameToMotorId(const std::string& jointName) const;
+
+    bool moveNamedJointRadians(
+        const std::string& jointName,
+        double radians,
+        uint16_t speed,
+        int tolerance = 15,
+        int timeoutSeconds = 8
+    );
     
 private:
     const char* deviceName_;
@@ -95,6 +115,7 @@ private:
 
     std::string lastElectricalSnapshot_;
     std::string buildElectricalSnapshot(const std::vector<int>& motorIds);
+    std::vector<std::string> jointNames_;
 };
 
 #endif

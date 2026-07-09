@@ -33,7 +33,7 @@ int main()
                 motor.disableTorque(disableId);
             }
 
-            motor.disconnect();
+            motor.emergencyShutdown(motorIds);
             return 1;
         }
     }
@@ -78,7 +78,7 @@ int main()
             motor.disableTorque(id);
         }
 
-        motor.disconnect();
+        motor.emergencyShutdown(motorIds);
         return 1;
     }
 
@@ -115,17 +115,12 @@ int main()
     std::cout << "Press Enter to move to test pose 1...";
     std::cin.get();
 
-    for (size_t i = 0; i < trajectoryToTestPose1.size(); ++i)
-        {
-            std::cout << "\nMoving to trajectory point " << i << "..." << std::endl;
-
-            if (!motor.moveToPose(trajectoryToTestPose1[i], movingSpeed, 15, 20, true))
-            {
-                std::cerr << "Failed to move to trajectory point " << i << std::endl;
-                motor.disconnect();
-                return 1;
-            }
-        }
+    if (!motor.moveTrajectory(trajectoryToTestPose1, movingSpeed, 15, 20, true))
+    {
+        std::cerr << "Failed to complete trajectory to test pose 1." << std::endl;
+        motor.emergencyShutdown(motorIds);
+        return 1;
+    }
     std::string testPose1ElectricalSnapshot = motor.getLastElectricalSnapshot();
 
     std::cout << "\nTest pose 1 reached." << std::endl;
@@ -133,10 +128,10 @@ int main()
     std::cout << "Press Enter to move back to home pose...";
     std::cin.get();
 
-    if (!motor.moveToPose(homePose, movingSpeed, 13, 20, true))
+    if (!motor.moveToPose(homePose, movingSpeed, 15, 20, true))
     {
         std::cerr << "Failed to move back to home pose." << std::endl;
-        motor.disconnect();
+        motor.emergencyShutdown(motorIds);
         return 1;
     }
 
@@ -161,7 +156,7 @@ int main()
         motor.disableTorque(id);
     }
 
-    motor.disconnect();
+    motor.emergencyShutdown(motorIds);
 
     return 0;
 }

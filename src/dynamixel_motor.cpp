@@ -16,14 +16,29 @@ int getMotorTolerance(int motorId)
     return 10; // main arm joints stay more accurate
 }
 
-DynamixelMotor::DynamixelMotor(const char* deviceName, int baudRate, float protocolVersion)
+DynamixelMotor::DynamixelMotor(
+    const char* deviceName,
+    int baudRate,
+    float protocolVersion
+)
     : deviceName_(deviceName),
       baudRate_(baudRate),
       protocolVersion_(protocolVersion),
-      connected_(false),
-      portHandler_(dynamixel::PortHandler::getPortHandler(deviceName)),
-      packetHandler_(dynamixel::PacketHandler::getPacketHandler(protocolVersion))
+      connected_(false)
 {
+    portHandler_ = dynamixel::PortHandler::getPortHandler(deviceName_);
+    packetHandler_ = dynamixel::PacketHandler::getPacketHandler(protocolVersion_);
+
+    jointNames_ = {
+        "joint0",
+        "joint1",
+        "joint2",
+        "joint3",
+        "joint4",
+        "joint5",
+        "joint6",
+        "joint7"
+    };
 }
 
 DynamixelMotor::~DynamixelMotor()
@@ -671,6 +686,87 @@ bool DynamixelMotor::moveToPose(
         timeoutSeconds,
         holdTorque
     );
+}
+
+int DynamixelMotor::jointNameToMotorId(const std::string& jointName) const
+{
+    for (size_t i = 0; i < jointNames_.size(); ++i)
+    {
+        if (jointNames_[i] == jointName)
+        {
+            return static_cast<int>(i);
+        }
+    }
+
+    std::cerr << "Unknown joint name: " << jointName << std::endl;
+    return -1;
+}
+
+bool DynamixelMotor::moveNamedJointRadians(
+    const std::string& jointName,
+    double radians,
+    uint16_t speed,
+    int tolerance,
+    int timeoutSeconds
+)
+{
+    int motorId = jointNameToMotorId(jointName);
+
+    if (motorId < 0)
+    {
+        return false;
+    }
+
+    uint16_t rawPosition = radiansToRawPosition(radians);
+
+    return moveJointSafely(
+        motorId,
+        rawPosition,
+        speed,
+        tolerance,
+        timeoutSeconds
+    );
+}
+
+bool DynamixelMotor::moveTrajectory(
+    const std::vector<std::vector<uint16_t>>& trajectory,
+    uint16_t speed,
+    int tolerance,
+    int timeoutSeconds,
+    bool holdTorque
+)
+{
+    if (trajectory.empty())
+    {
+        std::cerr << "Trajectory is empty." << std::endl;
+        return false;
+    }
+
+    for (size_t i = 0; i < trajectory.size(); ++i)
+    {
+        std::cout << "\nMoving to trajectory point " << i << "..." << std::endl;
+
+        if (!moveToPose(trajectory[i], speed, tolerance, timeoutSeconds, holdTorque))
+        {
+            std::cerr << "Failed at trajectory point " << i << std::endl;
+            return false;
+        }
+    }
+
+    std::cout << "\nTrajectory complete." << std::endl;
+    return true;
+}
+
+void DynamixelMotor::emergencyShutdown(const std::vector<int>& motorIds)
+{
+    std::cerr << "\nEMERGENCY SHUTDOWN: disabling torque on all motors." << std::endl;
+
+    for (int id : motorIds)
+    {
+        disableTorque(id);
+    }
+
+    disconnect();
 }
 
 bool DynamixelMotor::readPosition(int motorId, uint16_t& position)
