@@ -905,6 +905,37 @@ bool DynamixelMotor::moveJointRadians(int motorId, double radians)
     return setGoalPosition(motorId, rawPosition);
 }
 
+bool DynamixelMotor::moveJointRadiansPose(
+    const std::vector<double>& jointRadians,
+    uint16_t speed,
+    int tolerance,
+    int timeoutSeconds,
+    bool holdTorque
+)
+{
+    if (jointRadians.size() != 8)
+    {
+        std::cerr << "Radians pose must contain exactly 8 joint angles." << std::endl;
+        std::cerr << "Received " << jointRadians.size() << " angles." << std::endl;
+        return false;
+    }
+
+    std::vector<uint16_t> rawPositions;
+
+    for (double radians : jointRadians)
+    {
+        rawPositions.push_back(radiansToRawPosition(radians));
+    }
+
+    return moveToPose(
+        rawPositions,
+        speed,
+        tolerance,
+        timeoutSeconds,
+        holdTorque
+    );
+}
+
 double DynamixelMotor::rawPositionToRadians(uint16_t rawPosition) const
 {
     if (rawPosition > MAX_RAW_POSITION)
