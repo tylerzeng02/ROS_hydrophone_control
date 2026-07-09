@@ -59,6 +59,14 @@ public:
 
     bool moveJointRadians(int motorId, double radians);
 
+    bool moveJointRadiansPose(
+        const std::vector<double>& jointRadians,
+        uint16_t speed,
+        int tolerance = 15,
+        int timeoutSeconds = 10,
+        bool holdTorque = true
+    );
+
     double rawPositionToRadians(uint16_t rawPosition) const;
     uint16_t radiansToRawPosition(double radians) const;
     bool isPositionSafe(int motorId, uint16_t position) const;

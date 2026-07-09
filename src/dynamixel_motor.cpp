@@ -1,4 +1,6 @@
 #include "dynamixel_motor.h"
+#include "robot_calibration.h"
+
 #include <iostream>
 #include <cmath>
 #include <thread>
@@ -901,7 +903,27 @@ bool DynamixelMotor::printElectricalStatusForMotors(const std::vector<int>& moto
 
 bool DynamixelMotor::moveJointRadians(int motorId, double radians)
 {
-    uint16_t rawPosition = radiansToRawPosition(radians);
+    if (motorId < 0 || motorId >= static_cast<int>(jointCalibrations.size()))
+    {
+        std::cerr << "Invalid motor ID for radians move: " << motorId << std::endl;
+        return false;
+    }
+
+    const JointCalibration& joint = jointCalibrations[motorId];
+
+    uint16_t rawPosition = static_cast<uint16_t>(
+        radiansToTicks(joint, radians)
+    );
+
+    if (!isPositionWithinLimit(motorId, rawPosition))
+    {
+        std::cerr << "Radians command converted to unsafe raw position."
+                  << " Motor ID: " << motorId
+                  << " Raw position: " << rawPosition
+                  << std::endl;
+        return false;
+    }
+
     return setGoalPosition(motorId, rawPosition);
 }
 
@@ -913,18 +935,38 @@ bool DynamixelMotor::moveJointRadiansPose(
     bool holdTorque
 )
 {
-    if (jointRadians.size() != 8)
+    if (jointRadians.size() != jointCalibrations.size())
     {
-        std::cerr << "Radians pose must contain exactly 8 joint angles." << std::endl;
-        std::cerr << "Received " << jointRadians.size() << " angles." << std::endl;
+        std::cerr << "Radians pose must contain exactly "
+                  << jointCalibrations.size()
+                  << " joint angles." << std::endl;
+
+        std::cerr << "Received " << jointRadians.size()
+                  << " angles." << std::endl;
+
         return false;
     }
 
     std::vector<uint16_t> rawPositions;
 
-    for (double radians : jointRadians)
+    for (size_t i = 0; i < jointRadians.size(); ++i)
     {
-        rawPositions.push_back(radiansToRawPosition(radians));
+        const JointCalibration& joint = jointCalibrations[i];
+
+        uint16_t rawPosition = static_cast<uint16_t>(
+            radiansToTicks(joint, jointRadians[i])
+        );
+
+        if (!isPositionWithinLimit(joint.id, rawPosition))
+        {
+            std::cerr << "Radians pose contains unsafe target."
+                      << " Motor ID: " << joint.id
+                      << " Raw position: " << rawPosition
+                      << std::endl;
+            return false;
+        }
+
+        rawPositions.push_back(rawPosition);
     }
 
     return moveToPose(
