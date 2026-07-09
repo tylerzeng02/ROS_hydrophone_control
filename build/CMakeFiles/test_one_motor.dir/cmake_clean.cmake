@@ -1,4 +1,8 @@
 file(REMOVE_RECURSE
+  "CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.o"
+  "CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.o.d"
+  "CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.o"
+  "CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.o.d"
   "CMakeFiles/test_one_motor.dir/src/test_one_motor.cpp.o"
   "CMakeFiles/test_one_motor.dir/src/test_one_motor.cpp.o.d"
   "test_one_motor"

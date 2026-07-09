@@ -3,6 +3,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/cyton_setup.dir/src/dynamixel_motor.cpp.o.d"
   "CMakeFiles/cyton_setup.dir/src/main.cpp.o"
   "CMakeFiles/cyton_setup.dir/src/main.cpp.o.d"
+  "CMakeFiles/cyton_setup.dir/src/robot_calibration.cpp.o"
+  "CMakeFiles/cyton_setup.dir/src/robot_calibration.cpp.o.d"
   "cyton_setup"
   "cyton_setup.pdb"
 )

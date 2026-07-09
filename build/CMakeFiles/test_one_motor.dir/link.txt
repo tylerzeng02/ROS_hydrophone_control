@@ -1,1 +1,1 @@
-/usr/bin/c++ CMakeFiles/test_one_motor.dir/src/test_one_motor.cpp.o -o test_one_motor  -ldxl_x64_cpp
+/usr/bin/c++ CMakeFiles/test_one_motor.dir/src/test_one_motor.cpp.o CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.o CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.o -o test_one_motor  -ldxl_x64_cpp

@@ -719,7 +719,27 @@ bool DynamixelMotor::moveNamedJointRadians(
         return false;
     }
 
-    uint16_t rawPosition = radiansToRawPosition(radians);
+    if (motorId >= static_cast<int>(jointCalibrations.size()))
+    {
+        std::cerr << "Invalid motor ID for named radians move: "
+                  << motorId << std::endl;
+        return false;
+    }
+
+    const JointCalibration& joint = jointCalibrations[motorId];
+
+    uint16_t rawPosition = static_cast<uint16_t>(
+        radiansToTicks(joint, radians)
+    );
+
+    if (!isPositionWithinLimit(motorId, rawPosition))
+    {
+        std::cerr << "Named radians command converted to unsafe raw position."
+                  << " Motor ID: " << motorId
+                  << " Raw position: " << rawPosition
+                  << std::endl;
+        return false;
+    }
 
     return moveJointSafely(
         motorId,

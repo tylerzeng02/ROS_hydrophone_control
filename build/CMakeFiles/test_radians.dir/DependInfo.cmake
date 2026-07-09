@@ -8,9 +8,9 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/home/tzeng/cyton_setup/src/dynamixel_motor.cpp" "CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.o" "gcc" "CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.o.d"
-  "/home/tzeng/cyton_setup/src/robot_calibration.cpp" "CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.o" "gcc" "CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.o.d"
-  "/home/tzeng/cyton_setup/src/test_one_motor.cpp" "CMakeFiles/test_one_motor.dir/src/test_one_motor.cpp.o" "gcc" "CMakeFiles/test_one_motor.dir/src/test_one_motor.cpp.o.d"
+  "/home/tzeng/cyton_setup/src/dynamixel_motor.cpp" "CMakeFiles/test_radians.dir/src/dynamixel_motor.cpp.o" "gcc" "CMakeFiles/test_radians.dir/src/dynamixel_motor.cpp.o.d"
+  "/home/tzeng/cyton_setup/src/robot_calibration.cpp" "CMakeFiles/test_radians.dir/src/robot_calibration.cpp.o" "gcc" "CMakeFiles/test_radians.dir/src/robot_calibration.cpp.o.d"
+  "/home/tzeng/cyton_setup/tests/test_radians.cpp" "CMakeFiles/test_radians.dir/tests/test_radians.cpp.o" "gcc" "CMakeFiles/test_radians.dir/tests/test_radians.cpp.o.d"
   )
 
 # Targets to which this target links which contain Fortran sources.

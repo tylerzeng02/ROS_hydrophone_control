@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/test_radians.dir/tests/test_radians.cpp.o CMakeFiles/test_radians.dir/src/dynamixel_motor.cpp.o CMakeFiles/test_radians.dir/src/robot_calibration.cpp.o -o test_radians  -ldxl_x64_cpp

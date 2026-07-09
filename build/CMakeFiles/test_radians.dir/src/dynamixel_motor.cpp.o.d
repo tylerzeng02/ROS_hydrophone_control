@@ -1,4 +1,4 @@
-CMakeFiles/cyton_setup.dir/src/dynamixel_motor.cpp.o: \
+CMakeFiles/test_radians.dir/src/dynamixel_motor.cpp.o: \
  /home/tzeng/cyton_setup/src/dynamixel_motor.cpp \
  /usr/include/stdc-predef.h /home/tzeng/cyton_setup/src/dynamixel_motor.h \
  /usr/include/c++/12/cstdint \

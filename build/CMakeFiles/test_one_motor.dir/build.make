@@ -86,17 +86,49 @@ CMakeFiles/test_one_motor.dir/src/test_one_motor.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/test_one_motor.dir/src/test_one_motor.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/tzeng/cyton_setup/src/test_one_motor.cpp -o CMakeFiles/test_one_motor.dir/src/test_one_motor.cpp.s
 
+CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.o: CMakeFiles/test_one_motor.dir/flags.make
+CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.o: /home/tzeng/cyton_setup/src/dynamixel_motor.cpp
+CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.o: CMakeFiles/test_one_motor.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/tzeng/cyton_setup/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.o -MF CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.o.d -o CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.o -c /home/tzeng/cyton_setup/src/dynamixel_motor.cpp
+
+CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/tzeng/cyton_setup/src/dynamixel_motor.cpp > CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.i
+
+CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/tzeng/cyton_setup/src/dynamixel_motor.cpp -o CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.s
+
+CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.o: CMakeFiles/test_one_motor.dir/flags.make
+CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.o: /home/tzeng/cyton_setup/src/robot_calibration.cpp
+CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.o: CMakeFiles/test_one_motor.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/home/tzeng/cyton_setup/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.o"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.o -MF CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.o.d -o CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.o -c /home/tzeng/cyton_setup/src/robot_calibration.cpp
+
+CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.i"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/tzeng/cyton_setup/src/robot_calibration.cpp > CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.i
+
+CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.s"
+	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/tzeng/cyton_setup/src/robot_calibration.cpp -o CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.s
+
 # Object files for target test_one_motor
 test_one_motor_OBJECTS = \
-"CMakeFiles/test_one_motor.dir/src/test_one_motor.cpp.o"
+"CMakeFiles/test_one_motor.dir/src/test_one_motor.cpp.o" \
+"CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.o" \
+"CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.o"
 
 # External object files for target test_one_motor
 test_one_motor_EXTERNAL_OBJECTS =
 
 test_one_motor: CMakeFiles/test_one_motor.dir/src/test_one_motor.cpp.o
+test_one_motor: CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.o
+test_one_motor: CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.o
 test_one_motor: CMakeFiles/test_one_motor.dir/build.make
 test_one_motor: CMakeFiles/test_one_motor.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/tzeng/cyton_setup/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable test_one_motor"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/tzeng/cyton_setup/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Linking CXX executable test_one_motor"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/test_one_motor.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.
