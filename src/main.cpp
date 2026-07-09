@@ -91,25 +91,19 @@ int main()
     // {0, 1, 2, 3, 4, 5, 6, 7}
 
     std::vector<uint16_t> homePose = {
-        2015,
-        857,
-        935,
-        3239,
-        1200,
-        3087,
-        1967,
-        3077
+        2015, 857, 935, 3239, 1200, 3087, 1967, 2350
     };
 
     std::vector<uint16_t> testPose1 = {
-       1700,
-       1157,
-       1180,
-       3000,
-       1050,
-       3140,
-       1950,
-       2900
+        1776, 2408, 1144, 2991, 1495, 2312, 1759, 2350
+    };
+
+    std::vector<std::vector<uint16_t>> trajectoryToTestPose1 = {
+        homePose,
+        {1955, 1245, 987, 3177, 1274, 2893, 1915, 2350},
+        {1896, 1633, 1040, 3115, 1348, 2700, 1863, 2350},
+        {1836, 2020, 1092, 3053, 1421, 2506, 1811, 2350},
+        testPose1
     };
 
     const uint16_t movingSpeed = 20;
@@ -121,13 +115,17 @@ int main()
     std::cout << "Press Enter to move to test pose 1...";
     std::cin.get();
 
-    if (!motor.moveToPose(testPose1, movingSpeed, 13, 20, true))
-    {
-        std::cerr << "Failed to move to test pose 1." << std::endl;
-        motor.disconnect();
-        return 1;
-    }
+    for (size_t i = 0; i < trajectoryToTestPose1.size(); ++i)
+        {
+            std::cout << "\nMoving to trajectory point " << i << "..." << std::endl;
 
+            if (!motor.moveToPose(trajectoryToTestPose1[i], movingSpeed, 15, 20, true))
+            {
+                std::cerr << "Failed to move to trajectory point " << i << std::endl;
+                motor.disconnect();
+                return 1;
+            }
+        }
     std::string testPose1ElectricalSnapshot = motor.getLastElectricalSnapshot();
 
     std::cout << "\nTest pose 1 reached." << std::endl;
