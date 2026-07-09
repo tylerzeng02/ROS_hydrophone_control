@@ -4,6 +4,7 @@
 #include <thread>
 #include <chrono>
 #include <vector>
+#include <string>
 
 int getMotorTolerance(int motorId)
 {
@@ -65,6 +66,63 @@ void DynamixelMotor::disconnect()
     }
 }
 
+std::string DynamixelMotor::getLastElectricalSnapshot() const
+{
+    return lastElectricalSnapshot_;
+}
+
+std::string DynamixelMotor::buildElectricalSnapshot(const std::vector<int>& motorIds)
+{
+    std::string snapshot;
+
+    for (int id : motorIds)
+    {
+        uint8_t voltageRaw = 0;
+        uint16_t loadRaw = 0;
+        uint8_t temperature = 0;
+
+        bool voltageOk = readVoltage(id, voltageRaw);
+        bool loadOk = readLoad(id, loadRaw);
+        bool tempOk = readTemperature(id, temperature);
+
+        snapshot += "Motor " + std::to_string(id);
+
+        if (voltageOk)
+        {
+            double voltage = voltageRaw / 10.0;
+            snapshot += " | Voltage: " + std::to_string(voltage) + " V";
+        }
+        else
+        {
+            snapshot += " | Voltage: READ FAILED";
+        }
+
+        if (loadOk)
+        {
+            int loadMagnitude = loadRaw & 0x03FF;
+            double loadPercent = (static_cast<double>(loadMagnitude) / 1023.0) * 100.0;
+            snapshot += " | Load: " + std::to_string(loadPercent) + "%";
+        }
+        else
+        {
+            snapshot += " | Load: READ FAILED";
+        }
+
+        if (tempOk)
+        {
+            snapshot += " | Temp: " + std::to_string(static_cast<int>(temperature)) + " C";
+        }
+        else
+        {
+            snapshot += " | Temp: READ FAILED";
+        }
+
+        snapshot += "\n";
+    }
+
+    return snapshot;
+}
+
 bool DynamixelMotor::checkCommResult(int commResult, uint8_t dxlError, int motorId, const char* action)
 {
     if (commResult != COMM_SUCCESS)
@@ -104,7 +162,7 @@ bool DynamixelMotor::isPositionWithinLimit(int motorId, uint16_t position) const
             return position >= 855 && position <= 3245;
 
         case 4:
-            return position >= 855 && position <= 3245;
+            return position >= 1034 && position <= 3245;
 
         case 5:
             return position >= 855 && position <= 3245;
@@ -369,6 +427,8 @@ bool DynamixelMotor::moveJointsSafely(
         return false;
     }
 
+    int initialTotalError = 0;
+
     for (size_t i = 0; i < motorIds.size(); ++i)
     {
         int motorId = motorIds[i];
@@ -398,6 +458,15 @@ bool DynamixelMotor::moveJointsSafely(
                       << motorId << std::endl;
             return false;
         }
+
+        int startError = static_cast<int>(targetPosition) - static_cast<int>(currentPosition);
+
+        if (startError < 0)
+        {
+            startError = -startError;
+        }
+
+        initialTotalError += startError;
 
         std::cout << "Motor " << motorId
                   << " starting position: " << currentPosition << std::endl;
@@ -452,9 +521,13 @@ bool DynamixelMotor::moveJointsSafely(
 
     auto startTime = std::chrono::steady_clock::now();
 
+    bool midSnapshotCaptured = false;
+    lastElectricalSnapshot_.clear();
+
     while (true)
     {
         bool allReached = true;
+        int currentTotalError = 0;
 
         for (size_t i = 0; i < motorIds.size(); ++i)
         {
@@ -497,20 +570,44 @@ bool DynamixelMotor::moveJointsSafely(
                 error = -error;
             }
 
+            currentTotalError += error;
+
+            int motorTolerance = tolerance;
+
+            if (motorId == 7)
+            {
+                motorTolerance = 35;
+            }
+
             std::cout << "Motor " << motorId
                       << " | Current: " << currentPosition
                       << " | Target: " << targetPosition
-                      << " | Error: " << error << std::endl;
+                      << " | Error: " << error
+                      << " | Tolerance: " << motorTolerance
+                      << std::endl;
 
-            if (error > tolerance)
+            if (error > motorTolerance)
             {
                 allReached = false;
             }
         }
 
+        if (!midSnapshotCaptured && initialTotalError > 0 &&
+            currentTotalError <= initialTotalError / 2)
+        {
+            lastElectricalSnapshot_ = buildElectricalSnapshot(motorIds);
+            midSnapshotCaptured = true;
+        }
+
         if (allReached)
         {
             std::cout << "All target positions reached." << std::endl;
+
+            if (!midSnapshotCaptured)
+            {
+                lastElectricalSnapshot_ = buildElectricalSnapshot(motorIds);
+                midSnapshotCaptured = true;
+            }
 
             if (!holdTorque)
             {
@@ -649,6 +746,61 @@ bool DynamixelMotor::readTemperature(int motorId, uint8_t& temperature)
     );
 
     return checkCommResult(commResult, dxlError, motorId, "Read temperature");
+}
+
+bool DynamixelMotor::printElectricalStatus(int motorId)
+{
+    uint8_t voltageRaw = 0;
+    uint16_t loadRaw = 0;
+    uint8_t temperature = 0;
+
+    if (!readVoltage(motorId, voltageRaw))
+    {
+        std::cerr << "Failed to read voltage for motor " << motorId << std::endl;
+        return false;
+    }
+
+    if (!readLoad(motorId, loadRaw))
+    {
+        std::cerr << "Failed to read load for motor " << motorId << std::endl;
+        return false;
+    }
+
+    if (!readTemperature(motorId, temperature))
+    {
+        std::cerr << "Failed to read temperature for motor " << motorId << std::endl;
+        return false;
+    }
+
+    double voltage = voltageRaw / 10.0;
+
+    int loadMagnitude = loadRaw & 0x03FF;
+    bool loadDirection = loadRaw & 0x0400;
+    double loadPercent = (static_cast<double>(loadMagnitude) / 1023.0) * 100.0;
+
+    std::cout << "Motor " << motorId
+              << " | Voltage: " << voltage << " V"
+              << " | Load: " << loadPercent << "%"
+              << " | Load direction: " << (loadDirection ? "CW" : "CCW")
+              << " | Temp: " << static_cast<int>(temperature) << " C"
+              << std::endl;
+
+    return true;
+}
+
+bool DynamixelMotor::printElectricalStatusForMotors(const std::vector<int>& motorIds)
+{
+    bool allOk = true;
+
+    for (int id : motorIds)
+    {
+        if (!printElectricalStatus(id))
+        {
+            allOk = false;
+        }
+    }
+
+    return allOk;
 }
 
 bool DynamixelMotor::moveJointRadians(int motorId, double radians)

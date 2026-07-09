@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <string>
 #include "dynamixel_motor.h"
 
 int main()
@@ -17,7 +18,28 @@ int main()
 
     std::vector<int> motorIds = {0, 1, 2, 3, 4, 5, 6, 7};
 
-    std::cout << "\nChecking all motor positions before enabling torque..." << std::endl;
+    std::cout << "\nMake sure the arm is clear." << std::endl;
+    std::cout << "Press Enter to enable torque on all motors...";
+    std::cin.get();
+
+    for (int id : motorIds)
+    {
+        if (!motor.enableTorque(id))
+        {
+            std::cerr << "Failed to enable torque on motor " << id << std::endl;
+
+            for (int disableId : motorIds)
+            {
+                motor.disableTorque(disableId);
+            }
+
+            motor.disconnect();
+            return 1;
+        }
+    }
+
+    std::cout << "\nTorque enabled on all motors." << std::endl;
+    std::cout << "\nChecking all motor positions after enabling torque..." << std::endl;
 
     bool allMotorsSafe = true;
 
@@ -48,14 +70,21 @@ int main()
     if (!allMotorsSafe)
     {
         std::cerr << "\nStartup safety check failed." << std::endl;
-        std::cerr << "Torque will NOT be enabled." << std::endl;
+        std::cerr << "Disabling torque." << std::endl;
         std::cerr << "Move the arm manually into a safe range first." << std::endl;
+
+        for (int id : motorIds)
+        {
+            motor.disableTorque(id);
+        }
 
         motor.disconnect();
         return 1;
     }
 
     std::cout << "\nAll motors are inside safe ranges." << std::endl;
+    std::cout << "\nElectrical status before movement:" << std::endl;
+    motor.printElectricalStatusForMotors(motorIds);
 
     // Named poses.
     // Motor order is always:
@@ -66,7 +95,7 @@ int main()
         857,
         935,
         3239,
-        989,
+        1200,
         3087,
         1967,
         3077
@@ -77,7 +106,7 @@ int main()
        1157,
        1180,
        3000,
-       930,
+       1050,
        3140,
        1950,
        2900
@@ -92,25 +121,40 @@ int main()
     std::cout << "Press Enter to move to test pose 1...";
     std::cin.get();
 
-    if (!motor.moveToPose(testPose1, movingSpeed, 25, 20, true))
+    if (!motor.moveToPose(testPose1, movingSpeed, 13, 20, true))
     {
         std::cerr << "Failed to move to test pose 1." << std::endl;
         motor.disconnect();
         return 1;
     }
 
-    std::cout << "\nPress Enter to move back to home pose...";
+    std::string testPose1ElectricalSnapshot = motor.getLastElectricalSnapshot();
+
+    std::cout << "\nTest pose 1 reached." << std::endl;
+    std::cout << "Torque is still enabled and holding position." << std::endl;
+    std::cout << "Press Enter to move back to home pose...";
     std::cin.get();
 
-    if (!motor.moveToPose(homePose, movingSpeed, 25, 20, true))
+    if (!motor.moveToPose(homePose, movingSpeed, 13, 20, true))
     {
         std::cerr << "Failed to move back to home pose." << std::endl;
         motor.disconnect();
         return 1;
     }
 
+    std::string homePoseElectricalSnapshot = motor.getLastElectricalSnapshot();
+
     std::cout << "\nHome pose reached." << std::endl;
     std::cout << "Torque is still enabled and holding position." << std::endl;
+
+    std::cout << "\n===== MID-MOVEMENT ELECTRICAL SNAPSHOTS =====" << std::endl;
+
+    std::cout << "\nDuring movement to testPose1:" << std::endl;
+    std::cout << testPose1ElectricalSnapshot << std::endl;
+
+    std::cout << "\nDuring movement back to homePose:" << std::endl;
+    std::cout << homePoseElectricalSnapshot << std::endl;
+
     std::cout << "Press Enter to disable torque and end program...";
     std::cin.get();
 

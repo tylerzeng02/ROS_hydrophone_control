@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <string>
 #include "dynamixel_sdk/dynamixel_sdk.h"
 
 class DynamixelMotor
@@ -19,7 +20,7 @@ public:
     bool enableTorque(int motorId);
     bool disableTorque(int motorId);
 
-   bool setGoalPosition(int motorId, uint16_t position);
+    bool setGoalPosition(int motorId, uint16_t position);
     bool setMovingSpeed(int motorId, uint16_t speed);
 
     bool moveJointSafely(
@@ -53,11 +54,16 @@ public:
     bool readVoltage(int motorId, uint8_t& voltage);
     bool readTemperature(int motorId, uint8_t& temperature);
 
+    bool printElectricalStatus(int motorId);
+    bool printElectricalStatusForMotors(const std::vector<int>& motorIds);
+
     bool moveJointRadians(int motorId, double radians);
 
     double rawPositionToRadians(uint16_t rawPosition) const;
     uint16_t radiansToRawPosition(double radians) const;
     bool isPositionSafe(int motorId, uint16_t position) const;
+
+    std::string getLastElectricalSnapshot() const;
     
 private:
     const char* deviceName_;
@@ -86,6 +92,9 @@ private:
 
     static const uint16_t MIN_RAW_POSITION = 0;
     static const uint16_t MAX_RAW_POSITION = 4095;
+
+    std::string lastElectricalSnapshot_;
+    std::string buildElectricalSnapshot(const std::vector<int>& motorIds);
 };
 
 #endif
