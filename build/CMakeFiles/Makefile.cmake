@@ -57,4 +57,5 @@ set(CMAKE_DEPEND_INFO_FILES
   "CMakeFiles/cyton_setup.dir/DependInfo.cmake"
   "CMakeFiles/test_one_motor.dir/DependInfo.cmake"
   "CMakeFiles/test_radians.dir/DependInfo.cmake"
+  "CMakeFiles/test_radians_pose.dir/DependInfo.cmake"
   )

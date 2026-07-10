@@ -32,3 +32,13 @@ add_executable(test_radians
 target_include_directories(test_radians PRIVATE src)
 
 target_link_libraries(test_radians dxl_x64_cpp)
+
+add_executable(test_radians_pose
+    tests/test_radians_pose.cpp
+    src/dynamixel_motor.cpp
+    src/robot_calibration.cpp
+)
+
+target_include_directories(test_radians_pose PRIVATE src)
+
+target_link_libraries(test_radians_pose dxl_x64_cpp)

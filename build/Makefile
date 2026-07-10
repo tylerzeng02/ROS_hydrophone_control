@@ -155,6 +155,19 @@ test_radians/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_radians.dir/build.make CMakeFiles/test_radians.dir/build
 .PHONY : test_radians/fast
 
+#=============================================================================
+# Target rules for targets named test_radians_pose
+
+# Build rule for target.
+test_radians_pose: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_radians_pose
+.PHONY : test_radians_pose
+
+# fast build rule for target.
+test_radians_pose/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_radians_pose.dir/build.make CMakeFiles/test_radians_pose.dir/build
+.PHONY : test_radians_pose/fast
+
 src/dynamixel_motor.o: src/dynamixel_motor.cpp.o
 .PHONY : src/dynamixel_motor.o
 
@@ -163,6 +176,7 @@ src/dynamixel_motor.cpp.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/cyton_setup.dir/build.make CMakeFiles/cyton_setup.dir/src/dynamixel_motor.cpp.o
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_one_motor.dir/build.make CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.o
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_radians.dir/build.make CMakeFiles/test_radians.dir/src/dynamixel_motor.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_radians_pose.dir/build.make CMakeFiles/test_radians_pose.dir/src/dynamixel_motor.cpp.o
 .PHONY : src/dynamixel_motor.cpp.o
 
 src/dynamixel_motor.i: src/dynamixel_motor.cpp.i
@@ -173,6 +187,7 @@ src/dynamixel_motor.cpp.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/cyton_setup.dir/build.make CMakeFiles/cyton_setup.dir/src/dynamixel_motor.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_one_motor.dir/build.make CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_radians.dir/build.make CMakeFiles/test_radians.dir/src/dynamixel_motor.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_radians_pose.dir/build.make CMakeFiles/test_radians_pose.dir/src/dynamixel_motor.cpp.i
 .PHONY : src/dynamixel_motor.cpp.i
 
 src/dynamixel_motor.s: src/dynamixel_motor.cpp.s
@@ -183,6 +198,7 @@ src/dynamixel_motor.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/cyton_setup.dir/build.make CMakeFiles/cyton_setup.dir/src/dynamixel_motor.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_one_motor.dir/build.make CMakeFiles/test_one_motor.dir/src/dynamixel_motor.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_radians.dir/build.make CMakeFiles/test_radians.dir/src/dynamixel_motor.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_radians_pose.dir/build.make CMakeFiles/test_radians_pose.dir/src/dynamixel_motor.cpp.s
 .PHONY : src/dynamixel_motor.cpp.s
 
 src/main.o: src/main.cpp.o
@@ -217,6 +233,7 @@ src/robot_calibration.cpp.o:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/cyton_setup.dir/build.make CMakeFiles/cyton_setup.dir/src/robot_calibration.cpp.o
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_one_motor.dir/build.make CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.o
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_radians.dir/build.make CMakeFiles/test_radians.dir/src/robot_calibration.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_radians_pose.dir/build.make CMakeFiles/test_radians_pose.dir/src/robot_calibration.cpp.o
 .PHONY : src/robot_calibration.cpp.o
 
 src/robot_calibration.i: src/robot_calibration.cpp.i
@@ -227,6 +244,7 @@ src/robot_calibration.cpp.i:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/cyton_setup.dir/build.make CMakeFiles/cyton_setup.dir/src/robot_calibration.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_one_motor.dir/build.make CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.i
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_radians.dir/build.make CMakeFiles/test_radians.dir/src/robot_calibration.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_radians_pose.dir/build.make CMakeFiles/test_radians_pose.dir/src/robot_calibration.cpp.i
 .PHONY : src/robot_calibration.cpp.i
 
 src/robot_calibration.s: src/robot_calibration.cpp.s
@@ -237,6 +255,7 @@ src/robot_calibration.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/cyton_setup.dir/build.make CMakeFiles/cyton_setup.dir/src/robot_calibration.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_one_motor.dir/build.make CMakeFiles/test_one_motor.dir/src/robot_calibration.cpp.s
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_radians.dir/build.make CMakeFiles/test_radians.dir/src/robot_calibration.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_radians_pose.dir/build.make CMakeFiles/test_radians_pose.dir/src/robot_calibration.cpp.s
 .PHONY : src/robot_calibration.cpp.s
 
 src/test_one_motor.o: src/test_one_motor.cpp.o
@@ -287,6 +306,30 @@ tests/test_radians.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_radians.dir/build.make CMakeFiles/test_radians.dir/tests/test_radians.cpp.s
 .PHONY : tests/test_radians.cpp.s
 
+tests/test_radians_pose.o: tests/test_radians_pose.cpp.o
+.PHONY : tests/test_radians_pose.o
+
+# target to build an object file
+tests/test_radians_pose.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_radians_pose.dir/build.make CMakeFiles/test_radians_pose.dir/tests/test_radians_pose.cpp.o
+.PHONY : tests/test_radians_pose.cpp.o
+
+tests/test_radians_pose.i: tests/test_radians_pose.cpp.i
+.PHONY : tests/test_radians_pose.i
+
+# target to preprocess a source file
+tests/test_radians_pose.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_radians_pose.dir/build.make CMakeFiles/test_radians_pose.dir/tests/test_radians_pose.cpp.i
+.PHONY : tests/test_radians_pose.cpp.i
+
+tests/test_radians_pose.s: tests/test_radians_pose.cpp.s
+.PHONY : tests/test_radians_pose.s
+
+# target to generate assembly for a file
+tests/test_radians_pose.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/test_radians_pose.dir/build.make CMakeFiles/test_radians_pose.dir/tests/test_radians_pose.cpp.s
+.PHONY : tests/test_radians_pose.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -298,6 +341,7 @@ help:
 	@echo "... cyton_setup"
 	@echo "... test_one_motor"
 	@echo "... test_radians"
+	@echo "... test_radians_pose"
 	@echo "... src/dynamixel_motor.o"
 	@echo "... src/dynamixel_motor.i"
 	@echo "... src/dynamixel_motor.s"
@@ -313,6 +357,9 @@ help:
 	@echo "... tests/test_radians.o"
 	@echo "... tests/test_radians.i"
 	@echo "... tests/test_radians.s"
+	@echo "... tests/test_radians_pose.o"
+	@echo "... tests/test_radians_pose.i"
+	@echo "... tests/test_radians_pose.s"
 .PHONY : help
 
 
