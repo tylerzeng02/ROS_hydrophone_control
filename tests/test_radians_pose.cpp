@@ -5,6 +5,26 @@
 #include "dynamixel_motor.h"
 #include "robot_calibration.h"
 
+std::vector<double> rawPoseToRadians(const std::vector<uint16_t>& rawPose)
+{
+    std::vector<double> radiansPose;
+
+    if (rawPose.size() != jointCalibrations.size())
+    {
+        std::cerr << "Raw pose size does not match joint calibration size." << std::endl;
+        return radiansPose;
+    }
+
+    for (size_t i = 0; i < rawPose.size(); ++i)
+    {
+        const JointCalibration& joint = jointCalibrations[i];
+        double radians = ticksToRadians(joint, rawPose[i]);
+        radiansPose.push_back(radians);
+    }
+
+    return radiansPose;
+}
+
 void printPoseTargets(const std::vector<double>& radiansPose)
 {
     std::cout << "\nRadians pose target conversion:" << std::endl;
@@ -55,6 +75,64 @@ bool poseTargetsAreSafe(
     return true;
 }
 
+bool trajectoryTargetsAreSafe(
+    DynamixelMotor& motor,
+    const std::vector<std::vector<double>>& trajectory
+)
+{
+    for (size_t i = 0; i < trajectory.size(); ++i)
+    {
+        if (!poseTargetsAreSafe(motor, trajectory[i]))
+        {
+            std::cerr << "Trajectory point " << i
+                      << " contains unsafe target." << std::endl;
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool moveRadiansTrajectory(
+    DynamixelMotor& motor,
+    const std::vector<std::vector<double>>& trajectory,
+    uint16_t speed,
+    int tolerance,
+    int timeoutSeconds,
+    bool holdTorque
+)
+{
+    if (trajectory.empty())
+    {
+        std::cerr << "Radians trajectory is empty." << std::endl;
+        return false;
+    }
+
+    for (size_t i = 0; i < trajectory.size(); ++i)
+    {
+        std::cout << "\nMoving to radians trajectory point "
+                  << i << "..." << std::endl;
+
+        printPoseTargets(trajectory[i]);
+
+        if (!motor.moveJointRadiansPose(
+                trajectory[i],
+                speed,
+                tolerance,
+                timeoutSeconds,
+                holdTorque
+            ))
+        {
+            std::cerr << "Failed at radians trajectory point "
+                      << i << std::endl;
+            return false;
+        }
+    }
+
+    std::cout << "\nRadians trajectory complete." << std::endl;
+    return true;
+}
+
 int main()
 {
     const char* DEVICENAME = "/dev/ttyUSB0";
@@ -69,58 +147,84 @@ int main()
         return 1;
     }
 
-    const uint16_t speed = 30;
+    const uint16_t speed = 25;
     const int homeTolerance = 15;
-    const int poseTolerance = 15;
-    const int timeoutSeconds = 20;
+    const int trajectoryTolerance = 20;
+    const int timeoutSeconds = 25;
     const bool holdTorque = true;
 
     std::vector<int> motorIds = {0, 1, 2, 3, 4, 5, 6, 7};
 
-    std::vector<double> homeRadians = {
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+    std::vector<uint16_t> homePoseRaw = {
+        2015, 857, 935, 3239, 1200, 3087, 1967, 2350
     };
 
-    // Small safe pose based on the directions you successfully tested.
-    // Motor 7/gripper stays at 0.0 for now.
-    std::vector<double> smallPose = {
-        -0.05,  // motor 0
-         0.05,  // motor 1
-         0.05,  // motor 2
-        -0.05,  // motor 3
-        -0.05,  // motor 4
-         0.05,  // motor 5
-         0.05,  // motor 6
-         0.0    // motor 7
+    std::vector<uint16_t> testPose1Raw = {
+        1776, 2408, 1144, 2991, 1495, 2312, 1759, 2350
     };
 
-    std::cout << "\n===== FULL RADIANS POSE TEST =====" << std::endl;
+    std::vector<std::vector<uint16_t>> rawTrajectoryToTestPose1 = {
+        homePoseRaw,
+        {1955, 1245, 987, 3177, 1274, 2893, 1915, 2350},
+        {1896, 1633, 1040, 3115, 1348, 2700, 1863, 2350},
+        {1836, 2020, 1092, 3053, 1421, 2506, 1811, 2350},
+        testPose1Raw
+    };
+
+    std::vector<std::vector<double>> radiansTrajectoryToTestPose1;
+
+    for (const auto& rawPose : rawTrajectoryToTestPose1)
+    {
+        radiansTrajectoryToTestPose1.push_back(
+            rawPoseToRadians(rawPose)
+        );
+    }
+
+    std::vector<std::vector<double>> radiansTrajectoryBackHome;
+
+    for (auto it = radiansTrajectoryToTestPose1.rbegin();
+         it != radiansTrajectoryToTestPose1.rend();
+         ++it)
+    {
+        radiansTrajectoryBackHome.push_back(*it);
+    }
+
+    std::vector<double> homeRadians = rawPoseToRadians(homePoseRaw);
+    std::vector<double> testPose1Radians = rawPoseToRadians(testPose1Raw);
+
+    std::cout << "\n===== FULL RADIANS TRAJECTORY TEST =====" << std::endl;
     std::cout << "Speed: " << speed << std::endl;
     std::cout << "Home tolerance: " << homeTolerance << std::endl;
-    std::cout << "Pose tolerance: " << poseTolerance << std::endl;
+    std::cout << "Trajectory tolerance: " << trajectoryTolerance << std::endl;
 
-    std::cout << "\nHome pose targets:" << std::endl;
+    std::cout << "\nHome pose:" << std::endl;
     printPoseTargets(homeRadians);
 
-    std::cout << "\nSmall pose targets:" << std::endl;
-    printPoseTargets(smallPose);
+    std::cout << "\nTest pose 1:" << std::endl;
+    printPoseTargets(testPose1Radians);
 
-    if (!poseTargetsAreSafe(motor, homeRadians))
+    if (!trajectoryTargetsAreSafe(motor, radiansTrajectoryToTestPose1))
     {
-        std::cerr << "Home radians pose contains unsafe target. Cancelling." << std::endl;
+        std::cerr << "Trajectory to test pose 1 contains unsafe targets. Cancelling."
+                  << std::endl;
         motor.disconnect();
         return 1;
     }
 
-    if (!poseTargetsAreSafe(motor, smallPose))
+    if (!trajectoryTargetsAreSafe(motor, radiansTrajectoryBackHome))
     {
-        std::cerr << "Small radians pose contains unsafe target. Cancelling." << std::endl;
+        std::cerr << "Trajectory back home contains unsafe targets. Cancelling."
+                  << std::endl;
         motor.disconnect();
         return 1;
     }
 
     std::cout << "\nMake sure the arm is clear." << std::endl;
-    std::cout << "Press ENTER to move all motors to home / 0 rad...";
+    std::cout << "This test moves:" << std::endl;
+    std::cout << "home pose -> trajectory -> test pose 1 -> trajectory back home"
+              << std::endl;
+
+    std::cout << "\nPress ENTER to move all motors to home / 0 rad...";
     std::cin.get();
 
     if (!motor.moveJointRadiansPose(
@@ -138,36 +242,38 @@ int main()
 
     std::cout << "\nHome pose reached. Torque is holding." << std::endl;
 
-    std::cout << "\nPress ENTER to move to small radians pose...";
+    std::cout << "\nPress ENTER to run trajectory to test pose 1...";
     std::cin.get();
 
-    if (!motor.moveJointRadiansPose(
-            smallPose,
+    if (!moveRadiansTrajectory(
+            motor,
+            radiansTrajectoryToTestPose1,
             speed,
-            poseTolerance,
+            trajectoryTolerance,
             timeoutSeconds,
             holdTorque
         ))
     {
-        std::cerr << "Failed to move to small radians pose." << std::endl;
+        std::cerr << "Failed to complete trajectory to test pose 1." << std::endl;
         motor.emergencyShutdown(motorIds);
         return 1;
     }
 
-    std::cout << "\nSmall radians pose reached. Torque is holding." << std::endl;
+    std::cout << "\nTest pose 1 reached. Torque is holding." << std::endl;
 
-    std::cout << "\nPress ENTER to return to home / 0 rad...";
+    std::cout << "\nPress ENTER to return to home through reverse trajectory...";
     std::cin.get();
 
-    if (!motor.moveJointRadiansPose(
-            homeRadians,
+    if (!moveRadiansTrajectory(
+            motor,
+            radiansTrajectoryBackHome,
             speed,
-            homeTolerance,
+            trajectoryTolerance,
             timeoutSeconds,
             holdTorque
         ))
     {
-        std::cerr << "Failed to return to home radians pose." << std::endl;
+        std::cerr << "Failed to complete trajectory back home." << std::endl;
         motor.emergencyShutdown(motorIds);
         return 1;
     }
@@ -184,7 +290,7 @@ int main()
 
     motor.disconnect();
 
-    std::cout << "Full radians pose test complete." << std::endl;
+    std::cout << "Full radians trajectory test complete." << std::endl;
 
     return 0;
 }
