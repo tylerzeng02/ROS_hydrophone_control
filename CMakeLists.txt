@@ -15,14 +15,6 @@ add_executable(cyton_setup
 
 target_link_libraries(cyton_setup dxl_x64_cpp)
 
-add_executable(test_one_motor
-    src/test_one_motor.cpp
-    src/dynamixel_motor.cpp
-    src/robot_calibration.cpp
-)
-
-target_link_libraries(test_one_motor dxl_x64_cpp)
-
 add_executable(test_radians
     tests/test_radians.cpp
     src/dynamixel_motor.cpp
