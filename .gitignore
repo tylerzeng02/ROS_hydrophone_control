@@ -1,0 +1,20 @@
+# CMake build output
+build/
+cmake-build-*/
+
+# Compiled files
+*.o
+*.a
+*.so
+*.out
+
+# Future ROS 2 build output
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+*.swp
