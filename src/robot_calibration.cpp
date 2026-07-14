@@ -1,7 +1,6 @@
 #include "robot_calibration.h"
 
 #include <cmath>
-#include <algorithm>
 
 std::vector<JointCalibration> jointCalibrations = {
     // id, zeroTick, direction, minTick, maxTick
@@ -19,11 +18,12 @@ int radiansToTicks(const JointCalibration& joint, double radians)
     constexpr double PI = 3.14159265358979323846;
     constexpr double TICKS_PER_RADIAN = 4096.0 / (2.0 * PI);
 
-    int targetTick = static_cast<int>(
-        std::round(joint.zeroTick + joint.direction * radians * TICKS_PER_RADIAN)
+    return static_cast<int>(
+        std::round(
+            joint.zeroTick
+            + joint.direction * radians * TICKS_PER_RADIAN
+        )
     );
-
-    return std::clamp(targetTick, joint.minTick, joint.maxTick);
 }
 
 double ticksToRadians(const JointCalibration& joint, int tick)

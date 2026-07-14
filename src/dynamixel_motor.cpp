@@ -167,40 +167,21 @@ bool DynamixelMotor::isPositionWithinLimit(
     uint16_t position
 ) const
 {
-    switch (motorId)
+    if (motorId < 0 ||
+        motorId >= static_cast<int>(jointCalibrations.size()))
     {
-        case 0:
-            return position >= 341 && position <= 3755;
+        std::cerr << "Unknown motor ID: "
+                  << motorId
+                  << std::endl;
 
-        case 1:
-            return position >= 853 && position <= 3243;
-
-        case 2:
-            return position >= 912 && position <= 3320;
-
-        case 3:
-            return position >= 853 && position <= 3243;
-
-        case 4:
-            return position >= 853 && position <= 3243;
-
-        case 5:
-            return position >= 853 && position <= 3243;
-
-        case 6:
-            return position >= 341 && position <= 3755;
-
-        case 7:
-            return position >= 1578 && position <= 3172;
-
-        default:
-            std::cerr
-                << "Unknown motor ID: "
-                << motorId
-                << std::endl;
-
-            return false;
+        return false;
     }
+
+    const JointCalibration& joint =
+        jointCalibrations[motorId];
+
+    return position >= joint.minTick &&
+           position <= joint.maxTick;
 }
 
 bool DynamixelMotor::isPositionSafe(int motorId, uint16_t position) const
@@ -719,38 +700,50 @@ bool DynamixelMotor::moveNamedJointRadians(
     int timeoutSeconds
 )
 {
-    int motorId = jointNameToMotorId(jointName);
+    int motorId =
+        jointNameToMotorId(jointName);
 
     if (motorId < 0)
     {
         return false;
     }
 
-    if (motorId >= static_cast<int>(jointCalibrations.size()))
+    if (motorId >=
+        static_cast<int>(jointCalibrations.size()))
     {
-        std::cerr << "Invalid motor ID for named radians move: "
-                  << motorId << std::endl;
+        std::cerr
+            << "Invalid motor ID for named radians move: "
+            << motorId
+            << std::endl;
+
         return false;
     }
 
-    const JointCalibration& joint = jointCalibrations[motorId];
+    const JointCalibration& joint =
+        jointCalibrations[motorId];
 
-    uint16_t rawPosition = static_cast<uint16_t>(
-        radiansToTicks(joint, radians)
-    );
+    int targetTick =
+        radiansToTicks(joint, radians);
 
-    if (!isPositionWithinLimit(motorId, rawPosition))
+    if (targetTick < joint.minTick ||
+        targetTick > joint.maxTick)
     {
-        std::cerr << "Named radians command converted to unsafe raw position."
-                  << " Motor ID: " << motorId
-                  << " Raw position: " << rawPosition
-                  << std::endl;
+        std::cerr
+            << "Named radians command rejected."
+            << " Motor ID: " << motorId
+            << " | Calculated tick: " << targetTick
+            << " | Safe range: "
+            << joint.minTick
+            << " to "
+            << joint.maxTick
+            << std::endl;
+
         return false;
     }
 
     return moveJointSafely(
         motorId,
-        rawPosition,
+        static_cast<uint16_t>(targetTick),
         speed,
         tolerance,
         timeoutSeconds
@@ -928,30 +921,48 @@ bool DynamixelMotor::printElectricalStatusForMotors(const std::vector<int>& moto
     return allOk;
 }
 
-bool DynamixelMotor::moveJointRadians(int motorId, double radians)
+bool DynamixelMotor::moveJointRadians(
+    int motorId,
+    double radians
+)
 {
-    if (motorId < 0 || motorId >= static_cast<int>(jointCalibrations.size()))
+    if (motorId < 0 ||
+        motorId >= static_cast<int>(jointCalibrations.size()))
     {
-        std::cerr << "Invalid motor ID for radians move: " << motorId << std::endl;
-        return false;
-    }
-
-    const JointCalibration& joint = jointCalibrations[motorId];
-
-    uint16_t rawPosition = static_cast<uint16_t>(
-        radiansToTicks(joint, radians)
-    );
-
-    if (!isPositionWithinLimit(motorId, rawPosition))
-    {
-        std::cerr << "Radians command converted to unsafe raw position."
-                  << " Motor ID: " << motorId
-                  << " Raw position: " << rawPosition
+        std::cerr << "Invalid motor ID for radians move: "
+                  << motorId
                   << std::endl;
+
         return false;
     }
 
-    return setGoalPosition(motorId, rawPosition);
+    const JointCalibration& joint =
+        jointCalibrations[motorId];
+
+    int targetTick =
+        radiansToTicks(joint, radians);
+
+    if (targetTick < joint.minTick ||
+        targetTick > joint.maxTick)
+    {
+        std::cerr
+            << "Radians command rejected for motor "
+            << motorId
+            << ". Calculated tick: "
+            << targetTick
+            << ". Safe range: "
+            << joint.minTick
+            << " to "
+            << joint.maxTick
+            << std::endl;
+
+        return false;
+    }
+
+    return setGoalPosition(
+        motorId,
+        static_cast<uint16_t>(targetTick)
+    );
 }
 
 bool DynamixelMotor::moveJointRadiansPose(
@@ -975,25 +986,49 @@ bool DynamixelMotor::moveJointRadiansPose(
     }
 
     std::vector<uint16_t> rawPositions;
+    rawPositions.reserve(jointRadians.size());
 
     for (size_t i = 0; i < jointRadians.size(); ++i)
     {
-        const JointCalibration& joint = jointCalibrations[i];
+        const JointCalibration& joint =
+            jointCalibrations[i];
 
-        uint16_t rawPosition = static_cast<uint16_t>(
-            radiansToTicks(joint, jointRadians[i])
-        );
+        int targetTick =
+            radiansToTicks(
+                joint,
+                jointRadians[i]
+            );
 
-        if (!isPositionWithinLimit(joint.id, rawPosition))
+        std::cout
+            << "Motor " << joint.id
+            << " | Angle: " << jointRadians[i]
+            << " rad"
+            << " | Target tick: " << targetTick
+            << " | Safe range: "
+            << joint.minTick
+            << " to "
+            << joint.maxTick
+            << std::endl;
+
+        if (targetTick < joint.minTick ||
+            targetTick > joint.maxTick)
         {
-            std::cerr << "Radians pose contains unsafe target."
-                      << " Motor ID: " << joint.id
-                      << " Raw position: " << rawPosition
-                      << std::endl;
+            std::cerr
+                << "Radians pose rejected."
+                << " Motor ID: " << joint.id
+                << " | Calculated tick: " << targetTick
+                << " | Safe range: "
+                << joint.minTick
+                << " to "
+                << joint.maxTick
+                << std::endl;
+
             return false;
         }
 
-        rawPositions.push_back(rawPosition);
+        rawPositions.push_back(
+            static_cast<uint16_t>(targetTick)
+        );
     }
 
     return moveToPose(
@@ -1003,41 +1038,4 @@ bool DynamixelMotor::moveJointRadiansPose(
         timeoutSeconds,
         holdTorque
     );
-}
-
-double DynamixelMotor::rawPositionToRadians(uint16_t rawPosition) const
-{
-    if (rawPosition > MAX_RAW_POSITION)
-    {
-        rawPosition = MAX_RAW_POSITION;
-    }
-
-    const double PI = 3.14159265358979323846;
-
-    const double rangeRadians = 2.0 * PI;
-
-    double normalized =
-        static_cast<double>(rawPosition) / static_cast<double>(MAX_RAW_POSITION);
-
-    return (normalized * rangeRadians) - PI;
-}
-
-uint16_t DynamixelMotor::radiansToRawPosition(double radians) const
-{
-    const double PI = 3.14159265358979323846;
-
-    if (radians < -PI)
-    {
-        radians = -PI;
-    }
-
-    if (radians > PI)
-    {
-        radians = PI;
-    }
-
-    double normalized = (radians + PI) / (2.0 * PI);
-    double raw = normalized * static_cast<double>(MAX_RAW_POSITION);
-
-    return static_cast<uint16_t>(std::round(raw));
 }

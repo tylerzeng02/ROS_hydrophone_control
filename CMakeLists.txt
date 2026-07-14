@@ -66,3 +66,16 @@ target_link_libraries(test_ticks
     PRIVATE
     dxl_x64_cpp
 )
+add_subdirectory(
+    external/trac_ik/trac_ik_lib
+    external/trac_ik_build
+)
+
+add_executable(test_trac_ik
+    tests/test_trac_ik.cpp
+)
+
+target_link_libraries(test_trac_ik
+    PRIVATE
+        trac_ik
+)
