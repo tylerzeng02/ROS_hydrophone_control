@@ -162,36 +162,43 @@ bool DynamixelMotor::checkCommResult(int commResult, uint8_t dxlError, int motor
     return true;
 }
 
-bool DynamixelMotor::isPositionWithinLimit(int motorId, uint16_t position) const
+bool DynamixelMotor::isPositionWithinLimit(
+    int motorId,
+    uint16_t position
+) const
 {
     switch (motorId)
     {
         case 0:
-            return position >= 0 && position <= 4095;
+            return position >= 341 && position <= 3755;
 
         case 1:
-            return position >= 855 && position <= 3245;
+            return position >= 853 && position <= 3243;
 
         case 2:
-            return position >= 855 && position <= 3245;
+            return position >= 912 && position <= 3320;
 
         case 3:
-            return position >= 855 && position <= 3245;
+            return position >= 853 && position <= 3243;
 
         case 4:
-            return position >= 1034 && position <= 3245;
+            return position >= 853 && position <= 3243;
 
         case 5:
-            return position >= 855 && position <= 3245;
+            return position >= 853 && position <= 3243;
 
         case 6:
-            return position >= 0 && position <= 4095;
+            return position >= 341 && position <= 3755;
 
         case 7:
             return position >= 1578 && position <= 3172;
 
         default:
-            std::cerr << "Unknown motor ID: " << motorId << std::endl;
+            std::cerr
+                << "Unknown motor ID: "
+                << motorId
+                << std::endl;
+
             return false;
     }
 }
