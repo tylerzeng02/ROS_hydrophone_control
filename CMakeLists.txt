@@ -34,3 +34,35 @@ add_executable(test_radians_pose
 target_include_directories(test_radians_pose PRIVATE src)
 
 target_link_libraries(test_radians_pose dxl_x64_cpp)
+
+add_executable(read_motor_positions
+    tests/read_motor_positions.cpp
+    src/dynamixel_motor.cpp
+    src/robot_calibration.cpp
+)
+
+target_include_directories(read_motor_positions PRIVATE
+    src
+    external/DynamixelSDK/c++/include/dynamixel_sdk
+)
+
+target_link_libraries(read_motor_positions
+    dxl_x64_cpp
+)
+
+add_executable(test_ticks
+    tests/test_ticks.cpp
+    src/dynamixel_motor.cpp
+    src/robot_calibration.cpp
+)
+
+target_include_directories(test_ticks
+    PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/DynamixelSDK/c++/include
+)
+
+target_link_libraries(test_ticks
+    PRIVATE
+    dxl_x64_cpp
+)
