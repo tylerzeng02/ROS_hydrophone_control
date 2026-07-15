@@ -79,3 +79,69 @@ target_link_libraries(test_trac_ik
     PRIVATE
         trac_ik
 )
+
+add_executable(test_cyton_ik
+    tests/test_cyton_ik.cpp
+    src/robot_calibration.cpp
+)
+
+target_include_directories(test_cyton_ik PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/trac_ik/trac_ik_lib/include
+)
+
+target_link_libraries(test_cyton_ik PRIVATE
+    trac_ik
+    ${orocos_kdl_LIBRARIES}
+)
+
+add_executable(test_cyton_ik_move
+    tests/test_cyton_ik_move.cpp
+    src/dynamixel_motor.cpp
+    src/robot_calibration.cpp
+)
+
+target_include_directories(test_cyton_ik_move PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/DynamixelSDK/c++/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/trac_ik/trac_ik_lib/include
+)
+
+target_link_libraries(test_cyton_ik_move PRIVATE
+    trac_ik
+    ${orocos_kdl_LIBRARIES}
+    dxl_x64_cpp
+)
+
+add_executable(test_cyton_ik_target
+    tests/test_cyton_ik_target.cpp
+    src/robot_calibration.cpp
+)
+
+target_include_directories(test_cyton_ik_target PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/trac_ik/trac_ik_lib/include
+)
+
+target_link_libraries(test_cyton_ik_target PRIVATE
+    trac_ik
+    ${orocos_kdl_LIBRARIES}
+)
+
+add_executable(test_cyton_ik_target_move
+    tests/test_cyton_ik_target_move.cpp
+    src/dynamixel_motor.cpp
+    src/robot_calibration.cpp
+)
+
+target_include_directories(test_cyton_ik_target_move PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/DynamixelSDK/c++/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/trac_ik/trac_ik_lib/include
+)
+
+target_link_libraries(test_cyton_ik_target_move PRIVATE
+    trac_ik
+    ${orocos_kdl_LIBRARIES}
+    dxl_x64_cpp
+)
