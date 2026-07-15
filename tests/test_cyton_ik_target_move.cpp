@@ -5,6 +5,7 @@
 #include <iostream>
 #include <limits>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #include <kdl/chain.hpp>
@@ -20,6 +21,28 @@
 namespace
 {
 constexpr std::size_t JOINT_COUNT = 7;
+
+constexpr const char* DEVICE_NAME = "/dev/ttyUSB1";
+constexpr int BAUD_RATE = 1000000;
+constexpr float PROTOCOL_VERSION = 1.0F;
+
+constexpr uint16_t MOVING_SPEED = 10;
+constexpr int TOLERANCE = 15;
+constexpr int TIMEOUT_SECONDS = 30;
+
+/*
+ * Fixed end-effector orientation.
+ */
+constexpr double FIXED_ROLL = 0.246037;
+constexpr double FIXED_PITCH = -0.019880;
+constexpr double FIXED_YAW = 0.341417;
+
+struct PoseInput
+{
+    double x;
+    double y;
+    double z;
+};
 
 struct JointDescription
 {
@@ -84,6 +107,22 @@ void waitForEnter(const std::string& message)
 {
     std::cout << message;
     std::cin.get();
+}
+
+KDL::Frame makeTargetFrame(const PoseInput& pose)
+{
+    return KDL::Frame(
+        KDL::Rotation::RPY(
+            FIXED_ROLL,
+            FIXED_PITCH,
+            FIXED_YAW
+        ),
+        KDL::Vector(
+            pose.x,
+            pose.y,
+            pose.z
+        )
+    );
 }
 
 KDL::Chain createCytonChain()
@@ -155,46 +194,22 @@ void buildJointLimits(
         const JointCalibration& joint =
             jointCalibrations[i];
 
-        const double angleAtMinimum =
+        const double minimumAngle =
             ticksToRadians(joint, joint.minTick);
 
-        const double angleAtMaximum =
+        const double maximumAngle =
             ticksToRadians(joint, joint.maxTick);
 
         lowerLimits(i) =
-            std::min(angleAtMinimum, angleAtMaximum);
+            std::min(minimumAngle, maximumAngle);
 
         upperLimits(i) =
-            std::max(angleAtMinimum, angleAtMaximum);
+            std::max(minimumAngle, maximumAngle);
     }
 }
 
-void printPose(const KDL::Frame& pose)
-{
-    double roll = 0.0;
-    double pitch = 0.0;
-    double yaw = 0.0;
-
-    pose.M.GetRPY(
-        roll,
-        pitch,
-        yaw
-    );
-
-    std::cout
-        << std::fixed
-        << std::setprecision(6)
-        << "Position:\n"
-        << "  x = " << pose.p.x() << " m\n"
-        << "  y = " << pose.p.y() << " m\n"
-        << "  z = " << pose.p.z() << " m\n"
-        << "Orientation:\n"
-        << "  roll  = " << roll << " rad\n"
-        << "  pitch = " << pitch << " rad\n"
-        << "  yaw   = " << yaw << " rad\n";
-}
-
 bool convertSolutionToTicks(
+    const std::string& poseName,
     const KDL::JntArray& solution,
     std::vector<uint16_t>& targetTicks
 )
@@ -204,21 +219,20 @@ bool convertSolutionToTicks(
 
     bool allSafe = true;
 
-    std::cout << "\nSolved joint values:\n";
+    std::cout
+        << "\n"
+        << poseName
+        << " solved motor targets:\n";
 
     for (std::size_t i = 0; i < JOINT_COUNT; ++i)
     {
         const JointCalibration& joint =
             jointCalibrations[i];
 
-        const double radians =
-            solution(i);
+        const double radians = solution(i);
 
         const int tick =
-            radiansToTicks(
-                joint,
-                radians
-            );
+            radiansToTicks(joint, radians);
 
         const bool safe =
             tick >= joint.minTick &&
@@ -233,7 +247,7 @@ bool convertSolutionToTicks(
             << std::setprecision(6)
             << radians
             << " rad"
-            << " | target "
+            << " | "
             << tick
             << " ticks"
             << " | safe range ["
@@ -260,7 +274,95 @@ bool convertSolutionToTicks(
            targetTicks.size() == JOINT_COUNT;
 }
 
-bool checkStartingPositions(
+bool solvePose(
+    const std::string& poseName,
+    const KDL::Frame& targetPose,
+    KDL::Chain& chain,
+    const KDL::JntArray& lowerLimits,
+    const KDL::JntArray& upperLimits,
+    KDL::JntArray& seed,
+    KDL::JntArray& solution,
+    std::vector<uint16_t>& targetTicks
+)
+{
+    TRAC_IK::TRAC_IK solver(
+        chain,
+        lowerLimits,
+        upperLimits,
+        0.50,
+        1e-5,
+        TRAC_IK::Distance
+    );
+
+    const int result =
+        solver.CartToJnt(
+            seed,
+            targetPose,
+            solution
+        );
+
+    if (result < 0)
+    {
+        std::cerr
+            << "\nTRAC-IK could not solve "
+            << poseName
+            << ".\n";
+
+        return false;
+    }
+
+    KDL::ChainFkSolverPos_recursive fkSolver(chain);
+
+    KDL::Frame verifiedPose;
+
+    if (fkSolver.JntToCart(
+            solution,
+            verifiedPose
+        ) < 0)
+    {
+        std::cerr
+            << "Forward-kinematics verification failed for "
+            << poseName
+            << ".\n";
+
+        return false;
+    }
+
+    const KDL::Twist error =
+        KDL::diff(
+            verifiedPose,
+            targetPose
+        );
+
+    std::cout
+        << "\n"
+        << poseName
+        << " IK verification:\n"
+        << "Position error: "
+        << error.vel.Norm()
+        << " m\n"
+        << "Orientation error: "
+        << error.rot.Norm()
+        << " rad\n";
+
+    if (error.vel.Norm() > 1e-4 ||
+        error.rot.Norm() > 1e-4)
+    {
+        std::cerr
+            << poseName
+            << " verification error is too large.\n";
+
+        return false;
+    }
+
+    return convertSolutionToTicks(
+        poseName,
+        solution,
+        targetTicks
+    );
+}
+
+bool checkCurrentPositions(
     DynamixelMotor& motor,
     const std::vector<int>& motorIds
 )
@@ -284,18 +386,15 @@ bool checkStartingPositions(
         }
 
         const bool safe =
-            motor.isPositionSafe(
-                id,
-                position
-            );
+            motor.isPositionSafe(id, position);
 
         std::cout
             << "Motor " << id
-            << " | current "
+            << " | "
             << position
             << " ticks"
             << " | "
-            << (safe ? "SAFE" : "OUTSIDE SAFE RANGE")
+            << (safe ? "SAFE" : "UNSAFE")
             << '\n';
 
         if (!safe)
@@ -305,6 +404,48 @@ bool checkStartingPositions(
     }
 
     return allSafe;
+}
+
+void printMovementSummary(
+    DynamixelMotor& motor,
+    const std::vector<int>& motorIds,
+    const std::vector<uint16_t>& targetTicks,
+    const std::string& poseName
+)
+{
+    std::cout
+        << "\nMovement summary for "
+        << poseName
+        << ":\n";
+
+    for (std::size_t i = 0; i < motorIds.size(); ++i)
+    {
+        uint16_t currentPosition = 0;
+
+        if (!motor.readPosition(
+                motorIds[i],
+                currentPosition
+            ))
+        {
+            throw std::runtime_error(
+                "Failed to read current position."
+            );
+        }
+
+        const int change =
+            static_cast<int>(targetTicks[i]) -
+            static_cast<int>(currentPosition);
+
+        std::cout
+            << "Motor " << motorIds[i]
+            << ": "
+            << currentPosition
+            << " -> "
+            << targetTicks[i]
+            << " | change "
+            << change
+            << " ticks\n";
+    }
 }
 
 void disableAll(
@@ -321,22 +462,32 @@ void disableAll(
 
 int main()
 {
-    constexpr const char* DEVICE_NAME =
-        "/dev/ttyUSB1";
-
-    constexpr int BAUD_RATE = 1000000;
-    constexpr float PROTOCOL_VERSION = 1.0;
-
-    constexpr uint16_t MOVING_SPEED = 10;
-    constexpr int TOLERANCE = 15;
-    constexpr int TIMEOUT_SECONDS = 30;
-
     const std::vector<int> motorIds = {
         0, 1, 2, 3, 4, 5, 6
     };
 
     try
     {
+        std::cout
+            << "Pose A to Pose B IK movement test\n"
+            << "Position values are in metres.\n"
+            << "Orientation is fixed at:\n"
+            << "  roll  = " << FIXED_ROLL << '\n'
+            << "  pitch = " << FIXED_PITCH << '\n'
+            << "  yaw   = " << FIXED_YAW << '\n';
+
+        const PoseInput poseA = {
+            -0.036864,  // x
+            0.019448,  // y
+            0.606952   // z
+        };
+
+        const PoseInput poseB = {
+            0.063136,  // x
+            0.019448,  // y
+            0.606952   // z
+        };
+
         KDL::Chain chain =
             createCytonChain();
 
@@ -350,57 +501,6 @@ int main()
             return 1;
         }
 
-        double x = 0.0;
-        double y = 0.0;
-        double z = 0.0;
-
-        const double roll = 0.246037;
-        const double pitch = -0.019880;
-        const double yaw = 0.341417;
-
-        std::cout
-            << "Enter the desired end-effector pose.\n"
-            << "Position is measured from base_link in metres.\n"
-            << "Orientation is roll, pitch, yaw in radians.\n\n";
-
-        std::cout << "x: ";
-        std::cin >> x;
-
-        std::cout << "y: ";
-        std::cin >> y;
-
-        std::cout << "z: ";
-        std::cin >> z;
-
-        if (!std::cin)
-        {
-            std::cerr
-                << "Invalid numerical input.\n";
-
-            return 1;
-        }
-
-        std::cin.ignore(
-            std::numeric_limits<std::streamsize>::max(),
-            '\n'
-        );
-
-        const KDL::Frame targetPose(
-            KDL::Rotation::RPY(
-                roll,
-                pitch,
-                yaw
-            ),
-            KDL::Vector(
-                x,
-                y,
-                z
-            )
-        );
-
-        std::cout << "\nRequested pose:\n";
-        printPose(targetPose);
-
         KDL::JntArray lowerLimits(JOINT_COUNT);
         KDL::JntArray upperLimits(JOINT_COUNT);
 
@@ -409,98 +509,63 @@ int main()
             upperLimits
         );
 
-        KDL::JntArray seed(JOINT_COUNT);
-        KDL::JntArray solution(JOINT_COUNT);
+        KDL::JntArray seedA(JOINT_COUNT);
+        KDL::JntArray solutionA(JOINT_COUNT);
 
         for (std::size_t i = 0; i < JOINT_COUNT; ++i)
         {
-            seed(i) = 0.0;
-            solution(i) = 0.0;
+            seedA(i) = 0.0;
+            solutionA(i) = 0.0;
         }
 
-        TRAC_IK::TRAC_IK solver(
-            chain,
-            lowerLimits,
-            upperLimits,
-            0.50,
-            1e-5,
-            TRAC_IK::Distance
-        );
+        std::vector<uint16_t> poseATicks;
 
-        const int ikResult =
-            solver.CartToJnt(
-                seed,
-                targetPose,
-                solution
-            );
-
-        if (ikResult < 0)
-        {
-            std::cerr
-                << "\nTRAC-IK could not find a solution.\n"
-                << "The pose may be unreachable or outside "
-                << "the joint limits.\n";
-
-            return 1;
-        }
-
-        KDL::ChainFkSolverPos_recursive fkSolver(
-            chain
-        );
-
-        KDL::Frame verifiedPose;
-
-        if (fkSolver.JntToCart(
-                solution,
-                verifiedPose
-            ) < 0)
-        {
-            std::cerr
-                << "Forward-kinematics verification failed.\n";
-
-            return 1;
-        }
-
-        const KDL::Twist poseError =
-            KDL::diff(
-                verifiedPose,
-                targetPose
-            );
-
-        std::cout
-            << "\nTRAC-IK found a solution.\n"
-            << "Position error: "
-            << poseError.vel.Norm()
-            << " m\n"
-            << "Orientation error: "
-            << poseError.rot.Norm()
-            << " rad\n";
-
-        if (poseError.vel.Norm() > 1e-4 ||
-            poseError.rot.Norm() > 1e-4)
-        {
-            std::cerr
-                << "IK verification error is too large.\n";
-
-            return 1;
-        }
-
-        std::vector<uint16_t> targetTicks;
-
-        if (!convertSolutionToTicks(
-                solution,
-                targetTicks
+        if (!solvePose(
+                "Pose A",
+                makeTargetFrame(poseA),
+                chain,
+                lowerLimits,
+                upperLimits,
+                seedA,
+                solutionA,
+                poseATicks
             ))
         {
             std::cerr
-                << "\nMovement cancelled because at least one "
-                << "target is outside its safe range.\n";
+                << "Pose A is invalid or unreachable.\n";
+
+            return 1;
+        }
+
+        /*
+         * Seed Pose B using the Pose A solution.
+         * This encourages a nearby, continuous configuration.
+         */
+        KDL::JntArray seedB = solutionA;
+        KDL::JntArray solutionB(JOINT_COUNT);
+
+        std::vector<uint16_t> poseBTicks;
+
+        if (!solvePose(
+                "Pose B",
+                makeTargetFrame(poseB),
+                chain,
+                lowerLimits,
+                upperLimits,
+                seedB,
+                solutionB,
+                poseBTicks
+            ))
+        {
+            std::cerr
+                << "Pose B is invalid or unreachable.\n";
 
             return 1;
         }
 
         std::cout
-            << "\nMotor 7 is the gripper and will not move.\n";
+            << "\nBoth poses passed IK and motor-limit checks.\n"
+            << "Motor 7 will not move.\n";
 
         DynamixelMotor motor(
             DEVICE_NAME,
@@ -513,87 +578,80 @@ int main()
             return 1;
         }
 
-        if (!checkStartingPositions(
+        if (!checkCurrentPositions(
                 motor,
                 motorIds
             ))
         {
             std::cerr
-                << "\nMovement cancelled because at least one "
-                << "current motor position is unsafe.\n";
+                << "Movement cancelled because a starting "
+                << "position is unsafe.\n";
 
             motor.disconnect();
             return 1;
         }
 
-        std::cout
-            << "\nMovement summary:\n";
-
-        for (std::size_t i = 0;
-             i < motorIds.size();
-             ++i)
-        {
-            uint16_t currentPosition = 0;
-
-            if (!motor.readPosition(
-                    motorIds[i],
-                    currentPosition
-                ))
-            {
-                std::cerr
-                    << "Failed to reread motor "
-                    << motorIds[i] << ".\n";
-
-                motor.disconnect();
-                return 1;
-            }
-
-            const int movement =
-                static_cast<int>(targetTicks[i]) -
-                static_cast<int>(currentPosition);
-
-            std::cout
-                << "Motor " << motorIds[i]
-                << ": "
-                << currentPosition
-                << " -> "
-                << targetTicks[i]
-                << " | change "
-                << movement
-                << " ticks\n";
-        }
-
-        std::cout
-            << "\nMoving speed: "
-            << MOVING_SPEED
-            << '\n';
-
-        waitForEnter(
-            "\nCheck all printed targets and clear the arm.\n"
-            "Press Enter to enable torque and move motors 0-6..."
+        printMovementSummary(
+            motor,
+            motorIds,
+            poseATicks,
+            "Pose A"
         );
 
-        const bool movementSucceeded =
-            motor.moveJointsSafely(
+        waitForEnter(
+            "\nCheck the Pose A targets and clear the arm.\n"
+            "Press Enter to move to Pose A..."
+        );
+
+        if (!motor.moveJointsSafely(
                 motorIds,
-                targetTicks,
+                poseATicks,
                 MOVING_SPEED,
                 TOLERANCE,
                 TIMEOUT_SECONDS,
                 true
-            );
-
-        if (!movementSucceeded)
+            ))
         {
             std::cerr
-                << "\nMovement failed. Disabling torque.\n";
+                << "Movement to Pose A failed.\n";
 
             motor.emergencyShutdown(motorIds);
             return 1;
         }
 
         std::cout
-            << "\nTarget pose reached.\n"
+            << "\nPose A reached successfully.\n";
+
+        printMovementSummary(
+            motor,
+            motorIds,
+            poseBTicks,
+            "Pose B"
+        );
+
+        waitForEnter(
+            "\nCheck the Pose B targets and clear the arm.\n"
+            "Press Enter to move from Pose A to Pose B..."
+        );
+
+        if (!motor.moveJointsSafely(
+                motorIds,
+                poseBTicks,
+                MOVING_SPEED,
+                TOLERANCE,
+                TIMEOUT_SECONDS,
+                true
+            ))
+        {
+            std::cerr
+                << "Movement to Pose B failed.\n";
+
+            motor.emergencyShutdown(motorIds);
+            return 1;
+        }
+
+        std::cout
+            << "\nPose B reached successfully.\n"
             << "Torque remains enabled to hold the arm.\n";
 
         waitForEnter(

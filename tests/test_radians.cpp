@@ -30,7 +30,7 @@ int main()
     // 4 = elbow yaw
     // 5 = wrist pitch
     // 6 = wrist roll
-    const int jointIndex = 6;
+    const int jointIndex = 5;
 
     if (jointIndex < 0 ||
         jointIndex >= static_cast<int>(jointCalibrations.size()))
