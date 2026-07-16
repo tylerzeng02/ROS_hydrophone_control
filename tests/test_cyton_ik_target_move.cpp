@@ -33,9 +33,9 @@ constexpr int TIMEOUT_SECONDS = 30;
 /*
  * Fixed end-effector orientation.
  */
-constexpr double FIXED_ROLL = 0.246037;
-constexpr double FIXED_PITCH = -0.019880;
-constexpr double FIXED_YAW = 0.341417;
+constexpr double FIXED_ROLL = 0;
+constexpr double FIXED_PITCH = 0;
+constexpr double FIXED_YAW = 0;
 
 struct PoseInput
 {
@@ -479,13 +479,13 @@ int main()
         const PoseInput poseA = {
             -0.036864,  // x
             0.019448,  // y
-            0.606952   // z
+            0.646952   // z
         };
 
         const PoseInput poseB = {
-            0.063136,  // x
-            0.019448,  // y
-            0.606952   // z
+            -0.002411,  // x
+            0.008000,  // y
+            0.718910   // z
         };
 
         KDL::Chain chain =
