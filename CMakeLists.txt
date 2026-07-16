@@ -145,3 +145,18 @@ target_link_libraries(test_cyton_ik_target_move PRIVATE
     ${orocos_kdl_LIBRARIES}
     dxl_x64_cpp
 )
+
+add_executable(test_home_pose
+    tests/test_home_pose.cpp
+    src/dynamixel_motor.cpp
+    src/robot_calibration.cpp
+)
+
+target_include_directories(test_home_pose PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/DynamixelSDK/c++/include/dynamixel_sdk
+)
+
+target_link_libraries(test_home_pose PRIVATE
+    dxl_x64_cpp
+)

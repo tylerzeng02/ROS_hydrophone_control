@@ -20,11 +20,11 @@ int main()
     const float PROTOCOL_VERSION = 1.0;
 
     // Change these values.
-    const int MOTOR_ID = 2;
-    const uint16_t TARGET_POSITION = 2116;
+    const int MOTOR_ID = 1;
+    const uint16_t TARGET_POSITION = 2041;
 
     const uint16_t SPEED = 20;
-    const int TOLERANCE = 10;
+    const int TOLERANCE = 5;
     const int TIMEOUT_SECONDS = 15;
 
     DynamixelMotor motor(
