@@ -28,15 +28,9 @@ constexpr float PROTOCOL_VERSION = 1.0F;
 
 constexpr uint16_t MOVING_SPEED = 10;
 
-/*
- * Reduced from 10 to 5 ticks for tighter final positioning.
- */
 constexpr int TOLERANCE = 15;
 constexpr int TIMEOUT_SECONDS = 30;
 
-/*
- * Fixed end-effector orientation.
- */
 constexpr double FIXED_ROLL = 0.246037;
 constexpr double FIXED_PITCH = -0.019880;
 constexpr double FIXED_YAW = 0.341417;
@@ -840,7 +834,7 @@ int main()
             0.646952  // z
         };
 
-        constexpr double DESIRED_X_MOVEMENT = 0.1;
+        constexpr double DESIRED_X_MOVEMENT = 0.15;
 
         const double correctedXMovement =
             applyHorizontalDistanceCorrection(

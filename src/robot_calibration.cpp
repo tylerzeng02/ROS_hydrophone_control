@@ -5,7 +5,7 @@
 std::vector<JointCalibration> jointCalibrations = {
     // id, zeroTick, direction, minTick, maxTick
     {0, 2048, +1, 376, 3772},
-    {1, 2048, +1, 853, 3231},
+    {1, 2048, +1, 851, 3231},
     {2, 2066, +1, 912, 3327},
     {3, 2108, +1, 829, 3274},
     {4, 2078, +1, 952, 3245},
