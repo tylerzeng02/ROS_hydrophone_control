@@ -261,6 +261,20 @@ if(EXISTS
         src/robot_calibration.cpp
     )
 
+    add_executable(test_ndi_single_tool
+        tests/test_ndi_single_tool.cpp
+    )
+
+    target_include_directories(test_ndi_single_tool
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/external/ndicapi
+    )
+
+    target_link_libraries(test_ndi_single_tool
+        PRIVATE
+            ndicapi
+    )
+
     target_include_directories(test_five_pose_ndi_capture
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src

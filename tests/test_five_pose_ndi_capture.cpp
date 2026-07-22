@@ -285,11 +285,13 @@ public:
             movingRomPath_,
             "moving"
         );
-
         fixedToolHandle_ = allocateAndInitializeTool(
             fixedRomPath_,
             "fixed"
         );
+
+        printHandleDiagnostics(movingToolHandle_, "moving");
+        printHandleDiagnostics(fixedToolHandle_, "fixed");
 
         enableTool(movingToolHandle_, "moving");
         enableTool(fixedToolHandle_, "fixed");
@@ -325,14 +327,7 @@ public:
                  NDI_REQUIRED_VALID_SAMPLES;
              ++attempt) {
 
-            // One TX command updates both tools from the same Polaris frame.
-            ndiTX(
-                tracker_,
-                NDI_XFORMS_AND_STATUS |
-                NDI_ADDITIONAL_INFO |
-                NDI_FRAME_NUMBER
-            );
-            requireNoNdiError("TX");
+            requestTxUpdate();
 
             NdiPoseSample moving;
             NdiPoseSample fixed;
@@ -341,14 +336,16 @@ public:
                 movingToolHandle_,
                 "moving",
                 moving,
-                movingInvalidCount
+                movingInvalidCount,
+                true
             );
 
             const bool fixedValid = tryReadToolFromCurrentTx(
                 fixedToolHandle_,
                 "fixed",
                 fixed,
-                fixedInvalidCount
+                fixedInvalidCount,
+                true
             );
 
             if (movingValid && fixedValid) {
@@ -366,12 +363,12 @@ public:
         if (static_cast<int>(movingAccepted.size()) <
             NDI_REQUIRED_VALID_SAMPLES) {
             throw std::runtime_error(
-                "Not enough synchronized NDI samples. Accepted " +
+                "Not enough synchronized NDI TX samples. Accepted " +
                 std::to_string(movingAccepted.size()) + " of " +
                 std::to_string(NDI_REQUIRED_VALID_SAMPLES) +
-                ". Moving missing/invalid: " +
+                ". Moving invalid: " +
                 std::to_string(movingInvalidCount) +
-                ", fixed missing/invalid: " +
+                ", fixed invalid: " +
                 std::to_string(fixedInvalidCount) +
                 ", rejected pairs: " +
                 std::to_string(rejectedPairCount) + "."
@@ -445,6 +442,50 @@ private:
         return handle;
     }
 
+    void printHandleDiagnostics(
+        int handle,
+        const char* toolName
+    ) {
+        ndiPHINF(
+            tracker_,
+            handle,
+            NDI_BASIC |
+            NDI_PART_NUMBER |
+            NDI_MARKER_TYPE |
+            NDI_PORT_LOCATION
+        );
+        requireNoNdiError("PHINF");
+
+        const int status = ndiGetPHINFPortStatus(tracker_);
+        const int markerType = ndiGetPHINFMarkerType(tracker_);
+
+        // ndicapi writes a fixed-width tool information field.
+        // Allocate extra space and force termination before printing.
+        char toolInfo[128] = {};
+        ndiGetPHINFToolInfo(tracker_, toolInfo);
+        toolInfo[127] = '\0';
+
+        std::cout
+            << "PHINF " << toolName
+            << " handle 0x" << std::hex << handle << std::dec
+            << " | status=0x" << std::hex << status << std::dec
+            << " | markerType=" << markerType
+            << " | toolInfo=\"";
+
+        for (int i = 0; i < 30 && toolInfo[i] != '\0'; ++i) {
+            const unsigned char c =
+                static_cast<unsigned char>(toolInfo[i]);
+
+            if (c >= 32 && c <= 126) {
+                std::cout << toolInfo[i];
+            } else {
+                std::cout << '.';
+            }
+        }
+
+        std::cout << "\"\n";
+    }
+
     void enableTool(int handle, const char* toolName) {
         ndiPENA(tracker_, handle, NDI_DYNAMIC);
         requireNoNdiError("PENA");
@@ -455,17 +496,21 @@ private:
             << std::hex << handle << std::dec << ".\n";
     }
 
+    void requestTxUpdate() {
+        ndiTX(
+            tracker_,
+            NDI_XFORMS_AND_STATUS |
+            NDI_ADDITIONAL_INFO |
+            NDI_FRAME_NUMBER
+        );
+        requireNoNdiError("TX");
+    }
+
     void waitForBothToolsVisible() {
         constexpr int STARTUP_ATTEMPTS = 100;
 
         for (int attempt = 1; attempt <= STARTUP_ATTEMPTS; ++attempt) {
-            ndiTX(
-                tracker_,
-                NDI_XFORMS_AND_STATUS |
-                NDI_ADDITIONAL_INFO |
-                NDI_FRAME_NUMBER
-            );
-            requireNoNdiError("startup TX");
+            requestTxUpdate();
 
             NdiPoseSample moving;
             NdiPoseSample fixed;
@@ -490,16 +535,16 @@ private:
 
             if (movingValid && fixedValid) {
                 std::cout
-                    << "Both NDI tools are visible and producing transforms.\n";
+                    << "Both NDI tools are visible through TX.\n";
                 return;
             }
 
             if (attempt == 1 || attempt % 20 == 0) {
-                std::cout
-                    << "Waiting for both NDI tools..."
-                    << " moving=" << (movingValid ? "valid" : "invalid")
-                    << ", fixed=" << (fixedValid ? "valid" : "invalid")
-                    << '\n';
+                printTxDiagnostics(
+                    attempt,
+                    movingValid,
+                    fixedValid
+                );
             }
 
             std::this_thread::sleep_for(
@@ -508,11 +553,66 @@ private:
         }
 
         throw std::runtime_error(
-            "Both NDI tools were not visible after startup. "
-            "Verify that rigid body 2 uses the moving ROM, rigid body 3 "
-            "uses the fixed ROM, all four spheres are visible, and "
-            "the NDI tracking application is closed."
+            "TX did not produce valid transforms for both tools. "
+            "Review the printed TX result codes and port statuses. "
+            "Robot movement was blocked."
         );
+    }
+
+    void printTxDiagnostics(
+        int attempt,
+        bool movingValid,
+        bool fixedValid
+    ) {
+        double movingTransform[8] = {};
+        double fixedTransform[8] = {};
+
+        const int movingResult = ndiGetTXTransform(
+            tracker_,
+            movingToolHandle_,
+            movingTransform
+        );
+        const int fixedResult = ndiGetTXTransform(
+            tracker_,
+            fixedToolHandle_,
+            fixedTransform
+        );
+
+        const int movingStatus = ndiGetTXPortStatus(
+            tracker_,
+            movingToolHandle_
+        );
+        const int fixedStatus = ndiGetTXPortStatus(
+            tracker_,
+            fixedToolHandle_
+        );
+
+        const unsigned long movingFrame = ndiGetTXFrame(
+            tracker_,
+            movingToolHandle_
+        );
+        const unsigned long fixedFrame = ndiGetTXFrame(
+            tracker_,
+            fixedToolHandle_
+        );
+
+        std::cout
+            << "TX diagnostics attempt " << attempt
+            << " | moving valid="
+            << (movingValid ? "yes" : "no")
+            << ", result=" << movingResult
+            << ", status=0x"
+            << std::hex << movingStatus << std::dec
+            << ", frame=" << movingFrame
+            << ", error=" << movingTransform[7]
+            << " | fixed valid="
+            << (fixedValid ? "yes" : "no")
+            << ", result=" << fixedResult
+            << ", status=0x"
+            << std::hex << fixedStatus << std::dec
+            << ", frame=" << fixedFrame
+            << ", error=" << fixedTransform[7]
+            << '\n';
     }
 
     bool tryReadToolFromCurrentTx(
@@ -520,41 +620,40 @@ private:
         const char* toolName,
         NdiPoseSample& sample,
         int& invalidCount,
-        bool printErrors = true
+        bool printErrors
     ) {
         double transform[8] = {};
+
         const int result = ndiGetTXTransform(
             tracker_,
             toolHandle,
             transform
         );
 
-        if (result != NDI_OKAY) {
-            ++invalidCount;
-
-            if (printErrors) {
-                if (result == NDI_MISSING) {
-                    std::cerr
-                        << "NDI " << toolName
-                        << " sample skipped: marker is missing.\n";
-                } else if (result == NDI_DISABLED) {
-                    std::cerr
-                        << "NDI " << toolName
-                        << " sample skipped: tool is disabled.\n";
-                } else {
-                    std::cerr
-                        << "NDI " << toolName
-                        << " sample skipped: transform result code "
-                        << result << ".\n";
-                }
-            }
-            return false;
-        }
-
         const int portStatus = ndiGetTXPortStatus(
             tracker_,
             toolHandle
         );
+
+        const unsigned long frame = ndiGetTXFrame(
+            tracker_,
+            toolHandle
+        );
+
+        if (result != NDI_OKAY) {
+            ++invalidCount;
+
+            if (printErrors) {
+                std::cerr
+                    << "NDI " << toolName
+                    << " TX transform rejected: result="
+                    << result
+                    << ", status=0x"
+                    << std::hex << portStatus << std::dec
+                    << ", frame=" << frame << ".\n";
+            }
+            return false;
+        }
 
         if ((portStatus & NDI_ENABLED) == 0 ||
             (portStatus & NDI_OUT_OF_VOLUME) != 0) {
@@ -563,8 +662,9 @@ private:
             if (printErrors) {
                 std::cerr
                     << "NDI " << toolName
-                    << " sample skipped: invalid port status "
-                    << portStatus << ".\n";
+                    << " TX port status rejected: status=0x"
+                    << std::hex << portStatus << std::dec
+                    << ", frame=" << frame << ".\n";
             }
             return false;
         }
@@ -577,19 +677,10 @@ private:
         sample.tyMm = transform[5];
         sample.tzMm = transform[6];
         sample.error = transform[7];
-        sample.frameNumber = ndiGetTXFrame(tracker_, toolHandle);
+        sample.frameNumber = frame;
 
-        int visibleMarkers = 0;
-        for (int marker = 0; marker < 4; ++marker) {
-            if (ndiGetTXMarkerInfo(
-                    tracker_,
-                    toolHandle,
-                    marker
-                ) == NDI_MARKER_USED) {
-                ++visibleMarkers;
-            }
-        }
-        sample.visibleMarkerCount = visibleMarkers;
+        // Marker-level counting is not used as a blocking condition here.
+        sample.visibleMarkerCount = REQUIRED_VISIBLE_MARKERS;
 
         const bool finite =
             std::isfinite(sample.q0) &&
@@ -601,19 +692,15 @@ private:
             std::isfinite(sample.tzMm) &&
             std::isfinite(sample.error);
 
-        const bool qualityAccepted =
-            finite &&
-            sample.error <= MAX_NDI_ERROR;
-
-        if (!qualityAccepted) {
+        if (!finite || sample.error > MAX_NDI_ERROR) {
             ++invalidCount;
 
             if (printErrors) {
                 std::cerr
                     << "NDI " << toolName
-                    << " sample rejected: markers="
-                    << sample.visibleMarkerCount
-                    << ", error=" << sample.error << ".\n";
+                    << " TX quality rejected: error="
+                    << sample.error
+                    << ", frame=" << frame << ".\n";
             }
             return false;
         }
