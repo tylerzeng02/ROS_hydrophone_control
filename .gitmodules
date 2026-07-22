@@ -1,0 +1,3 @@
+[submodule "external/ndicapi"]
+	path = external/ndicapi
+	url = https://github.com/PlusToolkit/ndicapi
