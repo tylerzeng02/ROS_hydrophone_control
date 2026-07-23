@@ -1,6 +1,7 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <conio.h>
 #include <cstdint>
 #include <fstream>
 #include <iomanip>
@@ -16,6 +17,89 @@
 #include "ndicapi.h"
 
 namespace {
+
+// Thrown when the user presses the skip key while waiting on NDI tracking;
+// caught in main()'s per-pose loop so one bad pose doesn't abort the run.
+struct PoseSkippedByUser {};
+
+enum class NdiToolStatus {
+    Detected,
+    Missing,
+    OutOfVolume,
+    Disabled,
+    LowQuality
+};
+
+const char* toolStatusLabel(NdiToolStatus status) {
+    switch (status) {
+        case NdiToolStatus::Detected:    return "DETECTED";
+        case NdiToolStatus::Missing:     return "MISSING";
+        case NdiToolStatus::OutOfVolume: return "OUT_OF_VOLUME";
+        case NdiToolStatus::Disabled:    return "DISABLED";
+        case NdiToolStatus::LowQuality:  return "LOW_QUALITY";
+    }
+    return "UNKNOWN";
+}
+
+// Prints "<toolName> tool: <STATUS>" only the first time it's called and
+// whenever the status differs from the last printed value, so a steady
+// status doesn't spam the console.
+void printToolStatusIfChanged(
+    const char* toolName,
+    NdiToolStatus current,
+    NdiToolStatus& lastPrinted,
+    bool& everPrinted
+) {
+    if (everPrinted && current == lastPrinted) {
+        return;
+    }
+    std::cout << toolName << " tool: " << toolStatusLabel(current) << '\n';
+    lastPrinted = current;
+    everPrinted = true;
+}
+
+// Non-blocking check for the pause ('p') / skip ('s') hotkeys. Call once per
+// polling iteration. Throws PoseSkippedByUser if skip is pressed (either
+// directly or while paused). Returns how long this call spent paused, so
+// callers can shift their own elapsed-time budgets forward by that amount.
+std::chrono::milliseconds handleUserControls() {
+    if (!_kbhit()) {
+        return std::chrono::milliseconds(0);
+    }
+
+    const int key = _getch();
+
+    if (key == 's' || key == 'S') {
+        throw PoseSkippedByUser{};
+    }
+
+    if (key == 'p' || key == 'P') {
+        const auto pauseStart = std::chrono::steady_clock::now();
+        std::cout
+            << "\nProcess paused. Press 'p' to resume, or 's' to skip "
+            << "this pose.\n";
+
+        while (true) {
+            if (_kbhit()) {
+                const int resumeKey = _getch();
+                if (resumeKey == 'p' || resumeKey == 'P') {
+                    std::cout << "Resuming detection...\n";
+                    break;
+                }
+                if (resumeKey == 's' || resumeKey == 'S') {
+                    throw PoseSkippedByUser{};
+                }
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
+        return std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - pauseStart
+        );
+    }
+
+    return std::chrono::milliseconds(0);
+}
 
 constexpr std::size_t JOINT_COUNT = 7;
 constexpr std::size_t POSE_COUNT = 5;
@@ -34,13 +118,13 @@ constexpr const char* FIXED_TOOL_ROM =
 
 constexpr const char* OUTPUT_CSV = "five_pose_ndi_capture.csv";
 
-constexpr uint16_t MOVING_SPEED = 10;
+constexpr uint16_t MOVING_SPEED = 40;
 constexpr int MOTOR_TOLERANCE_TICKS = 10;
 constexpr int MOVE_TIMEOUT_SECONDS = 30;
 constexpr int SETTLING_TIME_MS = 750;
 
 constexpr int NDI_REQUIRED_VALID_SAMPLES = 30;
-constexpr int NDI_MAX_ATTEMPTS = 150;
+constexpr int NDI_MAX_ATTEMPTS = 1000;
 constexpr int NDI_SAMPLE_INTERVAL_MS = 20;
 constexpr int REQUIRED_VISIBLE_MARKERS = 4;
 constexpr double MAX_NDI_ERROR = 0.50;
@@ -278,6 +362,8 @@ public:
             );
         }
 
+        ndiTSTOP(tracker_);
+
         ndiINIT(tracker_);
         requireNoNdiError("INIT");
 
@@ -311,6 +397,13 @@ public:
     }
 
     DualToolCapture collectBothTools() {
+        waitForBothToolsVisible();
+
+        std::cout
+            << "Collecting " << NDI_REQUIRED_VALID_SAMPLES
+            << " synchronized samples. Press 'p' to pause, 's' to skip "
+            << "this pose.\n";
+
         std::vector<NdiPoseSample> movingAccepted;
         std::vector<NdiPoseSample> fixedAccepted;
 
@@ -321,13 +414,33 @@ public:
         int fixedInvalidCount = 0;
         int rejectedPairCount = 0;
 
+        NdiToolStatus lastMovingStatus = NdiToolStatus::Detected;
+        NdiToolStatus lastFixedStatus = NdiToolStatus::Detected;
+        bool movingStatusPrinted = false;
+        bool fixedStatusPrinted = false;
+
         for (int attempt = 0;
              attempt < NDI_MAX_ATTEMPTS &&
              static_cast<int>(movingAccepted.size()) <
                  NDI_REQUIRED_VALID_SAMPLES;
              ++attempt) {
 
+            handleUserControls();
+
             requestBxUpdate();
+
+            printToolStatusIfChanged(
+                "Moving",
+                classifyToolStatus(movingToolHandle_),
+                lastMovingStatus,
+                movingStatusPrinted
+            );
+            printToolStatusIfChanged(
+                "Fixed",
+                classifyToolStatus(fixedToolHandle_),
+                lastFixedStatus,
+                fixedStatusPrinted
+            );
 
             NdiPoseSample moving;
             NdiPoseSample fixed;
@@ -337,7 +450,7 @@ public:
                 "moving",
                 moving,
                 movingInvalidCount,
-                true
+                false
             );
 
             const bool fixedValid = tryReadToolFromCurrentBx(
@@ -345,7 +458,7 @@ public:
                 "fixed",
                 fixed,
                 fixedInvalidCount,
-                true
+                false
             );
 
             if (movingValid && fixedValid) {
@@ -508,11 +621,61 @@ private:
         requireNoNdiError("BX");
     }
 
+    // Classifies the most recent BX reply for one tool into a simple status
+    // label, purely for live console feedback (does not affect which
+    // samples are accepted into the pose average).
+    NdiToolStatus classifyToolStatus(int toolHandle) {
+        float transform[8] = {};
+        const int result = ndiGetBXTransform(tracker_, toolHandle, transform);
+
+        if (result == NDI_DISABLED) {
+            return NdiToolStatus::Disabled;
+        }
+        if (result == NDI_MISSING) {
+            return NdiToolStatus::Missing;
+        }
+
+        const int status = ndiGetBXPortStatus(tracker_, toolHandle);
+        if ((status & NDI_OUT_OF_VOLUME) != 0) {
+            return NdiToolStatus::OutOfVolume;
+        }
+
+        if (!std::isfinite(transform[7]) || transform[7] > MAX_NDI_ERROR) {
+            return NdiToolStatus::LowQuality;
+        }
+
+        return NdiToolStatus::Detected;
+    }
+
     void waitForBothToolsVisible() {
-        constexpr int STARTUP_ATTEMPTS = 100;
+        constexpr int STARTUP_ATTEMPTS = 600;
+
+        std::cout
+            << "Waiting for both NDI tools to become visible. Press 'p' "
+            << "to pause, 's' to skip this pose.\n";
+
+        NdiToolStatus lastMovingStatus = NdiToolStatus::Detected;
+        NdiToolStatus lastFixedStatus = NdiToolStatus::Detected;
+        bool movingStatusPrinted = false;
+        bool fixedStatusPrinted = false;
 
         for (int attempt = 1; attempt <= STARTUP_ATTEMPTS; ++attempt) {
+            handleUserControls();
+
             requestBxUpdate();
+
+            printToolStatusIfChanged(
+                "Moving",
+                classifyToolStatus(movingToolHandle_),
+                lastMovingStatus,
+                movingStatusPrinted
+            );
+            printToolStatusIfChanged(
+                "Fixed",
+                classifyToolStatus(fixedToolHandle_),
+                lastFixedStatus,
+                fixedStatusPrinted
+            );
 
             NdiPoseSample moving;
             NdiPoseSample fixed;
@@ -541,80 +704,17 @@ private:
                 return;
             }
 
-            if (attempt == 1 || attempt % 20 == 0) {
-                printBxDiagnostics(
-                    attempt,
-                    movingValid,
-                    fixedValid
-                );
-            }
-
             std::this_thread::sleep_for(
                 std::chrono::milliseconds(50)
             );
         }
 
         throw std::runtime_error(
-            "BX did not produce valid transforms for both tools. "
-            "Review the printed BX result codes and port statuses. "
-            "Robot movement was blocked."
+            "BX did not produce valid transforms for both tools after " +
+            std::to_string(STARTUP_ATTEMPTS * 50 / 1000) +
+            " seconds. Check that both tools have a clear, unobstructed "
+            "line of sight to the tracker."
         );
-    }
-
-    void printBxDiagnostics(
-        int attempt,
-        bool movingValid,
-        bool fixedValid
-    ) {
-        float movingTransform[8] = {};
-        float fixedTransform[8] = {};
-
-        const int movingResult = ndiGetBXTransform(
-            tracker_,
-            movingToolHandle_,
-            movingTransform
-        );
-        const int fixedResult = ndiGetBXTransform(
-            tracker_,
-            fixedToolHandle_,
-            fixedTransform
-        );
-
-        const int movingStatus = ndiGetBXPortStatus(
-            tracker_,
-            movingToolHandle_
-        );
-        const int fixedStatus = ndiGetBXPortStatus(
-            tracker_,
-            fixedToolHandle_
-        );
-
-        const unsigned long movingFrame = ndiGetBXFrame(
-            tracker_,
-            movingToolHandle_
-        );
-        const unsigned long fixedFrame = ndiGetBXFrame(
-            tracker_,
-            fixedToolHandle_
-        );
-
-        std::cout
-            << "BX diagnostics attempt " << attempt
-            << " | moving valid="
-            << (movingValid ? "yes" : "no")
-            << ", result=" << movingResult
-            << ", status=0x"
-            << std::hex << movingStatus << std::dec
-            << ", frame=" << movingFrame
-            << ", error=" << movingTransform[7]
-            << " | fixed valid="
-            << (fixedValid ? "yes" : "no")
-            << ", result=" << fixedResult
-            << ", status=0x"
-            << std::hex << fixedStatus << std::dec
-            << ", frame=" << fixedFrame
-            << ", error=" << fixedTransform[7]
-            << '\n';
     }
 
     bool tryReadToolFromCurrentBx(
@@ -997,6 +1097,8 @@ int main() {
             << "Moving marker: rigid body 2\n"
             << "Fixed marker: rigid body 3\n"
             << "Each Enter press commands exactly one pose.\n"
+            << "While waiting on NDI tracking: press 'p' to pause/resume, "
+            << "'s' to skip the current pose.\n"
             << "Press Ctrl+C or use your hardware emergency stop "
             << "if needed.\n";
 
@@ -1039,24 +1141,31 @@ int main() {
             const std::vector<double> actualRadians =
                 ticksToRadiansVector(actualTicks);
 
-            const DualToolCapture ndiCapture =
-                ndi.collectBothTools();
+            try {
+                const DualToolCapture ndiCapture =
+                    ndi.collectBothTools();
 
-            appendCsvRow(
-                csv,
-                poseIndex,
-                targetArray,
-                actualTicks,
-                actualRadians,
-                ndiCapture
-            );
+                appendCsvRow(
+                    csv,
+                    poseIndex,
+                    targetArray,
+                    actualTicks,
+                    actualRadians,
+                    ndiCapture
+                );
 
-            printCapturedPose(
-                poseIndex,
-                actualTicks,
-                actualRadians,
-                ndiCapture
-            );
+                printCapturedPose(
+                    poseIndex,
+                    actualTicks,
+                    actualRadians,
+                    ndiCapture
+                );
+            } catch (const PoseSkippedByUser&) {
+                std::cout
+                    << "\nPose " << poseIndex + 1
+                    << " skipped by user. No NDI data recorded for "
+                    << "this pose.\n";
+            }
         }
 
         std::cout
@@ -1066,6 +1175,13 @@ int main() {
         disableAll(motor, motorIds);
         motor.disconnect();
         return 0;
+    } catch (const PoseSkippedByUser&) {
+        std::cout
+            << "\nSkipped during initial NDI setup (before any pose "
+            << "was captured). Exiting.\n";
+        disableAll(motor, motorIds);
+        motor.disconnect();
+        return 1;
     } catch (const std::exception& error) {
         std::cerr << "\nERROR: " << error.what() << '\n';
         disableAll(motor, motorIds);

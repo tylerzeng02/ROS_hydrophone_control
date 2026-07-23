@@ -529,8 +529,15 @@ bool DynamixelMotor::moveJointsSafely(
     bool midSnapshotCaptured = false;
     lastElectricalSnapshot_.clear();
 
+    constexpr int PRINT_EVERY_N_ITERATIONS = 10;
+    int iterationCount = 0;
+
     while (true)
     {
+        const bool shouldPrint =
+            (iterationCount % PRINT_EVERY_N_ITERATIONS) == 0;
+        ++iterationCount;
+
         bool allReached = true;
         int currentTotalError = 0;
 
@@ -584,12 +591,15 @@ bool DynamixelMotor::moveJointsSafely(
                 motorTolerance = 35;
             }
 
-            std::cout << "Motor " << motorId
-                      << " | Current: " << currentPosition
-                      << " | Target: " << targetPosition
-                      << " | Error: " << error
-                      << " | Tolerance: " << motorTolerance
-                      << std::endl;
+            if (shouldPrint)
+            {
+                std::cout << "Motor " << motorId
+                          << " | Current: " << currentPosition
+                          << " | Target: " << targetPosition
+                          << " | Error: " << error
+                          << " | Tolerance: " << motorTolerance
+                          << std::endl;
+            }
 
             if (error > motorTolerance)
             {
