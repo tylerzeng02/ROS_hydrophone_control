@@ -327,12 +327,12 @@ public:
                  NDI_REQUIRED_VALID_SAMPLES;
              ++attempt) {
 
-            requestTxUpdate();
+            requestBxUpdate();
 
             NdiPoseSample moving;
             NdiPoseSample fixed;
 
-            const bool movingValid = tryReadToolFromCurrentTx(
+            const bool movingValid = tryReadToolFromCurrentBx(
                 movingToolHandle_,
                 "moving",
                 moving,
@@ -340,7 +340,7 @@ public:
                 true
             );
 
-            const bool fixedValid = tryReadToolFromCurrentTx(
+            const bool fixedValid = tryReadToolFromCurrentBx(
                 fixedToolHandle_,
                 "fixed",
                 fixed,
@@ -363,7 +363,7 @@ public:
         if (static_cast<int>(movingAccepted.size()) <
             NDI_REQUIRED_VALID_SAMPLES) {
             throw std::runtime_error(
-                "Not enough synchronized NDI TX samples. Accepted " +
+                "Not enough synchronized NDI BX samples. Accepted " +
                 std::to_string(movingAccepted.size()) + " of " +
                 std::to_string(NDI_REQUIRED_VALID_SAMPLES) +
                 ". Moving invalid: " +
@@ -496,28 +496,30 @@ private:
             << std::hex << handle << std::dec << ".\n";
     }
 
-    void requestTxUpdate() {
-        ndiTX(
+    void requestBxUpdate() {
+        ndiCommand(
             tracker_,
+            "BX:%04X",
             NDI_XFORMS_AND_STATUS |
             NDI_ADDITIONAL_INFO |
-            NDI_FRAME_NUMBER
+            NDI_3D_MARKER_POSITIONS |
+            NDI_NOT_NORMALLY_REPORTED
         );
-        requireNoNdiError("TX");
+        requireNoNdiError("BX");
     }
 
     void waitForBothToolsVisible() {
         constexpr int STARTUP_ATTEMPTS = 100;
 
         for (int attempt = 1; attempt <= STARTUP_ATTEMPTS; ++attempt) {
-            requestTxUpdate();
+            requestBxUpdate();
 
             NdiPoseSample moving;
             NdiPoseSample fixed;
             int movingInvalid = 0;
             int fixedInvalid = 0;
 
-            const bool movingValid = tryReadToolFromCurrentTx(
+            const bool movingValid = tryReadToolFromCurrentBx(
                 movingToolHandle_,
                 "moving",
                 moving,
@@ -525,7 +527,7 @@ private:
                 false
             );
 
-            const bool fixedValid = tryReadToolFromCurrentTx(
+            const bool fixedValid = tryReadToolFromCurrentBx(
                 fixedToolHandle_,
                 "fixed",
                 fixed,
@@ -535,12 +537,12 @@ private:
 
             if (movingValid && fixedValid) {
                 std::cout
-                    << "Both NDI tools are visible through TX.\n";
+                    << "Both NDI tools are visible through BX.\n";
                 return;
             }
 
             if (attempt == 1 || attempt % 20 == 0) {
-                printTxDiagnostics(
+                printBxDiagnostics(
                     attempt,
                     movingValid,
                     fixedValid
@@ -553,51 +555,51 @@ private:
         }
 
         throw std::runtime_error(
-            "TX did not produce valid transforms for both tools. "
-            "Review the printed TX result codes and port statuses. "
+            "BX did not produce valid transforms for both tools. "
+            "Review the printed BX result codes and port statuses. "
             "Robot movement was blocked."
         );
     }
 
-    void printTxDiagnostics(
+    void printBxDiagnostics(
         int attempt,
         bool movingValid,
         bool fixedValid
     ) {
-        double movingTransform[8] = {};
-        double fixedTransform[8] = {};
+        float movingTransform[8] = {};
+        float fixedTransform[8] = {};
 
-        const int movingResult = ndiGetTXTransform(
+        const int movingResult = ndiGetBXTransform(
             tracker_,
             movingToolHandle_,
             movingTransform
         );
-        const int fixedResult = ndiGetTXTransform(
+        const int fixedResult = ndiGetBXTransform(
             tracker_,
             fixedToolHandle_,
             fixedTransform
         );
 
-        const int movingStatus = ndiGetTXPortStatus(
+        const int movingStatus = ndiGetBXPortStatus(
             tracker_,
             movingToolHandle_
         );
-        const int fixedStatus = ndiGetTXPortStatus(
+        const int fixedStatus = ndiGetBXPortStatus(
             tracker_,
             fixedToolHandle_
         );
 
-        const unsigned long movingFrame = ndiGetTXFrame(
+        const unsigned long movingFrame = ndiGetBXFrame(
             tracker_,
             movingToolHandle_
         );
-        const unsigned long fixedFrame = ndiGetTXFrame(
+        const unsigned long fixedFrame = ndiGetBXFrame(
             tracker_,
             fixedToolHandle_
         );
 
         std::cout
-            << "TX diagnostics attempt " << attempt
+            << "BX diagnostics attempt " << attempt
             << " | moving valid="
             << (movingValid ? "yes" : "no")
             << ", result=" << movingResult
@@ -615,27 +617,27 @@ private:
             << '\n';
     }
 
-    bool tryReadToolFromCurrentTx(
+    bool tryReadToolFromCurrentBx(
         int toolHandle,
         const char* toolName,
         NdiPoseSample& sample,
         int& invalidCount,
         bool printErrors
     ) {
-        double transform[8] = {};
+        float transform[8] = {};
 
-        const int result = ndiGetTXTransform(
+        const int result = ndiGetBXTransform(
             tracker_,
             toolHandle,
             transform
         );
 
-        const int portStatus = ndiGetTXPortStatus(
+        const int portStatus = ndiGetBXPortStatus(
             tracker_,
             toolHandle
         );
 
-        const unsigned long frame = ndiGetTXFrame(
+        const unsigned long frame = ndiGetBXFrame(
             tracker_,
             toolHandle
         );
@@ -646,7 +648,7 @@ private:
             if (printErrors) {
                 std::cerr
                     << "NDI " << toolName
-                    << " TX transform rejected: result="
+                    << " BX transform rejected: result="
                     << result
                     << ", status=0x"
                     << std::hex << portStatus << std::dec
@@ -662,7 +664,7 @@ private:
             if (printErrors) {
                 std::cerr
                     << "NDI " << toolName
-                    << " TX port status rejected: status=0x"
+                    << " BX port status rejected: status=0x"
                     << std::hex << portStatus << std::dec
                     << ", frame=" << frame << ".\n";
             }
@@ -698,7 +700,7 @@ private:
             if (printErrors) {
                 std::cerr
                     << "NDI " << toolName
-                    << " TX quality rejected: error="
+                    << " BX quality rejected: error="
                     << sample.error
                     << ", frame=" << frame << ".\n";
             }

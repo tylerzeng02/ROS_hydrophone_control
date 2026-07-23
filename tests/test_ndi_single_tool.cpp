@@ -39,10 +39,19 @@ public:
             );
         }
 
+        ndiTSTOP(tracker_);
+
+        const char* resetReply = ndiRESET(tracker_);
+        std::cout
+            << "Serial break RESET reply: \""
+            << (resetReply != nullptr ? resetReply : "(null)")
+            << "\" | error=" << ndiGetError(tracker_) << '\n';
+
         ndiINIT(tracker_);
         requireNoNdiError("INIT");
 
         freeAllExistingHandles();
+        queryTrackingParameters();
 
         ndiPHRQ(tracker_, "********", "0", "1", "**", "**");
         requireNoNdiError("PHRQ");
@@ -65,7 +74,13 @@ public:
         }
         requireNoNdiError("PVWRFromFile");
 
-        ndiPINIT(tracker_, toolHandle_);
+        {
+            const char* pinitReply = ndiPINIT(tracker_, toolHandle_);
+            std::cout
+                << "PINIT raw reply: \""
+                << (pinitReply != nullptr ? pinitReply : "(null)")
+                << "\"\n";
+        }
         requireNoNdiError("PINIT");
 
         printHandleDiagnostics();
@@ -90,28 +105,30 @@ public:
              sampleIndex <= SAMPLE_COUNT;
              ++sampleIndex) {
 
-            ndiTX(
+            ndiCommand(
                 tracker_,
+                "BX:%04X",
                 NDI_XFORMS_AND_STATUS |
                 NDI_ADDITIONAL_INFO |
-                NDI_FRAME_NUMBER
+                NDI_3D_MARKER_POSITIONS |
+                NDI_NOT_NORMALLY_REPORTED
             );
-            requireNoNdiError("TX");
+            requireNoNdiError("BX");
 
-            double transform[8] = {};
+            float transform[8] = {};
 
-            const int result = ndiGetTXTransform(
+            const int result = ndiGetBXTransform(
                 tracker_,
                 toolHandle_,
                 transform
             );
 
-            const int status = ndiGetTXPortStatus(
+            const int status = ndiGetBXPortStatus(
                 tracker_,
                 toolHandle_
             );
 
-            const unsigned long frame = ndiGetTXFrame(
+            const unsigned long frame = ndiGetBXFrame(
                 tracker_,
                 toolHandle_
             );
@@ -189,7 +206,6 @@ public:
             << SAMPLE_COUNT << '\n';
 
         if (validCount == 0) {
-            sweepVolumes();
             throw std::runtime_error(
                 "No valid transforms were received for rigid body 2."
             );
@@ -197,6 +213,49 @@ public:
     }
 
 private:
+    void tryQuery(const char* label, const char* command) {
+        const char* reply = ndiCommand(tracker_, "%s", command);
+
+        std::cout
+            << label << " [" << command << "] => "
+            << (reply != nullptr ? reply : "(null)")
+            << " | error=" << ndiGetError(tracker_) << '\n';
+    }
+
+    void queryTrackingParameters() {
+        std::cout << "\nQuerying named tracking parameters...\n";
+
+        tryQuery("Sensitivity", "GET:Param.Tracking.Sensitivity");
+        tryQuery("Alerts", "GET:Info.Status.Alerts");
+        tryQuery("Selected Volume", "GET:Param.Tracking.Selected Volume");
+        tryQuery(
+            "Wavelength Warning",
+            "GET:Param.Default Wavelength.Return Warning"
+        );
+        tryQuery(
+            "Firmware Version",
+            "GETINFO:Features.Firmware.Version"
+        );
+
+        tryQuery("All Info.* params", "GET:Info.*");
+        tryQuery("All Param.* params", "GET:Param.*");
+
+        tryQuery(
+            "Illuminator Rate Info",
+            "GETINFO:Param.Tracking.Illuminator Rate"
+        );
+        tryQuery(
+            "Set Illuminator Rate index=1 (20Hz)",
+            "SET:Param.Tracking.Illuminator Rate=1"
+        );
+        tryQuery(
+            "Illuminator Rate after SET(1)",
+            "GET:Param.Tracking.Illuminator Rate"
+        );
+
+        std::cout << '\n';
+    }
+
     void freeAllExistingHandles() {
         ndiPHSR(tracker_, NDI_ALL_HANDLES);
         if (ndiGetError(tracker_) != NDI_OKAY) {
@@ -222,82 +281,6 @@ private:
 
             ndiPDIS(tracker_, handle);
             ndiPHF(tracker_, handle);
-        }
-    }
-
-    void sweepVolumes() {
-        std::cout
-            << "\nNo valid transforms in the current configuration. "
-            << "Sweeping measurement volumes...\n";
-
-        if (tracking_) {
-            ndiTSTOP(tracker_);
-            tracking_ = false;
-        }
-
-        const char* featureReply = ndiSFLIST(tracker_, 0x00);
-        std::cout
-            << "SFLIST feature summary: "
-            << (featureReply != nullptr ? featureReply : "(null)")
-            << '\n';
-
-        const char* volumeReply = ndiSFLIST(tracker_, 0x03);
-        std::cout
-            << "SFLIST volume list: "
-            << (volumeReply != nullptr ? volumeReply : "(null)")
-            << '\n';
-
-        for (int volume = 0; volume <= 4; ++volume) {
-            ndiVSEL(tracker_, volume);
-            if (ndiGetError(tracker_) != NDI_OKAY) {
-                std::cout
-                    << "Volume " << volume
-                    << ": VSEL rejected (error "
-                    << ndiGetError(tracker_) << ").\n";
-                continue;
-            }
-
-            ndiTSTART(tracker_);
-            if (ndiGetError(tracker_) != NDI_OKAY) {
-                std::cout
-                    << "Volume " << volume
-                    << ": TSTART failed (error "
-                    << ndiGetError(tracker_) << ").\n";
-                continue;
-            }
-            tracking_ = true;
-
-            int validInVolume = 0;
-            for (int i = 0; i < 20; ++i) {
-                ndiTX(
-                    tracker_,
-                    NDI_XFORMS_AND_STATUS |
-                    NDI_ADDITIONAL_INFO |
-                    NDI_FRAME_NUMBER
-                );
-
-                double transform[8] = {};
-                const int result = ndiGetTXTransform(
-                    tracker_,
-                    toolHandle_,
-                    transform
-                );
-
-                if (result == NDI_OKAY) {
-                    ++validInVolume;
-                }
-
-                std::this_thread::sleep_for(
-                    std::chrono::milliseconds(50)
-                );
-            }
-
-            std::cout
-                << "Volume " << volume << ": "
-                << validInVolume << " / 20 valid transforms.\n";
-
-            ndiTSTOP(tracker_);
-            tracking_ = false;
         }
     }
 
