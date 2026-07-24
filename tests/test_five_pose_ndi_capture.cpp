@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -58,11 +59,35 @@ void printToolStatusIfChanged(
     everPrinted = true;
 }
 
-// Non-blocking check for the pause ('p') / skip ('s') hotkeys. Call once per
-// polling iteration. Throws PoseSkippedByUser if skip is pressed (either
-// directly or while paused). Returns how long this call spent paused, so
-// callers can shift their own elapsed-time budgets forward by that amount.
-std::chrono::milliseconds handleUserControls() {
+// Prints the manual/auto mode banner after a spacebar toggle.
+void printModeToggle(bool manualModeEnabled) {
+    std::cout
+        << (manualModeEnabled
+                ? "\nManual mode ENABLED -- Enter will be required before "
+                  "each future pose.\n"
+                : "\nManual mode DISABLED -- poses will auto-advance "
+                  "again.\n");
+}
+
+// Non-blocking check for the mode-toggle spacebar. Usable at points where
+// pause/skip wouldn't make sense (e.g. between poses, before a new one has
+// started) -- does nothing for any other key.
+void checkForModeToggle(bool& manualModeEnabled) {
+    if (!_kbhit()) {
+        return;
+    }
+    if (_getch() == ' ') {
+        manualModeEnabled = !manualModeEnabled;
+        printModeToggle(manualModeEnabled);
+    }
+}
+
+// Non-blocking check for the pause ('p') / skip ('s') / manual-mode-toggle
+// (' ') hotkeys. Call once per polling iteration. Throws PoseSkippedByUser
+// if skip is pressed (either directly or while paused). Returns how long
+// this call spent paused, so callers can shift their own elapsed-time
+// budgets forward by that amount.
+std::chrono::milliseconds handleUserControls(bool& manualModeEnabled) {
     if (!_kbhit()) {
         return std::chrono::milliseconds(0);
     }
@@ -73,11 +98,17 @@ std::chrono::milliseconds handleUserControls() {
         throw PoseSkippedByUser{};
     }
 
+    if (key == ' ') {
+        manualModeEnabled = !manualModeEnabled;
+        printModeToggle(manualModeEnabled);
+        return std::chrono::milliseconds(0);
+    }
+
     if (key == 'p' || key == 'P') {
         const auto pauseStart = std::chrono::steady_clock::now();
         std::cout
-            << "\nProcess paused. Press 'p' to resume, or 's' to skip "
-            << "this pose.\n";
+            << "\nProcess paused. Press 'p' to resume, 's' to skip this "
+            << "pose, or space to toggle manual mode.\n";
 
         while (true) {
             if (_kbhit()) {
@@ -88,6 +119,10 @@ std::chrono::milliseconds handleUserControls() {
                 }
                 if (resumeKey == 's' || resumeKey == 'S') {
                     throw PoseSkippedByUser{};
+                }
+                if (resumeKey == ' ') {
+                    manualModeEnabled = !manualModeEnabled;
+                    printModeToggle(manualModeEnabled);
                 }
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -102,7 +137,7 @@ std::chrono::milliseconds handleUserControls() {
 }
 
 constexpr std::size_t JOINT_COUNT = 7;
-constexpr std::size_t POSE_COUNT = 100;
+constexpr std::size_t POSE_COUNT = 200;
 
 constexpr const char* CYTON_DEVICE = "COM4";
 constexpr int CYTON_BAUD_RATE = 1000000;
@@ -132,124 +167,217 @@ constexpr int STALL_REPEATS_TO_DETECT = 3;
 constexpr int STALL_GRACE_SECONDS = 5;
 
 constexpr int NDI_REQUIRED_VALID_SAMPLES = 30;
-constexpr int NDI_MAX_ATTEMPTS = 1000;
 constexpr int NDI_SAMPLE_INTERVAL_MS = 20;
 constexpr int REQUIRED_VISIBLE_MARKERS = 4;
 constexpr double MAX_NDI_ERROR = 0.50;
 
-// Generated for kinematic-calibration data collection: joints 0, 1, 3, 4, 5
-// sweep broadly across their safe tick ranges (jointCalibrations
-// minTick/maxTick, with a 100-tick safety margin from each extreme). Joint 2
-// (shoulder_yaw) uses an extra 100-tick margin beyond that (200 total from
-// each extreme) per an additional caution request. Joint 6 (wrist_roll) is
-// deliberately restricted to a narrow window around its zero tick (2048),
-// since large wrist_roll rotation reorients the moving marker's face away
-// from the Polaris (the marker's reflective side only faces one direction)
-// and the tool goes untrackable. Widen the joint-6 range only after
-// empirically sweeping it (watch the "Moving tool: DETECTED/MISSING"
-// status output) to find how far it can actually rotate while staying
-// visible to the tracker.
+// Hand-recorded via tests/record_hand_poses.cpp: the arm was physically
+// moved by hand (torque off) into each pose and the resulting joint ticks
+// captured, so every pose here is a real, human-verified configuration --
+// not randomly sampled -- meaning it's known in advance to be physically
+// reachable, collision-free, and (assuming it was checked live against the
+// "Moving tool: DETECTED/MISSING" status while posing) marker-visible.
 const std::array<std::array<uint16_t, JOINT_COUNT>, POSE_COUNT> TARGET_POSES = {{
-    {{580, 1366, 1716, 1461, 2520, 1071, 2140}},
-    {{3412, 2614, 1222, 1187, 2815, 1179, 1962}},
-    {{3427, 1783, 2293, 1806, 3115, 1274, 1728}},
-    {{1341, 1532, 3106, 1055, 1968, 947, 2170}},
-    {{600, 2322, 1138, 1838, 2667, 2183, 2089}},
-    {{2316, 2670, 1147, 1724, 1368, 1779, 2018}},
-    {{850, 1315, 2487, 2103, 2453, 1062, 1765}},
-    {{1404, 1235, 2958, 2244, 1262, 1040, 2366}},
-    {{2620, 1775, 2391, 1382, 2486, 2483, 1690}},
-    {{2744, 3126, 3016, 1551, 1638, 1617, 2122}},
-    {{2877, 1152, 1451, 3159, 1924, 2458, 2123}},
-    {{2644, 1182, 1322, 2080, 2631, 1088, 2322}},
-    {{2383, 1951, 1574, 1159, 2239, 2023, 1727}},
-    {{909, 2916, 1164, 1989, 2264, 1685, 1871}},
-    {{2128, 1076, 1833, 3166, 2637, 1738, 1762}},
-    {{2307, 1458, 1735, 2410, 1089, 3041, 1870}},
-    {{525, 2969, 1893, 941, 1290, 1841, 1934}},
-    {{1320, 1271, 2850, 1564, 1651, 2049, 1894}},
-    {{922, 1363, 2323, 2729, 1377, 2315, 2186}},
-    {{982, 2546, 2942, 2559, 2518, 916, 2405}},
-    {{2354, 2633, 1462, 1559, 2256, 1593, 2024}},
-    {{714, 2133, 1426, 2456, 2810, 2170, 1830}},
-    {{476, 1872, 2467, 2695, 2141, 1989, 2413}},
-    {{616, 2856, 2148, 2323, 1756, 2265, 1966}},
-    {{3488, 1867, 2999, 991, 1111, 1023, 2174}},
-    {{1528, 2505, 1176, 1627, 1094, 3166, 1806}},
-    {{1528, 2263, 1883, 2301, 1764, 1528, 2273}},
-    {{1549, 2312, 2859, 2197, 1955, 917, 1954}},
-    {{2001, 1194, 1702, 2774, 1964, 2328, 2134}},
-    {{2472, 1374, 1249, 990, 2952, 1815, 1933}},
-    {{1859, 1232, 1330, 1083, 2903, 1992, 1967}},
-    {{2581, 2780, 3017, 1362, 1187, 3204, 2356}},
-    {{1713, 1374, 1614, 1200, 2710, 1486, 2211}},
-    {{2405, 1235, 2102, 2698, 1407, 2494, 1940}},
-    {{3615, 1200, 1674, 2019, 1889, 2006, 2028}},
-    {{835, 1876, 2063, 1371, 2305, 2450, 2249}},
-    {{1668, 1489, 2798, 1902, 1834, 3105, 2299}},
-    {{2939, 1011, 2697, 2894, 1163, 1780, 1766}},
-    {{2642, 1951, 1776, 2052, 1364, 2142, 2360}},
-    {{1222, 3004, 1194, 2596, 1219, 3144, 1711}},
-    {{1551, 2495, 2151, 2230, 1415, 2639, 2153}},
-    {{1204, 1119, 2221, 2527, 1947, 1331, 1887}},
-    {{3549, 2320, 1972, 2080, 1830, 1027, 2278}},
-    {{2334, 2894, 2544, 980, 1253, 1628, 1940}},
-    {{3158, 2678, 2462, 1325, 2979, 2111, 1987}},
-    {{3544, 1842, 1664, 1980, 1412, 1242, 1875}},
-    {{2994, 3066, 1728, 2726, 1163, 2419, 1663}},
-    {{1797, 1243, 1271, 2055, 2615, 3212, 2203}},
-    {{1046, 2652, 2681, 1513, 1319, 1526, 1733}},
-    {{1411, 1553, 2906, 2488, 2228, 1308, 1882}},
-    {{691, 2748, 1168, 2416, 3135, 948, 1813}},
-    {{3451, 2438, 1443, 2705, 2289, 1297, 2100}},
-    {{3380, 1642, 1163, 1542, 1152, 1576, 2240}},
-    {{2409, 1185, 2602, 1697, 2260, 1932, 2045}},
-    {{1503, 2692, 1658, 1470, 2519, 2529, 2295}},
-    {{2519, 1045, 1250, 2870, 1487, 2373, 2292}},
-    {{3558, 2116, 2134, 2033, 2209, 2311, 2293}},
-    {{2509, 1868, 2140, 2037, 1879, 2244, 2260}},
-    {{1777, 2696, 2970, 1023, 1721, 2575, 2046}},
-    {{3329, 1690, 3055, 2181, 2046, 2126, 2188}},
-    {{1396, 2101, 2141, 2911, 2258, 1123, 2161}},
-    {{2855, 1145, 1621, 1230, 1766, 2613, 2377}},
-    {{3470, 1575, 1905, 1040, 1902, 1623, 2361}},
-    {{1076, 2794, 2149, 2185, 2801, 2539, 2396}},
-    {{2331, 952, 1629, 1912, 1299, 2162, 2018}},
-    {{2300, 2114, 1154, 1280, 2235, 2378, 1927}},
-    {{886, 1213, 1840, 2790, 2449, 2301, 1879}},
-    {{637, 3102, 2248, 3137, 1343, 2303, 2064}},
-    {{775, 2979, 2305, 1182, 1721, 926, 1744}},
-    {{3337, 2445, 2523, 2463, 1821, 2602, 1750}},
-    {{2791, 2508, 2021, 1167, 1419, 2853, 2327}},
-    {{709, 2226, 2093, 2738, 2331, 1723, 2186}},
-    {{724, 1259, 1652, 1277, 2784, 2111, 2376}},
-    {{721, 1253, 2799, 1171, 1813, 2369, 1986}},
-    {{808, 2584, 1823, 1018, 2525, 3146, 1810}},
-    {{2164, 1531, 1777, 2637, 1762, 2012, 1905}},
-    {{2128, 1618, 2220, 2732, 2177, 1477, 2037}},
-    {{3207, 2375, 1649, 1950, 1944, 1721, 2195}},
-    {{2298, 1886, 2237, 2165, 1449, 1928, 1937}},
-    {{3014, 2951, 1519, 2659, 1736, 1359, 1813}},
-    {{2957, 1474, 1306, 2552, 3118, 3241, 2021}},
-    {{2657, 2286, 2997, 1149, 2818, 2554, 2309}},
-    {{887, 1774, 1462, 2649, 1146, 2359, 1681}},
-    {{2098, 2902, 2488, 951, 2526, 2739, 1797}},
-    {{2723, 2555, 1118, 977, 2632, 1948, 2375}},
-    {{802, 2145, 1438, 2137, 2312, 2272, 1852}},
-    {{2301, 3129, 2053, 2464, 2794, 2211, 2049}},
-    {{2044, 2761, 2186, 1434, 2659, 1810, 2285}},
-    {{701, 3011, 2341, 2733, 1966, 2087, 1669}},
-    {{2268, 969, 2202, 2259, 1537, 1202, 1885}},
-    {{2736, 2730, 1894, 1657, 1667, 1915, 2411}},
-    {{1719, 1021, 2925, 1882, 1069, 1209, 1984}},
-    {{1285, 2294, 3062, 2362, 1952, 1751, 1674}},
-    {{2260, 2940, 2331, 2599, 2414, 910, 1889}},
-    {{3341, 1387, 2105, 2730, 2754, 2943, 1675}},
-    {{3587, 1645, 2026, 2560, 2218, 960, 2331}},
-    {{944, 2832, 3062, 2897, 1794, 2352, 2214}},
-    {{872, 2861, 1570, 2372, 1475, 1785, 2024}},
-    {{1154, 1895, 1868, 2421, 2409, 1510, 2026}},
-    {{3405, 1262, 1339, 1617, 2333, 2086, 2268}},
+    {{2079, 2031, 923, 2518, 3195, 2140, 2384}},
+    {{2195, 1830, 922, 2489, 3200, 2262, 2248}},
+    {{2424, 1900, 923, 2260, 3178, 2246, 1821}},
+    {{2539, 1837, 928, 2003, 3181, 2285, 1458}},
+    {{2800, 1722, 930, 1935, 3196, 2342, 1147}},
+    {{3091, 1626, 928, 1882, 3156, 2483, 665}},
+    {{3460, 1981, 916, 1894, 3158, 2032, 337}},
+    {{3535, 944, 929, 2120, 2923, 3096, 544}},
+    {{2725, 1947, 921, 2011, 3233, 3176, 999}},
+    {{2720, 1731, 921, 1684, 3187, 2938, 1001}},
+    {{2722, 1526, 925, 1686, 3195, 2498, 1001}},
+    {{2803, 1526, 937, 1679, 3244, 2176, 999}},
+    {{3030, 1337, 996, 1703, 2793, 2165, 383}},
+    {{3060, 936, 999, 1707, 2938, 2195, 414}},
+    {{3068, 3142, 1197, 1950, 2854, 2211, 951}},
+    {{3223, 3172, 1190, 1892, 2854, 2487, 951}},
+    {{3192, 3172, 1286, 1895, 2856, 2897, 952}},
+    {{3133, 3228, 1523, 1913, 2771, 1191, 1037}},
+    {{2895, 3225, 1527, 1910, 2770, 1179, 1038}},
+    {{2667, 3111, 1529, 1528, 2126, 1632, 785}},
+    {{2593, 3220, 1525, 1136, 2031, 1799, 787}},
+    {{2539, 2994, 1525, 1014, 2033, 1716, 831}},
+    {{2293, 3231, 1525, 1006, 2038, 1936, 1007}},
+    {{2202, 3228, 1525, 830, 1596, 1330, 1006}},
+    {{2200, 2792, 1233, 829, 1940, 1990, 1142}},
+    {{2208, 2360, 1266, 1031, 2597, 2134, 1144}},
+    {{2207, 2332, 1666, 1366, 2595, 1493, 1143}},
+    {{2323, 2222, 2090, 988, 2690, 942, 1144}},
+    {{2321, 2194, 2133, 829, 2381, 1366, 1146}},
+    {{2351, 1945, 2249, 831, 2372, 1538, 1144}},
+    {{2261, 1684, 2249, 830, 2047, 1857, 873}},
+    {{2190, 1371, 2249, 833, 1746, 1864, 573}},
+    {{1613, 852, 2211, 2503, 1358, 2128, 2834}},
+    {{1593, 851, 2207, 1582, 1362, 2288, 3532}},
+    {{1461, 911, 2105, 2144, 1039, 2826, 3527}},
+    {{1176, 1077, 2081, 2345, 1487, 2930, 3525}},
+    {{1158, 1356, 2080, 3245, 2021, 2569, 3303}},
+    {{1160, 1801, 2080, 3273, 2022, 2759, 3306}},
+    {{1135, 1508, 1853, 3267, 2129, 1877, 2979}},
+    {{1107, 1679, 1851, 2898, 2034, 1795, 2976}},
+    {{1107, 1560, 1850, 2794, 2032, 1589, 2976}},
+    {{1058, 1106, 1712, 2989, 1959, 1988, 3238}},
+    {{969, 944, 1713, 3273, 1818, 2352, 3240}},
+    {{968, 852, 1713, 3272, 1442, 2557, 3563}},
+    {{2233, 853, 991, 2539, 2168, 2868, 3028}},
+    {{2354, 852, 991, 2911, 2169, 2917, 3028}},
+    {{2383, 852, 991, 3265, 2179, 2986, 3027}},
+    {{3769, 1886, 1363, 1423, 1024, 1698, 512}},
+    {{3249, 1885, 1132, 1420, 1026, 2130, 337}},
+    {{2487, 1809, 1197, 1062, 1301, 1998, 3383}},
+    {{2236, 1809, 1197, 1062, 1303, 2114, 3378}},
+    {{2151, 1809, 1197, 1061, 1277, 2270, 3377}},
+    {{2056, 1810, 1198, 1061, 1211, 2366, 3376}},
+    {{1981, 1811, 1198, 1061, 1186, 2466, 3376}},
+    {{1946, 1809, 1198, 1061, 1171, 2757, 3376}},
+    {{1881, 1813, 1199, 1061, 1137, 3122, 3382}},
+    {{1612, 2218, 1140, 1215, 958, 2296, 2506}},
+    {{1457, 2218, 1141, 1299, 955, 2357, 2419}},
+    {{1311, 2218, 1139, 1365, 955, 2165, 2123}},
+    {{620, 1961, 1155, 2602, 962, 2168, 339}},
+    {{555, 1961, 1036, 2604, 1155, 2503, 340}},
+    {{973, 1891, 2138, 2101, 2034, 2153, 3172}},
+    {{975, 1743, 2139, 2105, 2035, 2092, 3173}},
+    {{975, 1631, 2169, 2102, 2035, 1844, 3173}},
+    {{973, 1516, 2188, 2109, 2034, 1738, 3149}},
+    {{975, 1359, 2188, 2126, 2035, 1746, 3149}},
+    {{975, 1621, 2189, 2736, 2034, 1971, 3118}},
+    {{975, 1766, 2195, 2749, 2035, 2011, 3069}},
+    {{971, 1935, 2217, 2767, 2037, 1988, 3069}},
+    {{966, 2154, 2286, 2777, 2035, 1969, 3069}},
+    {{908, 2381, 2286, 2720, 2032, 1909, 3072}},
+    {{707, 2702, 2287, 2614, 2034, 1574, 3072}},
+    {{687, 2952, 2270, 2391, 2006, 1262, 3072}},
+    {{691, 3222, 2883, 1795, 1978, 2948, 2082}},
+    {{889, 3222, 2879, 1796, 1977, 2980, 2083}},
+    {{1013, 3222, 2881, 1752, 2006, 3127, 2567}},
+    {{961, 852, 3307, 3187, 2128, 2025, 2241}},
+    {{1175, 852, 3306, 2719, 2838, 2181, 1557}},
+    {{1175, 851, 3305, 2760, 3035, 1965, 1558}},
+    {{1234, 851, 2144, 3219, 2457, 2780, 2570}},
+    {{1295, 1715, 2196, 3274, 2223, 2680, 2824}},
+    {{1296, 2151, 1367, 3272, 2165, 2187, 3531}},
+    {{984, 2274, 1322, 3273, 2244, 1968, 3664}},
+    {{487, 2425, 1273, 3273, 2245, 1647, 3750}},
+    {{414, 3223, 2506, 1853, 2037, 2629, 1949}},
+    {{580, 3223, 2506, 1854, 2036, 2705, 1949}},
+    {{758, 3223, 2505, 1851, 2036, 2787, 2268}},
+    {{973, 3220, 2584, 1671, 2355, 2975, 2339}},
+    {{1097, 3229, 2576, 1215, 2081, 1579, 3273}},
+    {{1524, 3229, 2577, 830, 2141, 1993, 3016}},
+    {{1601, 3225, 2577, 829, 2126, 1533, 3017}},
+    {{1601, 3225, 2577, 829, 2116, 1493, 3017}},
+    {{1723, 2512, 2578, 829, 1566, 2001, 3015}},
+    {{1724, 2705, 2578, 829, 1588, 1941, 2835}},
+    {{1725, 2712, 2577, 829, 1589, 1517, 2825}},
+    {{1722, 2902, 2580, 829, 2240, 2653, 2679}},
+    {{1431, 3224, 2580, 829, 2533, 2470, 2684}},
+    {{1140, 3224, 2580, 829, 2607, 2529, 2788}},
+    {{1069, 3225, 2580, 829, 2616, 1569, 3498}},
+    {{758, 3226, 2579, 830, 2861, 1756, 3754}},
+    {{2337, 1408, 932, 1667, 1963, 2089, 2895}},
+    {{2340, 1377, 931, 1695, 2027, 1751, 2895}},
+    {{2455, 1205, 933, 1686, 2029, 1621, 3027}},
+    {{2693, 852, 1575, 2260, 1572, 1260, 3753}},
+    {{2712, 877, 1589, 2581, 1574, 1110, 3753}},
+    {{2738, 869, 1588, 2863, 1571, 1024, 3753}},
+    {{2912, 851, 2010, 2997, 962, 945, 3754}},
+    {{3067, 851, 2010, 3255, 2050, 2298, 796}},
+    {{3077, 1229, 2009, 3163, 2049, 2002, 796}},
+    {{3078, 1042, 2009, 3259, 2190, 2552, 798}},
+    {{3477, 852, 2009, 3269, 2685, 2652, 351}},
+    {{3657, 854, 2011, 3037, 2775, 2682, 3753}},
+    {{3668, 853, 2016, 3267, 2514, 2437, 336}},
+    {{3763, 852, 2017, 3274, 2615, 2276, 336}},
+    {{3763, 853, 2017, 3273, 2307, 2113, 336}},
+    {{3760, 853, 2015, 3272, 2042, 2024, 336}},
+    {{3758, 852, 2015, 3272, 1788, 1974, 335}},
+    {{3758, 852, 2015, 3272, 1567, 1904, 335}},
+    {{3747, 852, 3170, 3189, 2265, 1788, 3289}},
+    {{3654, 852, 3170, 3262, 2182, 1945, 3293}},
+    {{3650, 852, 3170, 3274, 1986, 2657, 3294}},
+    {{3646, 852, 3167, 3240, 1549, 2773, 3689}},
+    {{2742, 852, 3168, 3274, 1038, 2463, 3695}},
+    {{2568, 852, 3168, 3274, 1026, 2318, 3694}},
+    {{2329, 852, 3169, 3274, 960, 2053, 3691}},
+    {{2323, 852, 3169, 3273, 958, 1711, 3694}},
+    {{2342, 852, 3170, 3260, 958, 1451, 3693}},
+    {{2340, 852, 3168, 3273, 2340, 2055, 841}},
+    {{2340, 853, 3168, 3269, 2678, 2419, 640}},
+    {{2577, 852, 3168, 3270, 2906, 2586, 443}},
+    {{2865, 852, 3168, 3260, 3176, 2186, 335}},
+    {{3593, 852, 3287, 3238, 3148, 1558, 335}},
+    {{3588, 852, 3287, 3261, 3196, 1629, 335}},
+    {{3770, 853, 3288, 2609, 3175, 1327, 3753}},
+    {{3769, 853, 3288, 2603, 3046, 1475, 3753}},
+    {{2938, 852, 3287, 3021, 2229, 2294, 3752}},
+    {{2937, 852, 3287, 3056, 2056, 2272, 3753}},
+    {{2931, 852, 3287, 3173, 1839, 2220, 3752}},
+    {{2929, 852, 3287, 3271, 1681, 2277, 3751}},
+    {{2855, 852, 3287, 3272, 1439, 2330, 3752}},
+    {{2166, 852, 3286, 3273, 1199, 1719, 3753}},
+    {{1889, 852, 3287, 3274, 1166, 1433, 3753}},
+    {{1669, 852, 3234, 2889, 1027, 756, 3752}},
+    {{1535, 852, 3232, 2368, 1026, 1320, 3484}},
+    {{1418, 852, 3222, 2230, 1027, 1480, 3483}},
+    {{1185, 852, 2876, 2012, 1634, 1511, 3546}},
+    {{1180, 852, 2883, 2003, 1639, 2470, 3073}},
+    {{1206, 907, 2876, 2408, 1703, 3049, 3072}},
+    {{1377, 852, 2657, 1798, 1710, 2560, 3076}},
+    {{1186, 853, 2656, 1804, 1710, 3099, 3075}},
+    {{864, 852, 2658, 2225, 1711, 3187, 3075}},
+    {{866, 852, 2659, 2027, 1712, 3314, 3077}},
+    {{701, 905, 2657, 2935, 1830, 2586, 3073}},
+    {{599, 852, 2657, 3114, 2028, 2488, 3076}},
+    {{598, 853, 2657, 3272, 2201, 2651, 3076}},
+    {{600, 853, 2658, 3273, 2546, 2728, 2767}},
+    {{1067, 853, 2657, 3259, 2834, 2340, 2376}},
+    {{1424, 853, 2658, 2833, 2924, 2060, 1759}},
+    {{1429, 852, 2657, 2343, 2924, 1859, 1152}},
+    {{1428, 852, 2657, 2052, 2727, 1778, 762}},
+    {{1571, 852, 2661, 1890, 2818, 1973, 627}},
+    {{1741, 852, 2715, 1887, 2927, 2165, 626}},
+    {{2119, 852, 2581, 1991, 3138, 2816, 337}},
+    {{2215, 853, 2762, 2420, 3139, 2790, 336}},
+    {{2214, 853, 2951, 2841, 2954, 2766, 336}},
+    {{2277, 854, 3292, 3071, 2855, 2644, 337}},
+    {{2334, 855, 3292, 2945, 2726, 2360, 336}},
+    {{2607, 852, 3290, 2717, 2581, 2437, 3754}},
+    {{2867, 856, 3291, 2842, 2477, 2211, 3751}},
+    {{2868, 854, 3289, 2855, 2315, 2298, 3751}},
+    {{2961, 2039, 2353, 2115, 1695, 2152, 859}},
+    {{2961, 2132, 2353, 2150, 1696, 2018, 862}},
+    {{2958, 2251, 2366, 2205, 1696, 1800, 935}},
+    {{2980, 2364, 2368, 2208, 1696, 1762, 977}},
+    {{2995, 2493, 2366, 2217, 1693, 1596, 979}},
+    {{3000, 2615, 2368, 2216, 1695, 1844, 1034}},
+    {{3012, 2628, 2366, 2217, 1693, 2028, 1034}},
+    {{3031, 2620, 2365, 2214, 1642, 2204, 1035}},
+    {{3046, 2484, 2367, 2063, 1633, 1385, 1033}},
+    {{3046, 2409, 2368, 1866, 1634, 1466, 1034}},
+    {{3046, 2287, 2368, 1709, 1635, 1622, 1035}},
+    {{3045, 2176, 2368, 1618, 1640, 1734, 1036}},
+    {{3046, 2078, 2369, 1488, 1640, 2009, 1097}},
+    {{3051, 1973, 2378, 1222, 1649, 2403, 1316}},
+    {{3128, 1935, 2496, 1224, 1639, 2396, 1315}},
+    {{3213, 1943, 2534, 1424, 1576, 2157, 1334}},
+    {{3232, 1950, 2724, 1463, 1450, 2102, 1338}},
+    {{3257, 1956, 2923, 1472, 1305, 2116, 1338}},
+    {{3333, 2077, 3046, 1481, 1048, 2506, 1334}},
+    {{3410, 2255, 3293, 1561, 958, 2573, 1222}},
+    {{3611, 2410, 3294, 1681, 960, 2593, 1226}},
+    {{3735, 2632, 3293, 1694, 971, 2710, 1423}},
+    {{3610, 2537, 2358, 1369, 1765, 1896, 880}},
+    {{3582, 2784, 2424, 1149, 1778, 1606, 883}},
+    {{3163, 1969, 2198, 1880, 1822, 2147, 881}},
+    {{3121, 1904, 1857, 1729, 1694, 1976, 881}},
+    {{3081, 1696, 1675, 1580, 1693, 2096, 734}},
+    {{2646, 1351, 1486, 1578, 2766, 2068, 730}},
+    {{2615, 1183, 1471, 1580, 2781, 1907, 543}},
+    {{2500, 1110, 1461, 1651, 2789, 1632, 347}},
 }};
 
 struct NdiPoseSample {
@@ -303,10 +431,24 @@ std::vector<uint16_t> readActualTicks(
             );
         }
         if (!motor.isPositionSafe(id, position)) {
-            throw std::runtime_error(
-                "Motor " + std::to_string(id) +
-                " is outside its calibrated safe range."
-            );
+            std::cout
+                << "\nWARNING: motor " << id << " ended up at position "
+                << position << ", which is outside its calibrated safe "
+                << "range. This pose cannot be safely captured.\n"
+                << "Press 's' to skip this pose (torque stays enabled, "
+                << "the arm keeps holding its current position).\n";
+
+            while (true) {
+                if (_kbhit()) {
+                    const int key = _getch();
+                    if (key == 's' || key == 'S') {
+                        throw PoseSkippedByUser{};
+                    }
+                }
+                std::this_thread::sleep_for(
+                    std::chrono::milliseconds(100)
+                );
+            }
         }
         ticks.push_back(position);
     }
@@ -469,7 +611,7 @@ public:
         shutdown();
     }
 
-    void initialize() {
+    void initialize(bool& manualModeEnabled) {
         tracker_ = ndiOpenSerial(device_);
         if (tracker_ == nullptr) {
             throw std::runtime_error(
@@ -508,16 +650,16 @@ public:
             << "Fixed tool handle: 0x"
             << fixedToolHandle_ << std::dec << '\n';
 
-        waitForBothToolsVisible();
+        waitForBothToolsVisible(manualModeEnabled);
     }
 
-    DualToolCapture collectBothTools() {
-        waitForBothToolsVisible();
+    DualToolCapture collectBothTools(bool& manualModeEnabled) {
+        waitForBothToolsVisible(manualModeEnabled);
 
         std::cout
             << "Collecting " << NDI_REQUIRED_VALID_SAMPLES
             << " synchronized samples. Press 'p' to pause, 's' to skip "
-            << "this pose.\n";
+            << "this pose, or space to toggle manual mode.\n";
 
         std::vector<NdiPoseSample> movingAccepted;
         std::vector<NdiPoseSample> fixedAccepted;
@@ -534,13 +676,20 @@ public:
         bool movingStatusPrinted = false;
         bool fixedStatusPrinted = false;
 
+        // No attempt cap here on purpose: a mere visibility/quality
+        // timeout must never abort the whole run (see the "'s' to skip"
+        // hotkey for the deliberate, user-triggered way to give up on a
+        // pose instead). Every WARNING_INTERVAL_ATTEMPTS attempts
+        // (~NDI_SAMPLE_INTERVAL_MS * that many ms) it prints a reminder
+        // instead of throwing, and keeps going indefinitely.
+        constexpr int WARNING_INTERVAL_ATTEMPTS = 1000;
+
         for (int attempt = 0;
-             attempt < NDI_MAX_ATTEMPTS &&
              static_cast<int>(movingAccepted.size()) <
                  NDI_REQUIRED_VALID_SAMPLES;
              ++attempt) {
 
-            handleUserControls();
+            handleUserControls(manualModeEnabled);
 
             requestBxUpdate();
 
@@ -583,23 +732,22 @@ public:
                 ++rejectedPairCount;
             }
 
+            if (attempt > 0 && attempt % WARNING_INTERVAL_ATTEMPTS == 0) {
+                std::cout
+                    << "\nWARNING: only " << movingAccepted.size() << "/"
+                    << NDI_REQUIRED_VALID_SAMPLES << " valid samples "
+                    << "collected after "
+                    << (attempt * NDI_SAMPLE_INTERVAL_MS) / 1000
+                    << "s (moving invalid: " << movingInvalidCount
+                    << ", fixed invalid: " << fixedInvalidCount
+                    << ", rejected pairs: " << rejectedPairCount << "). "
+                    << "Check that both tools have a clear, unobstructed "
+                    << "line of sight to the tracker, or press 's' to "
+                    << "skip this pose.\n";
+            }
+
             std::this_thread::sleep_for(
                 std::chrono::milliseconds(NDI_SAMPLE_INTERVAL_MS)
-            );
-        }
-
-        if (static_cast<int>(movingAccepted.size()) <
-            NDI_REQUIRED_VALID_SAMPLES) {
-            throw std::runtime_error(
-                "Not enough synchronized NDI BX samples. Accepted " +
-                std::to_string(movingAccepted.size()) + " of " +
-                std::to_string(NDI_REQUIRED_VALID_SAMPLES) +
-                ". Moving invalid: " +
-                std::to_string(movingInvalidCount) +
-                ", fixed invalid: " +
-                std::to_string(fixedInvalidCount) +
-                ", rejected pairs: " +
-                std::to_string(rejectedPairCount) + "."
             );
         }
 
@@ -762,20 +910,24 @@ private:
         return NdiToolStatus::Detected;
     }
 
-    void waitForBothToolsVisible() {
-        constexpr int STARTUP_ATTEMPTS = 600;
+    void waitForBothToolsVisible(bool& manualModeEnabled) {
+        // No attempt cap here on purpose -- see the identical note in
+        // collectBothTools(). A visibility timeout must never abort the
+        // whole run; it just keeps waiting and reminds periodically.
+        constexpr int WARNING_INTERVAL_ATTEMPTS = 600;
 
         std::cout
             << "Waiting for both NDI tools to become visible. Press 'p' "
-            << "to pause, 's' to skip this pose.\n";
+            << "to pause, 's' to skip this pose, or space to toggle "
+            << "manual mode.\n";
 
         NdiToolStatus lastMovingStatus = NdiToolStatus::Detected;
         NdiToolStatus lastFixedStatus = NdiToolStatus::Detected;
         bool movingStatusPrinted = false;
         bool fixedStatusPrinted = false;
 
-        for (int attempt = 1; attempt <= STARTUP_ATTEMPTS; ++attempt) {
-            handleUserControls();
+        for (int attempt = 1; ; ++attempt) {
+            handleUserControls(manualModeEnabled);
 
             requestBxUpdate();
 
@@ -819,17 +971,19 @@ private:
                 return;
             }
 
+            if (attempt > 0 && attempt % WARNING_INTERVAL_ATTEMPTS == 0) {
+                std::cout
+                    << "\nWARNING: still waiting for both tools to "
+                    << "become visible after " << (attempt * 50) / 1000
+                    << "s. Check that both tools have a clear, "
+                    << "unobstructed line of sight to the tracker, or "
+                    << "press 's' to skip this pose.\n";
+            }
+
             std::this_thread::sleep_for(
                 std::chrono::milliseconds(50)
             );
         }
-
-        throw std::runtime_error(
-            "BX did not produce valid transforms for both tools after " +
-            std::to_string(STARTUP_ATTEMPTS * 50 / 1000) +
-            " seconds. Check that both tools have a clear, unobstructed "
-            "line of sight to the tracker."
-        );
     }
 
     bool tryReadToolFromCurrentBx(
@@ -1154,6 +1308,68 @@ void printCapturedPose(
     );
 }
 
+// Checks OUTPUT_CSV (if it already exists from a previous, interrupted
+// run) for poses already captured, so a fresh run continues from the next
+// pose instead of overwriting earlier data. Also sanity-checks that
+// TARGET_POSES hasn't changed underneath the already-captured rows.
+// Returns the 0-based index of the next pose to attempt (0 if the file
+// doesn't exist yet or has no data rows).
+std::size_t findResumeStartIndex(const std::string& csvPath) {
+    std::ifstream in(csvPath);
+    if (!in) {
+        return 0;
+    }
+
+    std::string line;
+    std::getline(in, line);  // header row, discarded
+
+    std::size_t maxPoseId = 0;
+
+    while (std::getline(in, line)) {
+        if (line.empty()) {
+            continue;
+        }
+
+        std::stringstream fields(line);
+        std::string field;
+
+        if (!std::getline(fields, field, ',')) {
+            continue;
+        }
+        const std::size_t poseId = static_cast<std::size_t>(std::stoul(field));
+
+        std::getline(fields, field, ',');  // timestamp_ms, discarded
+
+        std::array<uint16_t, JOINT_COUNT> targetTicks{};
+        bool parsedOk = true;
+        for (std::size_t i = 0; i < JOINT_COUNT; ++i) {
+            if (!std::getline(fields, field, ',')) {
+                parsedOk = false;
+                break;
+            }
+            targetTicks[i] = static_cast<uint16_t>(std::stoi(field));
+        }
+
+        if (parsedOk && poseId >= 1 && poseId <= TARGET_POSES.size()) {
+            const auto& expected = TARGET_POSES[poseId - 1];
+            if (targetTicks != expected) {
+                std::cout
+                    << "WARNING: recorded pose " << poseId << " in "
+                    << csvPath << " does not match the current "
+                    << "TARGET_POSES entry at that index -- the pose "
+                    << "list may have changed since that data was "
+                    << "captured.\n";
+            }
+        }
+
+        if (poseId > maxPoseId) {
+            maxPoseId = poseId;
+        }
+    }
+
+    return maxPoseId;
+}
+
 }  // namespace
 
 int main() {
@@ -1174,16 +1390,27 @@ int main() {
             }
         }
 
+        const std::size_t resumeStartIndex =
+            findResumeStartIndex(OUTPUT_CSV);
+        const bool resuming = resumeStartIndex > 0;
+
         std::ofstream csv(
             OUTPUT_CSV,
-            std::ios::out | std::ios::trunc
+            std::ios::out | (resuming ? std::ios::app : std::ios::trunc)
         );
         if (!csv) {
             throw std::runtime_error(
                 std::string("Could not open CSV: ") + OUTPUT_CSV
             );
         }
-        writeCsvHeader(csv);
+        if (!resuming) {
+            writeCsvHeader(csv);
+        } else {
+            std::cout
+                << "Resuming: " << resumeStartIndex << " pose(s) already "
+                << "captured in " << OUTPUT_CSV << ". Continuing from "
+                << "pose " << resumeStartIndex + 1 << ".\n";
+        }
 
         if (!motor.connect()) {
             throw std::runtime_error(
@@ -1199,32 +1426,43 @@ int main() {
             }
         }
 
+        bool manualModeEnabled = false;
+
         NdiTracker ndi(
             NDI_DEVICE,
             MOVING_TOOL_ROM,
             FIXED_TOOL_ROM
         );
-        ndi.initialize();
+        ndi.initialize(manualModeEnabled);
 
         std::cout
             << "\nFive-pose Cyton + dual-tool NDI capture test\n"
             << "Output: " << OUTPUT_CSV << "\n"
             << "Moving marker: rigid body 2\n"
             << "Fixed marker: rigid body 3\n"
-            << "Each Enter press commands exactly one pose.\n"
-            << "While waiting on NDI tracking: press 'p' to pause/resume, "
-            << "'s' to skip the current pose.\n"
+            << "Poses auto-advance by default -- no Enter needed.\n"
+            << "At any time: 'p' pauses/resumes, 's' skips the current "
+            << "pose, and space toggles manual mode (requires Enter "
+            << "before each future pose until toggled off again).\n"
             << "Press Ctrl+C or use your hardware emergency stop "
             << "if needed.\n";
 
-        for (std::size_t poseIndex = 0;
+        for (std::size_t poseIndex = resumeStartIndex;
              poseIndex < TARGET_POSES.size();
              ++poseIndex) {
-            waitForEnter(
-                "\nPress Enter to move to pose " +
-                std::to_string(poseIndex + 1) + " of " +
-                std::to_string(POSE_COUNT) + "..."
-            );
+            checkForModeToggle(manualModeEnabled);
+
+            if (manualModeEnabled) {
+                waitForEnter(
+                    "\nPress Enter to move to pose " +
+                    std::to_string(poseIndex + 1) + " of " +
+                    std::to_string(POSE_COUNT) + "..."
+                );
+            } else {
+                std::cout
+                    << "\nAuto-advancing to pose " << poseIndex + 1
+                    << " of " << POSE_COUNT << "...\n";
+            }
 
             const auto& targetArray = TARGET_POSES[poseIndex];
             const std::vector<uint16_t> targetTicks(
@@ -1257,15 +1495,15 @@ int main() {
                 std::chrono::milliseconds(SETTLING_TIME_MS)
             );
 
-            const std::vector<uint16_t> actualTicks =
-                readActualTicks(motor, motorIds);
-
-            const std::vector<double> actualRadians =
-                ticksToRadiansVector(actualTicks);
-
             try {
+                const std::vector<uint16_t> actualTicks =
+                    readActualTicks(motor, motorIds);
+
+                const std::vector<double> actualRadians =
+                    ticksToRadiansVector(actualTicks);
+
                 const DualToolCapture ndiCapture =
-                    ndi.collectBothTools();
+                    ndi.collectBothTools(manualModeEnabled);
 
                 appendCsvRow(
                     csv,

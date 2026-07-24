@@ -1,6 +1,7 @@
 #include <array>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -36,6 +37,46 @@ void waitForEnter(const std::string& message) {
     std::getline(std::cin, line);
 }
 
+// Loads any poses already recorded by a previous run of this program, so a
+// new session continues the same batch instead of starting over. Silently
+// does nothing if the file doesn't exist yet (first run).
+void loadExistingPoses(
+    const std::string& path,
+    std::vector<std::array<uint16_t, JOINT_COUNT>>& poses
+) {
+    std::ifstream in(path);
+    if (!in) {
+        return;
+    }
+
+    std::string line;
+    std::getline(in, line);  // header row, discarded
+
+    while (std::getline(in, line)) {
+        if (line.empty()) {
+            continue;
+        }
+
+        std::stringstream fields(line);
+        std::string field;
+        std::getline(fields, field, ',');  // pose_id, discarded (renumbered on write)
+
+        std::array<uint16_t, JOINT_COUNT> pose{};
+        bool valid = true;
+        for (std::size_t i = 0; i < JOINT_COUNT; ++i) {
+            if (!std::getline(fields, field, ',')) {
+                valid = false;
+                break;
+            }
+            pose[i] = static_cast<uint16_t>(std::stoi(field));
+        }
+
+        if (valid) {
+            poses.push_back(pose);
+        }
+    }
+}
+
 }  // namespace
 
 int main() {
@@ -48,10 +89,63 @@ int main() {
     );
 
     std::vector<std::array<uint16_t, JOINT_COUNT>> recordedPoses;
+    loadExistingPoses(OUTPUT_CSV, recordedPoses);
+    const std::size_t preloadedCount = recordedPoses.size();
+    if (preloadedCount > 0) {
+        std::cout
+            << "Loaded " << preloadedCount << " pose(s) already recorded "
+            << "in " << OUTPUT_CSV << " -- continuing that batch.\n";
+    }
+
     std::vector<std::pair<uint16_t, uint16_t>> originalAngleLimits(
         motorIds.size()
     );
     bool angleLimitsWidened = false;
+
+    auto writeCsv = [&]() {
+        std::ofstream csvOut(OUTPUT_CSV, std::ios::out | std::ios::trunc);
+        if (!csvOut) {
+            return;
+        }
+        csvOut << "pose_id";
+        for (std::size_t i = 0; i < JOINT_COUNT; ++i) {
+            csvOut << ",tick_" << i;
+        }
+        csvOut << '\n';
+        for (std::size_t p = 0; p < recordedPoses.size(); ++p) {
+            csvOut << p + 1;
+            for (uint16_t tick : recordedPoses[p]) {
+                csvOut << ',' << tick;
+            }
+            csvOut << '\n';
+        }
+    };
+
+    auto writeSnippet = [&]() {
+        std::ofstream snippet(
+            OUTPUT_CPP_SNIPPET,
+            std::ios::out | std::ios::trunc
+        );
+        if (!snippet) {
+            return;
+        }
+        snippet
+            << "constexpr std::size_t POSE_COUNT = "
+            << recordedPoses.size() << ";\n"
+            << "const std::array<std::array<uint16_t, JOINT_COUNT>, "
+            << "POSE_COUNT> TARGET_POSES = {{\n";
+        for (const auto& pose : recordedPoses) {
+            snippet << "    {{";
+            for (std::size_t i = 0; i < JOINT_COUNT; ++i) {
+                snippet << pose[i];
+                if (i + 1 < JOINT_COUNT) {
+                    snippet << ", ";
+                }
+            }
+            snippet << "}},\n";
+        }
+        snippet << "}};\n";
+    };
 
     auto restoreAngleLimits = [&]() {
         if (!angleLimitsWidened) {
@@ -70,17 +164,6 @@ int main() {
             }
         }
     };
-
-    std::ofstream csv(OUTPUT_CSV, std::ios::out | std::ios::trunc);
-    if (!csv) {
-        std::cerr << "Could not open CSV: " << OUTPUT_CSV << '\n';
-        return 1;
-    }
-    csv << "pose_id";
-    for (std::size_t i = 0; i < JOINT_COUNT; ++i) {
-        csv << ",tick_" << i;
-    }
-    csv << '\n';
 
     try {
         if (!motor.connect()) {
@@ -155,21 +238,28 @@ int main() {
         std::cout
             << "\nHand-pose recorder\n"
             << "Torque is OFF -- move the arm by hand into a pose.\n"
-            << "Press Enter to lock and record that pose (up to "
-            << POSE_COUNT << " total).\n"
+            << "Press Enter to lock and record that pose ("
+            << POSE_COUNT << " new poses this session"
+            << (preloadedCount > 0
+                    ? ", added to the " + std::to_string(preloadedCount) +
+                          " already loaded"
+                    : "")
+            << ").\n"
             << "Torque briefly enables to hold exactly where the arm "
             << "already is, the position is recorded, then torque "
             << "releases again so you can move to the next pose.\n"
             << "Press Ctrl+C to stop early -- poses recorded so far are "
-            << "already saved to " << OUTPUT_CSV << " (each row is "
-            << "written and flushed immediately, not batched at the end).\n";
+            << "already saved to both " << OUTPUT_CSV << " and "
+            << OUTPUT_CPP_SNIPPET << " (rewritten after every pose, not "
+            << "batched at the end).\n";
 
         for (int poseIndex = 0; poseIndex < POSE_COUNT; ++poseIndex) {
             waitForEnter(
-                "\nMove the arm to pose " +
+                "\nMove the arm to new pose " +
                 std::to_string(poseIndex + 1) + " of " +
-                std::to_string(POSE_COUNT) +
-                ", then press Enter..."
+                std::to_string(POSE_COUNT) + " (" +
+                std::to_string(preloadedCount + poseIndex + 1) +
+                " total so far), then press Enter..."
             );
 
             std::array<uint16_t, JOINT_COUNT> pose{};
@@ -240,7 +330,9 @@ int main() {
                 locked = true;
             }
 
-            std::cout << "Recorded pose " << poseIndex + 1 << ": ";
+            std::cout
+                << "Recorded new pose " << poseIndex + 1 << " ("
+                << preloadedCount + poseIndex + 1 << " total so far): ";
             for (std::size_t i = 0; i < JOINT_COUNT; ++i) {
                 const JointCalibration& joint = jointCalibrations[i];
                 if (pose[i] < joint.minTick || pose[i] > joint.maxTick) {
@@ -253,14 +345,9 @@ int main() {
             }
             std::cout << '\n';
 
-            csv << poseIndex + 1;
-            for (uint16_t tick : pose) {
-                csv << ',' << tick;
-            }
-            csv << '\n';
-            csv.flush();
-
             recordedPoses.push_back(pose);
+            writeCsv();
+            writeSnippet();
 
             for (int id : motorIds) {
                 motor.disableTorque(id);
@@ -268,34 +355,10 @@ int main() {
         }
 
         std::cout
-            << "\nAll " << POSE_COUNT << " poses recorded.\n"
-            << "Saved to " << OUTPUT_CSV << '\n';
-
-        std::ofstream snippet(
-            OUTPUT_CPP_SNIPPET,
-            std::ios::out | std::ios::trunc
-        );
-        if (snippet) {
-            snippet
-                << "constexpr std::size_t POSE_COUNT = "
-                << recordedPoses.size() << ";\n"
-                << "const std::array<std::array<uint16_t, JOINT_COUNT>, "
-                << "POSE_COUNT> TARGET_POSES = {{\n";
-            for (const auto& pose : recordedPoses) {
-                snippet << "    {{";
-                for (std::size_t i = 0; i < JOINT_COUNT; ++i) {
-                    snippet << pose[i];
-                    if (i + 1 < JOINT_COUNT) {
-                        snippet << ", ";
-                    }
-                }
-                snippet << "}},\n";
-            }
-            snippet << "}};\n";
-            std::cout
-                << "Ready-to-paste TARGET_POSES snippet written to "
-                << OUTPUT_CPP_SNIPPET << '\n';
-        }
+            << "\nAll " << POSE_COUNT << " new poses recorded ("
+            << recordedPoses.size() << " total).\n"
+            << "Saved to " << OUTPUT_CSV << " and " << OUTPUT_CPP_SNIPPET
+            << '\n';
 
         restoreAngleLimits();
         motor.disconnect();
