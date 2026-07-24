@@ -5,7 +5,7 @@
 
 int main()
 {
-    const char* DEVICENAME = "/dev/ttyUSB0";
+    const char* DEVICENAME = "/dev/ttyUSB1";
     const int BAUDRATE = 1000000;
     const float PROTOCOL_VERSION = 1.0;
 
@@ -91,7 +91,14 @@ int main()
     // {0, 1, 2, 3, 4, 5, 6, 7}
 
     std::vector<uint16_t> homePose = {
-        2015, 857, 935, 3239, 1200, 3087, 1967, 2350
+        2048, // Motor 0
+        2048, // Motor 1
+        2116, // Motor 2
+        2048, // Motor 3
+        2048, // Motor 4
+        2048, // Motor 5
+        2048, // Motor 6
+        2048  // Motor 7, temporary safe value
     };
 
     std::vector<uint16_t> testPose1 = {
