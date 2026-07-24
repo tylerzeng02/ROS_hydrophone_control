@@ -56,6 +56,19 @@ public:
     bool readVoltage(int motorId, uint8_t& voltage);
     bool readTemperature(int motorId, uint8_t& temperature);
 
+    // Reads the servo's own EEPROM-stored CW/CCW angle limit registers --
+    // independent of jointCalibrations, these are enforced by the servo's
+    // firmware itself and will reject any goal position outside them
+    // (RxPacketError "Angle limit error"), even if jointCalibrations
+    // considers that position safe.
+    bool readAngleLimits(int motorId, uint16_t& cwLimit, uint16_t& ccwLimit);
+
+    // Writes the servo's own EEPROM-stored CW/CCW angle limit registers.
+    // Callers are responsible for restoring the original values afterward
+    // if they only meant to widen them temporarily -- these persist across
+    // power cycles.
+    bool writeAngleLimits(int motorId, uint16_t cwLimit, uint16_t ccwLimit);
+
     bool printElectricalStatus(int motorId);
     bool printElectricalStatusForMotors(const std::vector<int>& motorIds);
 
@@ -106,6 +119,8 @@ private:
 
     bool isPositionWithinLimit(int motorId, uint16_t position) const;
 
+    static const int ADDR_CW_ANGLE_LIMIT = 6;
+    static const int ADDR_CCW_ANGLE_LIMIT = 8;
     static const int ADDR_TORQUE_ENABLE = 24;
     static const int ADDR_GOAL_POSITION = 30;
     static const int ADDR_MOVING_SPEED = 32;

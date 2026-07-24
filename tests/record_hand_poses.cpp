@@ -3,6 +3,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "dynamixel_motor.h"
@@ -16,6 +17,15 @@ constexpr float CYTON_PROTOCOL_VERSION = 1.0F;
 
 constexpr std::size_t JOINT_COUNT = 7;
 constexpr int POSE_COUNT = 100;
+
+// Full raw tick range for these servos (4096 ticks/revolution). Widening
+// each motor's hardware CW/CCW angle-limit registers to this for the
+// duration of this program only lets the servo ACCEPT holding wherever a
+// human already physically placed it by hand -- it never causes the arm to
+// move anywhere it hasn't already been placed, so it introduces no new
+// mechanical risk specific to this tool.
+constexpr uint16_t FULL_RANGE_CW_LIMIT = 0;
+constexpr uint16_t FULL_RANGE_CCW_LIMIT = 4095;
 
 constexpr const char* OUTPUT_CSV = "recorded_hand_poses.csv";
 constexpr const char* OUTPUT_CPP_SNIPPET = "recorded_hand_poses_target_poses.txt";
@@ -38,6 +48,28 @@ int main() {
     );
 
     std::vector<std::array<uint16_t, JOINT_COUNT>> recordedPoses;
+    std::vector<std::pair<uint16_t, uint16_t>> originalAngleLimits(
+        motorIds.size()
+    );
+    bool angleLimitsWidened = false;
+
+    auto restoreAngleLimits = [&]() {
+        if (!angleLimitsWidened) {
+            return;
+        }
+        std::cout << "\nRestoring original hardware angle limits...\n";
+        for (std::size_t idx = 0; idx < motorIds.size(); ++idx) {
+            const auto& limits = originalAngleLimits[idx];
+            if (!motor.writeAngleLimits(
+                    motorIds[idx], limits.first, limits.second
+                )) {
+                std::cerr
+                    << "WARNING: failed to restore original angle limits "
+                    << "for motor " << motorIds[idx] << ". They were ["
+                    << limits.first << ", " << limits.second << "].\n";
+            }
+        }
+    };
 
     std::ofstream csv(OUTPUT_CSV, std::ios::out | std::ios::trunc);
     if (!csv) {
@@ -65,6 +97,56 @@ int main() {
             }
         }
 
+        std::cout << "\nServo hardware angle limits (independent of "
+                   << "jointCalibrations -- the servo itself rejects any "
+                   << "goal position outside these):\n";
+        for (std::size_t idx = 0; idx < motorIds.size(); ++idx) {
+            const int id = motorIds[idx];
+            uint16_t cwLimit = 0;
+            uint16_t ccwLimit = 0;
+            if (!motor.readAngleLimits(id, cwLimit, ccwLimit)) {
+                throw std::runtime_error(
+                    "Could not read angle limits for motor " +
+                    std::to_string(id)
+                );
+            }
+            originalAngleLimits[idx] = {cwLimit, ccwLimit};
+
+            const JointCalibration& joint = jointCalibrations[id];
+            std::cout
+                << "  Motor " << id << " hardware limits: ["
+                << cwLimit << ", " << ccwLimit << "]"
+                << "  jointCalibrations range: ["
+                << joint.minTick << ", " << joint.maxTick << "]";
+            if (cwLimit > joint.minTick || ccwLimit < joint.maxTick) {
+                std::cout
+                    << "  <- hardware is TIGHTER than jointCalibrations "
+                    << "here; hand-posing near that edge may be rejected";
+            }
+            std::cout << '\n';
+        }
+
+        std::cout
+            << "\nWidening every motor's hardware angle limits to the "
+            << "full [" << FULL_RANGE_CW_LIMIT << ", " << FULL_RANGE_CCW_LIMIT
+            << "] range for this session, so any hand-posed position gets "
+            << "accepted. Original limits are printed above and will be "
+            << "restored automatically when this program exits normally "
+            << "or hits an error -- but NOT if it's killed via Ctrl+C, so "
+            << "avoid that this run, or restore them manually afterward if "
+            << "you do.\n";
+        for (int id : motorIds) {
+            if (!motor.writeAngleLimits(
+                    id, FULL_RANGE_CW_LIMIT, FULL_RANGE_CCW_LIMIT
+                )) {
+                throw std::runtime_error(
+                    "Could not widen angle limits for motor " +
+                    std::to_string(id)
+                );
+            }
+        }
+        angleLimitsWidened = true;
+
         // Start free-moving so the arm can be posed by hand.
         for (int id : motorIds) {
             motor.disableTorque(id);
@@ -91,39 +173,71 @@ int main() {
             );
 
             std::array<uint16_t, JOINT_COUNT> pose{};
+            bool locked = false;
 
-            for (std::size_t i = 0; i < JOINT_COUNT; ++i) {
-                uint16_t position = 0;
-                if (!motor.readPosition(motorIds[i], position)) {
-                    throw std::runtime_error(
-                        "Failed to read position for motor " +
-                        std::to_string(motorIds[i])
-                    );
+            while (!locked) {
+                for (std::size_t i = 0; i < JOINT_COUNT; ++i) {
+                    uint16_t position = 0;
+                    if (!motor.readPosition(motorIds[i], position)) {
+                        throw std::runtime_error(
+                            "Failed to read position for motor " +
+                            std::to_string(motorIds[i])
+                        );
+                    }
+                    pose[i] = position;
                 }
-                pose[i] = position;
-            }
 
-            // Lock the arm exactly where it already is: write the just-read
-            // position back as the goal BEFORE enabling torque. If torque
-            // were enabled first while a stale goal from an earlier pose
-            // was still in the register, the arm would lurch toward that
-            // old target the instant torque came on.
-            for (std::size_t i = 0; i < JOINT_COUNT; ++i) {
-                if (!motor.setGoalPosition(motorIds[i], pose[i])) {
-                    throw std::runtime_error(
-                        "Failed to set goal position for motor " +
-                        std::to_string(motorIds[i])
-                    );
+                // Lock the arm exactly where it already is: write the
+                // just-read position back as the goal BEFORE enabling
+                // torque. If torque were enabled first while a stale goal
+                // from an earlier pose was still in the register, the arm
+                // would lurch toward that old target the instant torque
+                // came on. Checked for ALL motors before enabling torque on
+                // ANY of them, so a rejection here never leaves some
+                // motors torqued and others not.
+                bool allGoalsAccepted = true;
+                for (std::size_t i = 0; i < JOINT_COUNT; ++i) {
+                    if (!motor.setGoalPosition(motorIds[i], pose[i])) {
+                        std::cout
+                            << "Motor " << motorIds[i] << "'s current "
+                            << "position (" << pose[i] << ") was rejected "
+                            << "(see the error above -- likely outside "
+                            << "that servo's own hardware angle limit). "
+                            << "Move that joint back within range.\n";
+                        allGoalsAccepted = false;
+                        break;
+                    }
                 }
-            }
 
-            for (int id : motorIds) {
-                if (!motor.enableTorque(id)) {
-                    throw std::runtime_error(
-                        "Failed to enable torque on motor " +
-                        std::to_string(id)
+                if (!allGoalsAccepted) {
+                    waitForEnter(
+                        "Press Enter once repositioned, to try locking "
+                        "pose " + std::to_string(poseIndex + 1) +
+                        " again..."
                     );
+                    continue;
                 }
+
+                bool allTorqueEnabled = true;
+                for (int id : motorIds) {
+                    if (!motor.enableTorque(id)) {
+                        std::cout
+                            << "Failed to enable torque on motor " << id
+                            << " (see the error above).\n";
+                        allTorqueEnabled = false;
+                        break;
+                    }
+                }
+
+                if (!allTorqueEnabled) {
+                    waitForEnter(
+                        "Press Enter to retry pose " +
+                        std::to_string(poseIndex + 1) + "..."
+                    );
+                    continue;
+                }
+
+                locked = true;
             }
 
             std::cout << "Recorded pose " << poseIndex + 1 << ": ";
@@ -183,6 +297,7 @@ int main() {
                 << OUTPUT_CPP_SNIPPET << '\n';
         }
 
+        restoreAngleLimits();
         motor.disconnect();
         return 0;
     } catch (const std::exception& error) {
@@ -194,6 +309,7 @@ int main() {
         for (int id : motorIds) {
             motor.disableTorque(id);
         }
+        restoreAngleLimits();
         motor.disconnect();
         return 1;
     }

@@ -856,6 +856,70 @@ void DynamixelMotor::emergencyShutdown(const std::vector<int>& motorIds)
     disconnect();
 }
 
+bool DynamixelMotor::readAngleLimits(
+    int motorId,
+    uint16_t& cwLimit,
+    uint16_t& ccwLimit
+)
+{
+    uint8_t dxlError = 0;
+
+    int commResult = packetHandler_->read2ByteTxRx(
+        portHandler_,
+        motorId,
+        ADDR_CW_ANGLE_LIMIT,
+        &cwLimit,
+        &dxlError
+    );
+
+    if (!checkCommResult(commResult, dxlError, motorId, "Read CW angle limit"))
+    {
+        return false;
+    }
+
+    commResult = packetHandler_->read2ByteTxRx(
+        portHandler_,
+        motorId,
+        ADDR_CCW_ANGLE_LIMIT,
+        &ccwLimit,
+        &dxlError
+    );
+
+    return checkCommResult(commResult, dxlError, motorId, "Read CCW angle limit");
+}
+
+bool DynamixelMotor::writeAngleLimits(
+    int motorId,
+    uint16_t cwLimit,
+    uint16_t ccwLimit
+)
+{
+    uint8_t dxlError = 0;
+
+    int commResult = packetHandler_->write2ByteTxRx(
+        portHandler_,
+        motorId,
+        ADDR_CW_ANGLE_LIMIT,
+        cwLimit,
+        &dxlError
+    );
+
+    if (!checkCommResult(commResult, dxlError, motorId, "Write CW angle limit"))
+    {
+        return false;
+    }
+
+    commResult = packetHandler_->write2ByteTxRx(
+        portHandler_,
+        motorId,
+        ADDR_CCW_ANGLE_LIMIT,
+        ccwLimit,
+        &dxlError
+    );
+
+    return checkCommResult(commResult, dxlError, motorId, "Write CCW angle limit");
+}
+
 bool DynamixelMotor::readPosition(int motorId, uint16_t& position)
 {
     uint8_t dxlError = 0;
