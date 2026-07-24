@@ -417,7 +417,9 @@ bool DynamixelMotor::moveJointsSafely(
     uint16_t speed,
     int tolerance,
     int timeoutSeconds,
-    bool holdTorque
+    bool holdTorque,
+    int stallRepeatsToDetect,
+    int stallGraceSeconds
 )
 {
     if (motorIds.size() != targetPositions.size())
@@ -532,6 +534,11 @@ bool DynamixelMotor::moveJointsSafely(
     constexpr int PRINT_EVERY_N_ITERATIONS = 10;
     int iterationCount = 0;
 
+    int previousTotalError = -1;
+    int stallRepeatCount = 0;
+    bool stallDetected = false;
+    std::chrono::steady_clock::time_point stallStartTime;
+
     while (true)
     {
         const bool shouldPrint =
@@ -614,6 +621,31 @@ bool DynamixelMotor::moveJointsSafely(
             midSnapshotCaptured = true;
         }
 
+        if (stallRepeatsToDetect > 0 && !allReached)
+        {
+            if (currentTotalError == previousTotalError)
+            {
+                ++stallRepeatCount;
+            }
+            else
+            {
+                stallRepeatCount = 1;
+                previousTotalError = currentTotalError;
+            }
+
+            if (stallRepeatCount >= stallRepeatsToDetect && !stallDetected)
+            {
+                stallDetected = true;
+                stallStartTime = std::chrono::steady_clock::now();
+                std::cout
+                    << "Error values unchanged for " << stallRepeatCount
+                    << " consecutive checks -- motors may have stopped "
+                    << "moving. Waiting " << stallGraceSeconds
+                    << " more seconds before accepting the current position."
+                    << std::endl;
+            }
+        }
+
         if (allReached)
         {
             std::cout << "All target positions reached." << std::endl;
@@ -653,6 +685,29 @@ bool DynamixelMotor::moveJointsSafely(
             }
 
             return false;
+        }
+
+        if (stallDetected)
+        {
+            auto stallElapsedSeconds =
+                std::chrono::duration_cast<std::chrono::seconds>(
+                    now - stallStartTime
+                ).count();
+
+            if (stallElapsedSeconds >= stallGraceSeconds)
+            {
+                std::cerr
+                    << "Motors appear to have stopped moving before "
+                    << "reaching target; accepting current position after "
+                    << stallGraceSeconds << "s grace period." << std::endl;
+
+                for (int id : motorIds)
+                {
+                    disableTorque(id);
+                }
+
+                return false;
+            }
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));

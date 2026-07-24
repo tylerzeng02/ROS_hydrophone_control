@@ -134,6 +134,23 @@ target_link_libraries(test_home_pose
         dynamixel_sdk
 )
 
+add_executable(record_hand_poses
+    tests/record_hand_poses.cpp
+    src/dynamixel_motor.cpp
+    src/robot_calibration.cpp
+)
+
+target_include_directories(record_hand_poses
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/DynamixelSDK/c++/include
+)
+
+target_link_libraries(record_hand_poses
+    PRIVATE
+        dynamixel_sdk
+)
+
 # ------------------------------------------------------------
 # TRAC-IK targets
 # Only enabled when TRAC-IK exists

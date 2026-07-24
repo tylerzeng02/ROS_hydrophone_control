@@ -37,7 +37,9 @@ public:
         uint16_t speed,
         int tolerance = 15,
         int timeoutSeconds = 10,
-        bool holdTorque = false
+        bool holdTorque = false,
+        int stallRepeatsToDetect = 0,
+        int stallGraceSeconds = 5
     );
 
     bool moveToPose(
