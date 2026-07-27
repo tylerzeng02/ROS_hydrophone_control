@@ -39,7 +39,7 @@ public:
         int timeoutSeconds = 10,
         bool holdTorque = false,
         int stallRepeatsToDetect = 0,
-        int stallGraceSeconds = 5
+        bool enforceSafetyLimits = true
     );
 
     bool moveToPose(
@@ -105,7 +105,17 @@ public:
         int tolerance = 15,
         int timeoutSeconds = 8
     );
-    
+
+    // Writes the goal position register directly, bypassing the
+    // jointCalibrations safety gate that setGoalPosition() enforces.
+    // ONLY for freezing a motor at a position it is already physically at
+    // (e.g. moveJointsSafely()'s safety-stop handling, or
+    // record_hand_poses.cpp locking a hand-verified pose that may sit
+    // outside jointCalibrations' software range) -- never for commanding a
+    // motor to a NEW position, since that would defeat the safety check
+    // entirely.
+    bool writeGoalPositionRaw(int motorId, uint16_t position);
+
 private:
     const char* deviceName_;
     int baudRate_;

@@ -17,7 +17,7 @@ constexpr int CYTON_BAUD_RATE = 1000000;
 constexpr float CYTON_PROTOCOL_VERSION = 1.0F;
 
 constexpr std::size_t JOINT_COUNT = 7;
-constexpr int POSE_COUNT = 100;
+constexpr int POSE_COUNT = 200;
 
 // Full raw tick range for these servos (4096 ticks/revolution). Widening
 // each motor's hardware CW/CCW angle-limit registers to this for the
@@ -285,15 +285,22 @@ int main() {
                 // came on. Checked for ALL motors before enabling torque on
                 // ANY of them, so a rejection here never leaves some
                 // motors torqued and others not.
+                //
+                // Uses writeGoalPositionRaw() (bypasses the jointCalibrations
+                // software range check that setGoalPosition() enforces) --
+                // this is deliberately freezing the motor at a position it
+                // is already physically at, which the user has already
+                // visually verified is safe by hand-posing it there, so a
+                // hand-chosen pose outside jointCalibrations' current
+                // min/max is still accepted rather than rejected.
                 bool allGoalsAccepted = true;
                 for (std::size_t i = 0; i < JOINT_COUNT; ++i) {
-                    if (!motor.setGoalPosition(motorIds[i], pose[i])) {
+                    if (!motor.writeGoalPositionRaw(motorIds[i], pose[i])) {
                         std::cout
                             << "Motor " << motorIds[i] << "'s current "
-                            << "position (" << pose[i] << ") was rejected "
-                            << "(see the error above -- likely outside "
-                            << "that servo's own hardware angle limit). "
-                            << "Move that joint back within range.\n";
+                            << "position (" << pose[i] << ") failed to "
+                            << "write (see the error above -- likely a "
+                            << "communication issue, not a range check).\n";
                         allGoalsAccepted = false;
                         break;
                     }

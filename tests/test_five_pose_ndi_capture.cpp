@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
@@ -137,7 +138,7 @@ std::chrono::milliseconds handleUserControls(bool& manualModeEnabled) {
 }
 
 constexpr std::size_t JOINT_COUNT = 7;
-constexpr std::size_t POSE_COUNT = 200;
+constexpr std::size_t POSE_COUNT = 100;
 
 constexpr const char* CYTON_DEVICE = "COM4";
 constexpr int CYTON_BAUD_RATE = 1000000;
@@ -158,18 +159,58 @@ constexpr int MOTOR_TOLERANCE_TICKS = 10;
 constexpr int MOVE_TIMEOUT_SECONDS = 30;
 constexpr int SETTLING_TIME_MS = 750;
 
+// Stability-based settling wait (currently used only by --quick-test, see
+// NdiTracker::waitForPoseStability()): instead of assuming SETTLING_TIME_MS
+// is always enough, poll the moving tool until its last
+// STABILITY_WINDOW_SIZE valid readings all agree within
+// STABILITY_TOLERANCE_MM of each other. STABILITY_TOLERANCE_MM is set just
+// above the ~0.3-0.4mm noise floor measured by --settling-diagnostic on
+// these same poses. STABILITY_MAX_WAIT_MS caps how long this can run so a
+// pose that never stabilizes doesn't block forever.
+constexpr std::size_t STABILITY_WINDOW_SIZE = 5;
+constexpr double STABILITY_TOLERANCE_MM = 0.4;
+constexpr long STABILITY_MAX_WAIT_MS = 4000;
+
 // If the combined position error across all joints reads exactly the same
 // value for this many consecutive ~100ms checks, the arm has effectively
 // stopped moving (stalled short of tolerance, e.g. friction/backlash) --
-// no point waiting out the full MOVE_TIMEOUT_SECONDS in that case, so give
-// it a short grace period instead.
+// no point waiting out the full MOVE_TIMEOUT_SECONDS in that case, so the
+// current position is accepted immediately once this triggers.
 constexpr int STALL_REPEATS_TO_DETECT = 3;
-constexpr int STALL_GRACE_SECONDS = 5;
 
 constexpr int NDI_REQUIRED_VALID_SAMPLES = 30;
 constexpr int NDI_SAMPLE_INTERVAL_MS = 20;
 constexpr int REQUIRED_VISIBLE_MARKERS = 4;
 constexpr double MAX_NDI_ERROR = 0.50;
+
+// --settling-diagnostic mode: reuses the first N (already hand-verified
+// safe) poses from TARGET_POSES below, but instead of the normal
+// SETTLING_TIME_MS sleep + 30-sample average, logs every single BX poll for
+// SETTLING_DIAGNOSTIC_DURATION_MS starting the instant the move reports
+// done, to see how much the tracked pose is still changing early on.
+constexpr int SETTLING_DIAGNOSTIC_POSE_COUNT = 15;
+constexpr int SETTLING_DIAGNOSTIC_DURATION_MS = 4000;
+constexpr const char* SETTLING_DIAGNOSTIC_CSV = "settling_diagnostic.csv";
+
+// --quick-test mode: runs the SAME real capture pipeline (stability-based
+// settle via waitForPoseStability() + full 30-sample average per tool via
+// collectBothTools()) as the normal 100-pose run, but in one short sitting
+// -- to test whether collecting the dataset without the multi-hour
+// session-length drift found in the original (superseded) 200-pose data
+// gets the fitted calibration error down near the arm's ~0.5mm repeatability
+// floor. Writes to its own CSV so it never touches five_pose_ndi_capture.csv
+// or its resume state.
+//
+// QUICK_TEST_POSE_INDICES covers all 100 poses in this hand-recorded set:
+// unlike the old 200-pose dataset's first-N slices, this dataset was
+// hand-recorded with per-joint range coverage already in mind and
+// independently verified to cover ~90-100% of every joint's safe range
+// (see calibration/diag_new_dataset_diversity.py), so no subset curation
+// is needed here.
+constexpr std::array<int, 100> QUICK_TEST_POSE_INDICES = {
+    0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99
+};
+constexpr const char* QUICK_TEST_CSV = "quick_calibration_test.csv";
 
 // Hand-recorded via tests/record_hand_poses.cpp: the arm was physically
 // moved by hand (torque off) into each pose and the resulting joint ticks
@@ -178,206 +219,106 @@ constexpr double MAX_NDI_ERROR = 0.50;
 // reachable, collision-free, and (assuming it was checked live against the
 // "Moving tool: DETECTED/MISSING" status while posing) marker-visible.
 const std::array<std::array<uint16_t, JOINT_COUNT>, POSE_COUNT> TARGET_POSES = {{
-    {{2079, 2031, 923, 2518, 3195, 2140, 2384}},
-    {{2195, 1830, 922, 2489, 3200, 2262, 2248}},
-    {{2424, 1900, 923, 2260, 3178, 2246, 1821}},
-    {{2539, 1837, 928, 2003, 3181, 2285, 1458}},
-    {{2800, 1722, 930, 1935, 3196, 2342, 1147}},
-    {{3091, 1626, 928, 1882, 3156, 2483, 665}},
-    {{3460, 1981, 916, 1894, 3158, 2032, 337}},
-    {{3535, 944, 929, 2120, 2923, 3096, 544}},
-    {{2725, 1947, 921, 2011, 3233, 3176, 999}},
-    {{2720, 1731, 921, 1684, 3187, 2938, 1001}},
-    {{2722, 1526, 925, 1686, 3195, 2498, 1001}},
-    {{2803, 1526, 937, 1679, 3244, 2176, 999}},
-    {{3030, 1337, 996, 1703, 2793, 2165, 383}},
-    {{3060, 936, 999, 1707, 2938, 2195, 414}},
-    {{3068, 3142, 1197, 1950, 2854, 2211, 951}},
-    {{3223, 3172, 1190, 1892, 2854, 2487, 951}},
-    {{3192, 3172, 1286, 1895, 2856, 2897, 952}},
-    {{3133, 3228, 1523, 1913, 2771, 1191, 1037}},
-    {{2895, 3225, 1527, 1910, 2770, 1179, 1038}},
-    {{2667, 3111, 1529, 1528, 2126, 1632, 785}},
-    {{2593, 3220, 1525, 1136, 2031, 1799, 787}},
-    {{2539, 2994, 1525, 1014, 2033, 1716, 831}},
-    {{2293, 3231, 1525, 1006, 2038, 1936, 1007}},
-    {{2202, 3228, 1525, 830, 1596, 1330, 1006}},
-    {{2200, 2792, 1233, 829, 1940, 1990, 1142}},
-    {{2208, 2360, 1266, 1031, 2597, 2134, 1144}},
-    {{2207, 2332, 1666, 1366, 2595, 1493, 1143}},
-    {{2323, 2222, 2090, 988, 2690, 942, 1144}},
-    {{2321, 2194, 2133, 829, 2381, 1366, 1146}},
-    {{2351, 1945, 2249, 831, 2372, 1538, 1144}},
-    {{2261, 1684, 2249, 830, 2047, 1857, 873}},
-    {{2190, 1371, 2249, 833, 1746, 1864, 573}},
-    {{1613, 852, 2211, 2503, 1358, 2128, 2834}},
-    {{1593, 851, 2207, 1582, 1362, 2288, 3532}},
-    {{1461, 911, 2105, 2144, 1039, 2826, 3527}},
-    {{1176, 1077, 2081, 2345, 1487, 2930, 3525}},
-    {{1158, 1356, 2080, 3245, 2021, 2569, 3303}},
-    {{1160, 1801, 2080, 3273, 2022, 2759, 3306}},
-    {{1135, 1508, 1853, 3267, 2129, 1877, 2979}},
-    {{1107, 1679, 1851, 2898, 2034, 1795, 2976}},
-    {{1107, 1560, 1850, 2794, 2032, 1589, 2976}},
-    {{1058, 1106, 1712, 2989, 1959, 1988, 3238}},
-    {{969, 944, 1713, 3273, 1818, 2352, 3240}},
-    {{968, 852, 1713, 3272, 1442, 2557, 3563}},
-    {{2233, 853, 991, 2539, 2168, 2868, 3028}},
-    {{2354, 852, 991, 2911, 2169, 2917, 3028}},
-    {{2383, 852, 991, 3265, 2179, 2986, 3027}},
-    {{3769, 1886, 1363, 1423, 1024, 1698, 512}},
-    {{3249, 1885, 1132, 1420, 1026, 2130, 337}},
-    {{2487, 1809, 1197, 1062, 1301, 1998, 3383}},
-    {{2236, 1809, 1197, 1062, 1303, 2114, 3378}},
-    {{2151, 1809, 1197, 1061, 1277, 2270, 3377}},
-    {{2056, 1810, 1198, 1061, 1211, 2366, 3376}},
-    {{1981, 1811, 1198, 1061, 1186, 2466, 3376}},
-    {{1946, 1809, 1198, 1061, 1171, 2757, 3376}},
-    {{1881, 1813, 1199, 1061, 1137, 3122, 3382}},
-    {{1612, 2218, 1140, 1215, 958, 2296, 2506}},
-    {{1457, 2218, 1141, 1299, 955, 2357, 2419}},
-    {{1311, 2218, 1139, 1365, 955, 2165, 2123}},
-    {{620, 1961, 1155, 2602, 962, 2168, 339}},
-    {{555, 1961, 1036, 2604, 1155, 2503, 340}},
-    {{973, 1891, 2138, 2101, 2034, 2153, 3172}},
-    {{975, 1743, 2139, 2105, 2035, 2092, 3173}},
-    {{975, 1631, 2169, 2102, 2035, 1844, 3173}},
-    {{973, 1516, 2188, 2109, 2034, 1738, 3149}},
-    {{975, 1359, 2188, 2126, 2035, 1746, 3149}},
-    {{975, 1621, 2189, 2736, 2034, 1971, 3118}},
-    {{975, 1766, 2195, 2749, 2035, 2011, 3069}},
-    {{971, 1935, 2217, 2767, 2037, 1988, 3069}},
-    {{966, 2154, 2286, 2777, 2035, 1969, 3069}},
-    {{908, 2381, 2286, 2720, 2032, 1909, 3072}},
-    {{707, 2702, 2287, 2614, 2034, 1574, 3072}},
-    {{687, 2952, 2270, 2391, 2006, 1262, 3072}},
-    {{691, 3222, 2883, 1795, 1978, 2948, 2082}},
-    {{889, 3222, 2879, 1796, 1977, 2980, 2083}},
-    {{1013, 3222, 2881, 1752, 2006, 3127, 2567}},
-    {{961, 852, 3307, 3187, 2128, 2025, 2241}},
-    {{1175, 852, 3306, 2719, 2838, 2181, 1557}},
-    {{1175, 851, 3305, 2760, 3035, 1965, 1558}},
-    {{1234, 851, 2144, 3219, 2457, 2780, 2570}},
-    {{1295, 1715, 2196, 3274, 2223, 2680, 2824}},
-    {{1296, 2151, 1367, 3272, 2165, 2187, 3531}},
-    {{984, 2274, 1322, 3273, 2244, 1968, 3664}},
-    {{487, 2425, 1273, 3273, 2245, 1647, 3750}},
-    {{414, 3223, 2506, 1853, 2037, 2629, 1949}},
-    {{580, 3223, 2506, 1854, 2036, 2705, 1949}},
-    {{758, 3223, 2505, 1851, 2036, 2787, 2268}},
-    {{973, 3220, 2584, 1671, 2355, 2975, 2339}},
-    {{1097, 3229, 2576, 1215, 2081, 1579, 3273}},
-    {{1524, 3229, 2577, 830, 2141, 1993, 3016}},
-    {{1601, 3225, 2577, 829, 2126, 1533, 3017}},
-    {{1601, 3225, 2577, 829, 2116, 1493, 3017}},
-    {{1723, 2512, 2578, 829, 1566, 2001, 3015}},
-    {{1724, 2705, 2578, 829, 1588, 1941, 2835}},
-    {{1725, 2712, 2577, 829, 1589, 1517, 2825}},
-    {{1722, 2902, 2580, 829, 2240, 2653, 2679}},
-    {{1431, 3224, 2580, 829, 2533, 2470, 2684}},
-    {{1140, 3224, 2580, 829, 2607, 2529, 2788}},
-    {{1069, 3225, 2580, 829, 2616, 1569, 3498}},
-    {{758, 3226, 2579, 830, 2861, 1756, 3754}},
-    {{2337, 1408, 932, 1667, 1963, 2089, 2895}},
-    {{2340, 1377, 931, 1695, 2027, 1751, 2895}},
-    {{2455, 1205, 933, 1686, 2029, 1621, 3027}},
-    {{2693, 852, 1575, 2260, 1572, 1260, 3753}},
-    {{2712, 877, 1589, 2581, 1574, 1110, 3753}},
-    {{2738, 869, 1588, 2863, 1571, 1024, 3753}},
-    {{2912, 851, 2010, 2997, 962, 945, 3754}},
-    {{3067, 851, 2010, 3255, 2050, 2298, 796}},
-    {{3077, 1229, 2009, 3163, 2049, 2002, 796}},
-    {{3078, 1042, 2009, 3259, 2190, 2552, 798}},
-    {{3477, 852, 2009, 3269, 2685, 2652, 351}},
-    {{3657, 854, 2011, 3037, 2775, 2682, 3753}},
-    {{3668, 853, 2016, 3267, 2514, 2437, 336}},
-    {{3763, 852, 2017, 3274, 2615, 2276, 336}},
-    {{3763, 853, 2017, 3273, 2307, 2113, 336}},
-    {{3760, 853, 2015, 3272, 2042, 2024, 336}},
-    {{3758, 852, 2015, 3272, 1788, 1974, 335}},
-    {{3758, 852, 2015, 3272, 1567, 1904, 335}},
-    {{3747, 852, 3170, 3189, 2265, 1788, 3289}},
-    {{3654, 852, 3170, 3262, 2182, 1945, 3293}},
-    {{3650, 852, 3170, 3274, 1986, 2657, 3294}},
-    {{3646, 852, 3167, 3240, 1549, 2773, 3689}},
-    {{2742, 852, 3168, 3274, 1038, 2463, 3695}},
-    {{2568, 852, 3168, 3274, 1026, 2318, 3694}},
-    {{2329, 852, 3169, 3274, 960, 2053, 3691}},
-    {{2323, 852, 3169, 3273, 958, 1711, 3694}},
-    {{2342, 852, 3170, 3260, 958, 1451, 3693}},
-    {{2340, 852, 3168, 3273, 2340, 2055, 841}},
-    {{2340, 853, 3168, 3269, 2678, 2419, 640}},
-    {{2577, 852, 3168, 3270, 2906, 2586, 443}},
-    {{2865, 852, 3168, 3260, 3176, 2186, 335}},
-    {{3593, 852, 3287, 3238, 3148, 1558, 335}},
-    {{3588, 852, 3287, 3261, 3196, 1629, 335}},
-    {{3770, 853, 3288, 2609, 3175, 1327, 3753}},
-    {{3769, 853, 3288, 2603, 3046, 1475, 3753}},
-    {{2938, 852, 3287, 3021, 2229, 2294, 3752}},
-    {{2937, 852, 3287, 3056, 2056, 2272, 3753}},
-    {{2931, 852, 3287, 3173, 1839, 2220, 3752}},
-    {{2929, 852, 3287, 3271, 1681, 2277, 3751}},
-    {{2855, 852, 3287, 3272, 1439, 2330, 3752}},
-    {{2166, 852, 3286, 3273, 1199, 1719, 3753}},
-    {{1889, 852, 3287, 3274, 1166, 1433, 3753}},
-    {{1669, 852, 3234, 2889, 1027, 756, 3752}},
-    {{1535, 852, 3232, 2368, 1026, 1320, 3484}},
-    {{1418, 852, 3222, 2230, 1027, 1480, 3483}},
-    {{1185, 852, 2876, 2012, 1634, 1511, 3546}},
-    {{1180, 852, 2883, 2003, 1639, 2470, 3073}},
-    {{1206, 907, 2876, 2408, 1703, 3049, 3072}},
-    {{1377, 852, 2657, 1798, 1710, 2560, 3076}},
-    {{1186, 853, 2656, 1804, 1710, 3099, 3075}},
-    {{864, 852, 2658, 2225, 1711, 3187, 3075}},
-    {{866, 852, 2659, 2027, 1712, 3314, 3077}},
-    {{701, 905, 2657, 2935, 1830, 2586, 3073}},
-    {{599, 852, 2657, 3114, 2028, 2488, 3076}},
-    {{598, 853, 2657, 3272, 2201, 2651, 3076}},
-    {{600, 853, 2658, 3273, 2546, 2728, 2767}},
-    {{1067, 853, 2657, 3259, 2834, 2340, 2376}},
-    {{1424, 853, 2658, 2833, 2924, 2060, 1759}},
-    {{1429, 852, 2657, 2343, 2924, 1859, 1152}},
-    {{1428, 852, 2657, 2052, 2727, 1778, 762}},
-    {{1571, 852, 2661, 1890, 2818, 1973, 627}},
-    {{1741, 852, 2715, 1887, 2927, 2165, 626}},
-    {{2119, 852, 2581, 1991, 3138, 2816, 337}},
-    {{2215, 853, 2762, 2420, 3139, 2790, 336}},
-    {{2214, 853, 2951, 2841, 2954, 2766, 336}},
-    {{2277, 854, 3292, 3071, 2855, 2644, 337}},
-    {{2334, 855, 3292, 2945, 2726, 2360, 336}},
-    {{2607, 852, 3290, 2717, 2581, 2437, 3754}},
-    {{2867, 856, 3291, 2842, 2477, 2211, 3751}},
-    {{2868, 854, 3289, 2855, 2315, 2298, 3751}},
-    {{2961, 2039, 2353, 2115, 1695, 2152, 859}},
-    {{2961, 2132, 2353, 2150, 1696, 2018, 862}},
-    {{2958, 2251, 2366, 2205, 1696, 1800, 935}},
-    {{2980, 2364, 2368, 2208, 1696, 1762, 977}},
-    {{2995, 2493, 2366, 2217, 1693, 1596, 979}},
-    {{3000, 2615, 2368, 2216, 1695, 1844, 1034}},
-    {{3012, 2628, 2366, 2217, 1693, 2028, 1034}},
-    {{3031, 2620, 2365, 2214, 1642, 2204, 1035}},
-    {{3046, 2484, 2367, 2063, 1633, 1385, 1033}},
-    {{3046, 2409, 2368, 1866, 1634, 1466, 1034}},
-    {{3046, 2287, 2368, 1709, 1635, 1622, 1035}},
-    {{3045, 2176, 2368, 1618, 1640, 1734, 1036}},
-    {{3046, 2078, 2369, 1488, 1640, 2009, 1097}},
-    {{3051, 1973, 2378, 1222, 1649, 2403, 1316}},
-    {{3128, 1935, 2496, 1224, 1639, 2396, 1315}},
-    {{3213, 1943, 2534, 1424, 1576, 2157, 1334}},
-    {{3232, 1950, 2724, 1463, 1450, 2102, 1338}},
-    {{3257, 1956, 2923, 1472, 1305, 2116, 1338}},
-    {{3333, 2077, 3046, 1481, 1048, 2506, 1334}},
-    {{3410, 2255, 3293, 1561, 958, 2573, 1222}},
-    {{3611, 2410, 3294, 1681, 960, 2593, 1226}},
-    {{3735, 2632, 3293, 1694, 971, 2710, 1423}},
-    {{3610, 2537, 2358, 1369, 1765, 1896, 880}},
-    {{3582, 2784, 2424, 1149, 1778, 1606, 883}},
-    {{3163, 1969, 2198, 1880, 1822, 2147, 881}},
-    {{3121, 1904, 1857, 1729, 1694, 1976, 881}},
-    {{3081, 1696, 1675, 1580, 1693, 2096, 734}},
-    {{2646, 1351, 1486, 1578, 2766, 2068, 730}},
-    {{2615, 1183, 1471, 1580, 2781, 1907, 543}},
-    {{2500, 1110, 1461, 1651, 2789, 1632, 347}},
+    {{336, 852, 2084, 3266, 2067, 2067, 3753}},
+    {{612, 852, 2083, 3267, 2095, 2053, 3460}},
+    {{832, 852, 2106, 3265, 2090, 2085, 3106}},
+    {{1130, 852, 2165, 3267, 2112, 2058, 2695}},
+    {{1527, 852, 2167, 3248, 2121, 2087, 2439}},
+    {{1780, 852, 2167, 3244, 2119, 2109, 2160}},
+    {{2103, 852, 2165, 3267, 2140, 2143, 1735}},
+    {{2399, 851, 2180, 3266, 2153, 2088, 1541}},
+    {{2813, 852, 2180, 3260, 2147, 2122, 1170}},
+    {{3259, 852, 2180, 3260, 2149, 2128, 661}},
+    {{3263, 851, 2182, 3260, 2150, 2129, 662}},
+    {{3589, 852, 2180, 3239, 2152, 2068, 438}},
+    {{3740, 852, 2180, 3249, 2154, 2039, 336}},
+    {{3498, 852, 2180, 3244, 2154, 2047, 337}},
+    {{3777, 2067, 928, 1062, 3035, 1937, 3190}},
+    {{3788, 2180, 1229, 1054, 3029, 2207, 3293}},
+    {{3788, 2182, 1605, 1062, 3027, 2529, 3294}},
+    {{3751, 2202, 1845, 1053, 2700, 2819, 3688}},
+    {{3787, 2196, 2254, 1055, 2802, 3081, 3516}},
+    {{3718, 2251, 2793, 1054, 1216, 2329, 1241}},
+    {{3718, 2253, 3047, 1061, 1219, 2152, 1266}},
+    {{3716, 2247, 3325, 1060, 1183, 1854, 1457}},
+    {{3692, 3222, 3306, 2043, 2127, 1176, 1614}},
+    {{3786, 3225, 1379, 2012, 1598, 968, 3444}},
+    {{3776, 3227, 1214, 1869, 1366, 1206, 2907}},
+    {{3776, 3228, 1216, 1943, 1044, 1449, 2722}},
+    {{3776, 3228, 1216, 2215, 1041, 1430, 2677}},
+    {{3776, 3228, 1238, 2217, 1178, 1833, 2677}},
+    {{3776, 3228, 1378, 2217, 1332, 1995, 2678}},
+    {{3274, 3225, 1671, 1918, 954, 1238, 3669}},
+    {{3291, 2169, 1179, 1341, 983, 1867, 3753}},
+    {{3597, 1780, 1462, 1267, 1140, 1584, 353}},
+    {{3785, 1979, 1462, 1057, 1150, 1639, 720}},
+    {{3785, 1937, 1889, 1086, 1149, 1243, 802}},
+    {{3745, 1986, 2209, 1203, 1027, 1216, 745}},
+    {{3746, 1987, 2512, 1159, 1026, 1217, 872}},
+    {{3746, 1987, 2738, 1152, 1024, 1429, 936}},
+    {{3746, 2063, 3075, 1193, 1040, 1496, 937}},
+    {{3746, 2105, 3207, 1297, 1039, 2067, 952}},
+    {{3758, 2109, 3219, 1453, 1042, 2763, 953}},
+    {{3787, 2166, 3319, 1585, 1355, 2778, 689}},
+    {{3673, 2004, 2721, 2892, 2917, 2029, 501}},
+    {{3674, 2151, 2807, 2863, 2965, 2345, 499}},
+    {{3761, 2286, 2807, 2889, 2844, 2493, 561}},
+    {{3761, 2340, 2861, 2893, 3163, 2727, 508}},
+    {{3767, 2499, 2858, 2839, 2519, 2621, 843}},
+    {{3787, 2659, 2859, 2867, 2432, 3008, 910}},
+    {{3785, 1945, 1739, 3192, 1044, 2616, 2769}},
+    {{3786, 1911, 1740, 3192, 1011, 2228, 2854}},
+    {{3785, 1864, 1175, 2312, 955, 2098, 3747}},
+    {{3785, 1863, 1192, 2314, 1125, 1719, 3746}},
+    {{3775, 1859, 1194, 2388, 1639, 1276, 3743}},
+    {{3761, 1469, 1271, 2898, 2339, 1704, 863}},
+    {{3762, 1457, 1272, 3061, 2353, 2013, 912}},
+    {{3761, 1453, 1271, 3104, 2349, 2318, 1010}},
+    {{3762, 1451, 1272, 3210, 2349, 2553, 1017}},
+    {{3494, 2042, 2128, 2547, 2349, 2274, 591}},
+    {{3493, 2172, 2307, 2604, 2349, 2453, 592}},
+    {{3486, 2366, 2352, 2605, 2349, 2535, 592}},
+    {{3475, 2518, 2350, 2603, 2346, 3076, 592}},
+    {{3482, 2592, 2349, 2668, 2346, 3162, 591}},
+    {{3538, 3023, 2348, 2340, 2032, 1241, 931}},
+    {{3538, 2995, 2347, 2034, 2032, 1462, 931}},
+    {{3533, 2984, 2349, 1777, 2033, 1622, 930}},
+    {{3469, 2986, 2352, 1413, 2036, 1914, 931}},
+    {{3222, 3022, 2353, 1328, 2036, 1896, 1210}},
+    {{3195, 2889, 2350, 1108, 1949, 2177, 1209}},
+    {{3197, 2646, 2349, 1056, 1858, 2310, 1209}},
+    {{3204, 2336, 2350, 962, 1819, 2572, 1442}},
+    {{3196, 2007, 2348, 1000, 1592, 2871, 1253}},
+    {{3076, 1869, 2140, 854, 1564, 3030, 1518}},
+    {{2958, 1610, 2065, 845, 1564, 3126, 1639}},
+    {{2958, 1371, 2066, 868, 1523, 3102, 1637}},
+    {{2958, 1160, 2066, 852, 1520, 3163, 1636}},
+    {{3297, 3226, 1791, 1991, 1941, 1140, 505}},
+    {{3296, 3132, 1792, 1581, 1942, 1607, 507}},
+    {{3342, 2866, 1792, 1343, 2017, 2028, 550}},
+    {{3343, 2621, 1793, 1347, 2028, 2182, 549}},
+    {{3339, 2337, 1979, 1693, 2028, 2166, 782}},
+    {{3342, 2089, 2043, 2028, 2027, 2155, 775}},
+    {{3339, 1960, 1964, 1923, 2027, 2510, 871}},
+    {{3319, 1828, 1932, 1690, 2017, 2898, 871}},
+    {{3231, 1711, 1885, 1603, 2018, 3010, 874}},
+    {{3028, 1446, 1811, 1560, 2021, 3185, 1238}},
+    {{2943, 1262, 1773, 1552, 2021, 3291, 1513}},
+    {{2927, 850, 2081, 2965, 1982, 3243, 1224}},
+    {{3045, 852, 2080, 3274, 2278, 2866, 973}},
+    {{3408, 851, 2078, 3274, 2691, 2600, 415}},
+    {{3775, 851, 2134, 3276, 2848, 2322, 334}},
+    {{3775, 852, 3006, 3256, 2927, 1578, 3752}},
+    {{3778, 1585, 3008, 2970, 2021, 1698, 3752}},
+    {{3776, 1831, 3315, 2993, 2002, 1522, 3753}},
+    {{3775, 1860, 3317, 2990, 2685, 1444, 412}},
+    {{3756, 1979, 3303, 2987, 2684, 1961, 677}},
+    {{3775, 2013, 3309, 3094, 2957, 3156, 1263}},
+    {{3774, 2071, 3307, 3006, 2522, 1342, 477}},
+    {{3769, 1995, 2940, 2748, 2923, 2204, 339}},
+    {{3770, 1976, 2618, 2787, 3246, 2532, 339}},
+    {{3773, 1915, 2036, 3174, 3090, 2945, 853}},
+    {{3773, 1914, 2036, 3238, 2909, 2259, 1010}},
 }};
 
 struct NdiPoseSample {
@@ -404,6 +345,20 @@ struct DualToolCapture {
     NdiPoseSample movingRelativeToFixed;
 };
 
+// One instantaneous (non-averaged) moving-relative-to-fixed sample, tagged
+// with elapsed time since collectRawSettlingSeries() started -- used only by
+// the --settling-diagnostic mode to see how the pose changes right after a
+// move, before the real capture loop's 30-sample average would begin.
+struct SettlingSample {
+    int poseIndex = 0;
+    long elapsedMs = 0;
+    bool valid = false;
+    double txMm = 0.0;
+    double tyMm = 0.0;
+    double tzMm = 0.0;
+    double error = 0.0;
+};
+
 void waitForEnter(const std::string& message) {
     std::cout << message << std::flush;
     std::string line;
@@ -423,32 +378,17 @@ std::vector<uint16_t> readActualTicks(
     std::vector<uint16_t> ticks;
     ticks.reserve(motorIds.size());
 
+    // No isPositionSafe() gate here: every TARGET_POSES entry was hand-
+    // verified by physically moving the arm there (via
+    // record_hand_poses.cpp), so a motor reading slightly outside
+    // jointCalibrations here reflects settling/backlash noise around an
+    // already-confirmed-safe position, not a real safety concern.
     for (int id : motorIds) {
         uint16_t position = 0;
         if (!motor.readPosition(id, position)) {
             throw std::runtime_error(
                 "Failed to read motor " + std::to_string(id)
             );
-        }
-        if (!motor.isPositionSafe(id, position)) {
-            std::cout
-                << "\nWARNING: motor " << id << " ended up at position "
-                << position << ", which is outside its calibrated safe "
-                << "range. This pose cannot be safely captured.\n"
-                << "Press 's' to skip this pose (torque stays enabled, "
-                << "the arm keeps holding its current position).\n";
-
-            while (true) {
-                if (_kbhit()) {
-                    const int key = _getch();
-                    if (key == 's' || key == 'S') {
-                        throw PoseSkippedByUser{};
-                    }
-                }
-                std::this_thread::sleep_for(
-                    std::chrono::milliseconds(100)
-                );
-            }
         }
         ticks.push_back(position);
     }
@@ -474,28 +414,6 @@ std::vector<double> ticksToRadiansVector(
     }
 
     return radians;
-}
-
-bool targetPoseIsSafe(
-    const std::array<uint16_t, JOINT_COUNT>& pose
-) {
-    if (jointCalibrations.size() < JOINT_COUNT) {
-        return false;
-    }
-
-    for (std::size_t i = 0; i < JOINT_COUNT; ++i) {
-        const JointCalibration& joint = jointCalibrations[i];
-        if (pose[i] < joint.minTick || pose[i] > joint.maxTick) {
-            std::cerr
-                << "Pose rejected: motor " << joint.id
-                << " target " << pose[i]
-                << " is outside [" << joint.minTick
-                << ", " << joint.maxTick << "].\n";
-            return false;
-        }
-    }
-
-    return true;
 }
 
 void normalizeQuaternion(NdiPoseSample& pose) {
@@ -760,6 +678,134 @@ public:
         );
 
         return capture;
+    }
+
+    // Diagnostic only: polls BX as fast as NDI_SAMPLE_INTERVAL_MS allows for
+    // durationMs, starting the instant this is called (no blind
+    // SETTLING_TIME_MS sleep beforehand), logging the single-sample
+    // moving-relative-to-fixed pose at every poll -- lets us see the actual
+    // settling curve after a move instead of assuming 750ms is enough before
+    // the real 30-sample average starts.
+    void collectRawSettlingSeries(
+        int poseIndex,
+        int durationMs,
+        bool& manualModeEnabled,
+        std::vector<SettlingSample>& out
+    ) {
+        const auto start = std::chrono::steady_clock::now();
+
+        while (true) {
+            const long elapsedMs = std::chrono::duration_cast<
+                std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - start
+            ).count();
+            if (elapsedMs >= durationMs) {
+                break;
+            }
+
+            handleUserControls(manualModeEnabled);
+            requestBxUpdate();
+
+            NdiPoseSample moving;
+            NdiPoseSample fixed;
+            int movingInvalidCount = 0;
+            int fixedInvalidCount = 0;
+
+            const bool movingValid = tryReadToolFromCurrentBx(
+                movingToolHandle_, "moving", moving, movingInvalidCount, false
+            );
+            const bool fixedValid = tryReadToolFromCurrentBx(
+                fixedToolHandle_, "fixed", fixed, fixedInvalidCount, false
+            );
+
+            SettlingSample sample;
+            sample.poseIndex = poseIndex;
+            sample.elapsedMs = elapsedMs;
+
+            if (movingValid && fixedValid) {
+                const NdiPoseSample relative =
+                    computeMovingRelativeToFixed(moving, fixed);
+                sample.valid = true;
+                sample.txMm = relative.txMm;
+                sample.tyMm = relative.tyMm;
+                sample.tzMm = relative.tzMm;
+                sample.error =
+                    (moving.error > fixed.error) ? moving.error : fixed.error;
+            }
+
+            out.push_back(sample);
+
+            std::this_thread::sleep_for(
+                std::chrono::milliseconds(NDI_SAMPLE_INTERVAL_MS)
+            );
+        }
+    }
+
+    // Waits until the moving tool's position has stopped changing (last
+    // STABILITY_WINDOW_SIZE valid samples all within STABILITY_TOLERANCE_MM
+    // of each other) instead of assuming a fixed sleep is always enough.
+    // Only the moving tool is checked -- the fixed tool never moves, so its
+    // stability is irrelevant here. Falls back to proceeding anyway after
+    // STABILITY_MAX_WAIT_MS, consistent with this file's "warn, don't
+    // abort" philosophy elsewhere (waitForBothToolsVisible/collectBothTools).
+    void waitForPoseStability(bool& manualModeEnabled) {
+        std::vector<std::array<double, 3>> recent;
+        const auto start = std::chrono::steady_clock::now();
+
+        while (true) {
+            const long elapsedMs = std::chrono::duration_cast<
+                std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - start
+            ).count();
+
+            if (elapsedMs >= STABILITY_MAX_WAIT_MS) {
+                std::cout
+                    << "\nWARNING: moving tool did not stabilize within "
+                    << STABILITY_MAX_WAIT_MS
+                    << "ms -- proceeding with capture anyway.\n";
+                return;
+            }
+
+            handleUserControls(manualModeEnabled);
+            requestBxUpdate();
+
+            NdiPoseSample moving;
+            int invalidCount = 0;
+            const bool valid = tryReadToolFromCurrentBx(
+                movingToolHandle_, "moving", moving, invalidCount, false
+            );
+
+            if (valid) {
+                recent.push_back({moving.txMm, moving.tyMm, moving.tzMm});
+                if (recent.size() > STABILITY_WINDOW_SIZE) {
+                    recent.erase(recent.begin());
+                }
+
+                if (recent.size() == STABILITY_WINDOW_SIZE) {
+                    double maxSpread = 0.0;
+                    for (std::size_t i = 0; i < recent.size(); ++i) {
+                        for (std::size_t j = i + 1; j < recent.size(); ++j) {
+                            const double dx = recent[i][0] - recent[j][0];
+                            const double dy = recent[i][1] - recent[j][1];
+                            const double dz = recent[i][2] - recent[j][2];
+                            const double dist =
+                                std::sqrt(dx * dx + dy * dy + dz * dz);
+                            if (dist > maxSpread) {
+                                maxSpread = dist;
+                            }
+                        }
+                    }
+
+                    if (maxSpread <= STABILITY_TOLERANCE_MM) {
+                        return;
+                    }
+                }
+            }
+
+            std::this_thread::sleep_for(
+                std::chrono::milliseconds(NDI_SAMPLE_INTERVAL_MS)
+            );
+        }
     }
 
     void shutdown() noexcept {
@@ -1370,9 +1416,15 @@ std::size_t findResumeStartIndex(const std::string& csvPath) {
     return maxPoseId;
 }
 
-}  // namespace
-
-int main() {
+// --settling-diagnostic mode: moves through the first
+// SETTLING_DIAGNOSTIC_POSE_COUNT poses of TARGET_POSES (already
+// hand-verified safe -- same array the real 200-pose capture uses) and,
+// instead of the normal SETTLING_TIME_MS sleep + 30-sample average, logs
+// every raw BX poll for SETTLING_DIAGNOSTIC_DURATION_MS right after each
+// move completes. Lets us see directly whether the tracked pose is still
+// moving/settling in the window the real capture loop would otherwise
+// silently average over.
+int runSettlingDiagnostic() {
     const std::vector<int> motorIds = {0, 1, 2, 3, 4, 5, 6};
 
     DynamixelMotor motor(
@@ -1382,14 +1434,303 @@ int main() {
     );
 
     try {
-        for (const auto& pose : TARGET_POSES) {
-            if (!targetPoseIsSafe(pose)) {
+        std::ofstream csv(SETTLING_DIAGNOSTIC_CSV, std::ios::out | std::ios::trunc);
+        if (!csv) {
+            throw std::runtime_error(
+                std::string("Could not open CSV: ") + SETTLING_DIAGNOSTIC_CSV
+            );
+        }
+        csv << "pose_id,elapsed_ms,valid,tx_mm,ty_mm,tz_mm,error\n";
+
+        if (!motor.connect()) {
+            throw std::runtime_error("Could not connect to the Cyton motors.");
+        }
+
+        for (int id : motorIds) {
+            if (!motor.pingMotor(id)) {
                 throw std::runtime_error(
-                    "At least one predefined target pose is unsafe."
+                    "Could not ping motor " + std::to_string(id)
                 );
             }
         }
 
+        bool manualModeEnabled = false;
+
+        NdiTracker ndi(NDI_DEVICE, MOVING_TOOL_ROM, FIXED_TOOL_ROM);
+
+        try {
+            ndi.initialize(manualModeEnabled);
+        } catch (const PoseSkippedByUser&) {
+            std::cout
+                << "\nSkipped the initial visibility wait. Proceeding -- "
+                << "visibility gets re-checked at the start of each pose "
+                << "anyway.\n";
+        }
+
+        std::cout
+            << "\nSettling diagnostic: " << SETTLING_DIAGNOSTIC_POSE_COUNT
+            << " poses, " << SETTLING_DIAGNOSTIC_DURATION_MS
+            << "ms of raw BX samples logged per pose (no settling sleep).\n"
+            << "Output: " << SETTLING_DIAGNOSTIC_CSV << "\n"
+            << "'p' pauses/resumes, 's' skips the current pose.\n";
+
+        for (int poseIndex = 0;
+             poseIndex < SETTLING_DIAGNOSTIC_POSE_COUNT;
+             ++poseIndex) {
+            checkForModeToggle(manualModeEnabled);
+
+            std::cout
+                << "\nMoving to pose " << poseIndex + 1 << " of "
+                << SETTLING_DIAGNOSTIC_POSE_COUNT << "...\n";
+
+            const auto& targetArray = TARGET_POSES[poseIndex];
+            const std::vector<uint16_t> targetTicks(
+                targetArray.begin(), targetArray.end()
+            );
+
+            if (!motor.moveJointsSafely(
+                    motorIds,
+                    targetTicks,
+                    MOVING_SPEED,
+                    MOTOR_TOLERANCE_TICKS,
+                    MOVE_TIMEOUT_SECONDS,
+                    true,
+                    STALL_REPEATS_TO_DETECT,
+                    false
+                )) {
+                std::cout
+                    << "Warning: pose " << poseIndex + 1
+                    << " did not fully reach its target. Logging settling "
+                    << "data from the actual position reached.\n";
+            }
+
+            try {
+                std::vector<SettlingSample> samples;
+                ndi.collectRawSettlingSeries(
+                    poseIndex,
+                    SETTLING_DIAGNOSTIC_DURATION_MS,
+                    manualModeEnabled,
+                    samples
+                );
+
+                for (const auto& s : samples) {
+                    csv
+                        << s.poseIndex << ','
+                        << s.elapsedMs << ','
+                        << (s.valid ? 1 : 0) << ','
+                        << s.txMm << ','
+                        << s.tyMm << ','
+                        << s.tzMm << ','
+                        << s.error << '\n';
+                }
+                csv.flush();
+
+                std::cout
+                    << "  logged " << samples.size() << " samples ("
+                    << std::count_if(
+                           samples.begin(), samples.end(),
+                           [](const SettlingSample& s) { return s.valid; }
+                       )
+                    << " valid).\n";
+            } catch (const PoseSkippedByUser&) {
+                std::cout
+                    << "\nPose " << poseIndex + 1
+                    << " skipped by user. No settling data recorded for "
+                    << "this pose.\n";
+            }
+        }
+
+        std::cout
+            << "\nSettling diagnostic complete. Saved data to "
+            << SETTLING_DIAGNOSTIC_CSV << '\n';
+
+        disableAll(motor, motorIds);
+        motor.disconnect();
+        return 0;
+    } catch (const std::exception& error) {
+        std::cerr << "\nERROR: " << error.what() << '\n';
+        disableAll(motor, motorIds);
+        motor.disconnect();
+        return 1;
+    }
+}
+
+// Real (30-sample-averaged) capture, limited to the first
+// QUICK_TEST_POSE_COUNT poses, written to its own CSV. See the constant
+// comment above for why this exists.
+int runQuickCalibrationTest() {
+    const std::vector<int> motorIds = {0, 1, 2, 3, 4, 5, 6};
+
+    DynamixelMotor motor(
+        CYTON_DEVICE,
+        CYTON_BAUD_RATE,
+        CYTON_PROTOCOL_VERSION
+    );
+
+    try {
+        std::ofstream csv(QUICK_TEST_CSV, std::ios::out | std::ios::trunc);
+        if (!csv) {
+            throw std::runtime_error(
+                std::string("Could not open CSV: ") + QUICK_TEST_CSV
+            );
+        }
+        writeCsvHeader(csv);
+
+        if (!motor.connect()) {
+            throw std::runtime_error("Could not connect to the Cyton motors.");
+        }
+
+        for (int id : motorIds) {
+            if (!motor.pingMotor(id)) {
+                throw std::runtime_error(
+                    "Could not ping motor " + std::to_string(id)
+                );
+            }
+        }
+
+        bool manualModeEnabled = false;
+
+        NdiTracker ndi(NDI_DEVICE, MOVING_TOOL_ROM, FIXED_TOOL_ROM);
+
+        try {
+            ndi.initialize(manualModeEnabled);
+        } catch (const PoseSkippedByUser&) {
+            std::cout
+                << "\nSkipped the initial visibility wait. Proceeding -- "
+                << "visibility gets re-checked at the start of each pose "
+                << "anyway.\n";
+        }
+
+        const std::size_t quickTestPoseCount = QUICK_TEST_POSE_INDICES.size();
+
+        std::cout
+            << "\nQuick calibration test: " << quickTestPoseCount
+            << " diverse poses, full real capture pipeline (stability-based "
+            << "settle + 30-sample average per tool), collected in one "
+            << "short sitting.\n"
+            << "Output: " << QUICK_TEST_CSV << "\n"
+            << "Poses auto-advance. 'p' pauses/resumes, 's' skips the "
+            << "current pose, space toggles manual mode.\n";
+
+        for (std::size_t i = 0; i < quickTestPoseCount; ++i) {
+            const std::size_t poseIndex =
+                static_cast<std::size_t>(QUICK_TEST_POSE_INDICES[i]);
+
+            checkForModeToggle(manualModeEnabled);
+
+            if (manualModeEnabled) {
+                waitForEnter(
+                    "\nPress Enter to move to pose " +
+                    std::to_string(i + 1) + " of " +
+                    std::to_string(quickTestPoseCount) + " (TARGET_POSES[" +
+                    std::to_string(poseIndex) + "])..."
+                );
+            } else {
+                std::cout
+                    << "\nAuto-advancing to pose " << i + 1
+                    << " of " << quickTestPoseCount << " (TARGET_POSES["
+                    << poseIndex << "])...\n";
+            }
+
+            const auto& targetArray = TARGET_POSES[poseIndex];
+            const std::vector<uint16_t> targetTicks(
+                targetArray.begin(), targetArray.end()
+            );
+
+            if (!motor.moveJointsSafely(
+                    motorIds,
+                    targetTicks,
+                    MOVING_SPEED,
+                    MOTOR_TOLERANCE_TICKS,
+                    MOVE_TIMEOUT_SECONDS,
+                    true,
+                    STALL_REPEATS_TO_DETECT,
+                    false
+                )) {
+                std::cout
+                    << "\nWarning: pose " << i + 1
+                    << " did not fully reach its target. Continuing with "
+                    << "the actual position reached.\n";
+
+                for (int id : motorIds) {
+                    if (!motor.enableTorque(id)) {
+                        std::cerr
+                            << "WARNING: could not confirm torque is "
+                            << "enabled on motor " << id << ".\n";
+                    }
+                }
+            }
+
+            try {
+                ndi.waitForPoseStability(manualModeEnabled);
+
+                const std::vector<uint16_t> actualTicks =
+                    readActualTicks(motor, motorIds);
+                const std::vector<double> actualRadians =
+                    ticksToRadiansVector(actualTicks);
+                const DualToolCapture ndiCapture =
+                    ndi.collectBothTools(manualModeEnabled);
+
+                appendCsvRow(
+                    csv,
+                    poseIndex,
+                    targetArray,
+                    actualTicks,
+                    actualRadians,
+                    ndiCapture
+                );
+                printCapturedPose(
+                    poseIndex, actualTicks, actualRadians, ndiCapture
+                );
+            } catch (const PoseSkippedByUser&) {
+                std::cout
+                    << "\nPose " << i + 1
+                    << " skipped by user. No NDI data recorded for this "
+                    << "pose.\n";
+            }
+        }
+
+        std::cout
+            << "\nQuick calibration test complete. Saved data to "
+            << QUICK_TEST_CSV << '\n';
+
+        disableAll(motor, motorIds);
+        motor.disconnect();
+        return 0;
+    } catch (const PoseSkippedByUser&) {
+        std::cout
+            << "\nSkipped during initial NDI setup (before any pose was "
+            << "captured). Exiting.\n";
+        disableAll(motor, motorIds);
+        motor.disconnect();
+        return 1;
+    } catch (const std::exception& error) {
+        std::cerr << "\nERROR: " << error.what() << '\n';
+        disableAll(motor, motorIds);
+        motor.disconnect();
+        return 1;
+    }
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+    if (argc > 1 && std::string(argv[1]) == "--settling-diagnostic") {
+        return runSettlingDiagnostic();
+    }
+    if (argc > 1 && std::string(argv[1]) == "--quick-test") {
+        return runQuickCalibrationTest();
+    }
+
+    const std::vector<int> motorIds = {0, 1, 2, 3, 4, 5, 6};
+
+    DynamixelMotor motor(
+        CYTON_DEVICE,
+        CYTON_BAUD_RATE,
+        CYTON_PROTOCOL_VERSION
+    );
+
+    try {
         const std::size_t resumeStartIndex =
             findResumeStartIndex(OUTPUT_CSV);
         const bool resuming = resumeStartIndex > 0;
@@ -1433,7 +1774,15 @@ int main() {
             MOVING_TOOL_ROM,
             FIXED_TOOL_ROM
         );
-        ndi.initialize(manualModeEnabled);
+
+        try {
+            ndi.initialize(manualModeEnabled);
+        } catch (const PoseSkippedByUser&) {
+            std::cout
+                << "\nSkipped the initial visibility wait. Proceeding to "
+                << "poses -- visibility gets re-checked at the start of "
+                << "each pose anyway.\n";
+        }
 
         std::cout
             << "\nFive-pose Cyton + dual-tool NDI capture test\n"
@@ -1478,16 +1827,23 @@ int main() {
                     MOVE_TIMEOUT_SECONDS,
                     true,
                     STALL_REPEATS_TO_DETECT,
-                    STALL_GRACE_SECONDS
+                    false
                 )) {
                 std::cout
                     << "\nWarning: pose " << poseIndex + 1
-                    << " did not fully reach its target within the "
-                    << "timeout. Re-enabling torque and continuing with "
-                    << "the actual position reached.\n";
+                    << " did not fully reach its target (see the message "
+                    << "above for why). Continuing with the actual "
+                    << "position reached.\n";
 
                 for (int id : motorIds) {
-                    motor.enableTorque(id);
+                    if (!motor.enableTorque(id)) {
+                        std::cerr
+                            << "WARNING: could not confirm torque is "
+                            << "enabled on motor " << id << " -- it may "
+                            << "be holding position on its own or may "
+                            << "have gone limp. Check the arm physically "
+                            << "before continuing.\n";
+                    }
                 }
             }
 

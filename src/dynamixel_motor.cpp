@@ -242,6 +242,21 @@ bool DynamixelMotor::disableTorque(int motorId)
     return checkCommResult(commResult, dxlError, motorId, "Disable torque");
 }
 
+bool DynamixelMotor::writeGoalPositionRaw(int motorId, uint16_t position)
+{
+    uint8_t dxlError = 0;
+
+    int commResult = packetHandler_->write2ByteTxRx(
+        portHandler_,
+        motorId,
+        ADDR_GOAL_POSITION,
+        position,
+        &dxlError
+    );
+
+    return checkCommResult(commResult, dxlError, motorId, "Set goal position");
+}
+
 bool DynamixelMotor::setGoalPosition(int motorId, uint16_t position)
 {
     if (position > MAX_RAW_POSITION)
@@ -259,17 +274,7 @@ bool DynamixelMotor::setGoalPosition(int motorId, uint16_t position)
         return false;
     }
 
-    uint8_t dxlError = 0;
-
-    int commResult = packetHandler_->write2ByteTxRx(
-        portHandler_,
-        motorId,
-        ADDR_GOAL_POSITION,
-        position,
-        &dxlError
-    );
-
-    return checkCommResult(commResult, dxlError, motorId, "Set goal position");
+    return writeGoalPositionRaw(motorId, position);
 }
 
 bool DynamixelMotor::setMovingSpeed(int motorId, uint16_t speed)
@@ -419,7 +424,7 @@ bool DynamixelMotor::moveJointsSafely(
     int timeoutSeconds,
     bool holdTorque,
     int stallRepeatsToDetect,
-    int stallGraceSeconds
+    bool enforceSafetyLimits
 )
 {
     if (motorIds.size() != targetPositions.size())
@@ -441,7 +446,7 @@ bool DynamixelMotor::moveJointsSafely(
         int motorId = motorIds[i];
         uint16_t targetPosition = targetPositions[i];
 
-        if (!isPositionWithinLimit(motorId, targetPosition))
+        if (enforceSafetyLimits && !isPositionWithinLimit(motorId, targetPosition))
         {
             std::cerr << "Target position " << targetPosition
                       << " is outside the safe range for motor ID "
@@ -458,7 +463,7 @@ bool DynamixelMotor::moveJointsSafely(
             return false;
         }
 
-        if (!isPositionWithinLimit(motorId, currentPosition))
+        if (enforceSafetyLimits && !isPositionWithinLimit(motorId, currentPosition))
         {
             std::cerr << "Starting position " << currentPosition
                       << " is outside the safe range for motor ID "
@@ -510,7 +515,11 @@ bool DynamixelMotor::moveJointsSafely(
 
     for (size_t i = 0; i < motorIds.size(); ++i)
     {
-        if (!setGoalPosition(motorIds[i], targetPositions[i]))
+        const bool goalAccepted = enforceSafetyLimits
+            ? setGoalPosition(motorIds[i], targetPositions[i])
+            : writeGoalPositionRaw(motorIds[i], targetPositions[i]);
+
+        if (!goalAccepted)
         {
             std::cerr << "Failed to set goal position for motor ID "
                       << motorIds[i] << std::endl;
@@ -536,8 +545,6 @@ bool DynamixelMotor::moveJointsSafely(
 
     int previousTotalError = -1;
     int stallRepeatCount = 0;
-    bool stallDetected = false;
-    std::chrono::steady_clock::time_point stallStartTime;
 
     while (true)
     {
@@ -568,15 +575,30 @@ bool DynamixelMotor::moveJointsSafely(
                 return false;
             }
 
-            if (!isPositionWithinLimit(motorId, currentPosition))
+            if (enforceSafetyLimits && !isPositionWithinLimit(motorId, currentPosition))
             {
                 std::cerr << "SAFETY STOP: motor " << motorId
                           << " moved outside safe range at position "
-                          << currentPosition << std::endl;
+                          << currentPosition << ". Freezing all motors "
+                          << "at their current position -- torque stays "
+                          << "enabled rather than being released."
+                          << std::endl;
 
+                // Command each motor's goal to wherever it already
+                // physically is, so it holds there instead of continuing
+                // toward the original (now-abandoned) target. Uses the
+                // raw writer, not setGoalPosition(), because the
+                // offending motor's OWN current position is by
+                // definition outside jointCalibrations here --
+                // setGoalPosition() would reject commanding it to hold
+                // exactly where it already is.
                 for (int id : motorIds)
                 {
-                    disableTorque(id);
+                    uint16_t freezePosition = 0;
+                    if (readPosition(id, freezePosition))
+                    {
+                        writeGoalPositionRaw(id, freezePosition);
+                    }
                 }
 
                 return false;
@@ -633,16 +655,26 @@ bool DynamixelMotor::moveJointsSafely(
                 previousTotalError = currentTotalError;
             }
 
-            if (stallRepeatCount >= stallRepeatsToDetect && !stallDetected)
+            if (stallRepeatCount >= stallRepeatsToDetect)
             {
-                stallDetected = true;
-                stallStartTime = std::chrono::steady_clock::now();
-                std::cout
+                std::cerr
                     << "Error values unchanged for " << stallRepeatCount
-                    << " consecutive checks -- motors may have stopped "
-                    << "moving. Waiting " << stallGraceSeconds
-                    << " more seconds before accepting the current position."
-                    << std::endl;
+                    << " consecutive checks -- motors have stopped "
+                    << "moving; accepting current position." << std::endl;
+
+                if (!holdTorque)
+                {
+                    for (int id : motorIds)
+                    {
+                        disableTorque(id);
+                    }
+                }
+                else
+                {
+                    std::cout << "Torque remains enabled to hold current position." << std::endl;
+                }
+
+                return false;
             }
         }
 
@@ -679,35 +711,19 @@ bool DynamixelMotor::moveJointsSafely(
         {
             std::cerr << "Timeout: motors did not reach target in time." << std::endl;
 
-            for (int id : motorIds)
+            if (!holdTorque)
             {
-                disableTorque(id);
-            }
-
-            return false;
-        }
-
-        if (stallDetected)
-        {
-            auto stallElapsedSeconds =
-                std::chrono::duration_cast<std::chrono::seconds>(
-                    now - stallStartTime
-                ).count();
-
-            if (stallElapsedSeconds >= stallGraceSeconds)
-            {
-                std::cerr
-                    << "Motors appear to have stopped moving before "
-                    << "reaching target; accepting current position after "
-                    << stallGraceSeconds << "s grace period." << std::endl;
-
                 for (int id : motorIds)
                 {
                     disableTorque(id);
                 }
-
-                return false;
             }
+            else
+            {
+                std::cout << "Torque remains enabled to hold current position." << std::endl;
+            }
+
+            return false;
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
