@@ -1,6 +1,7 @@
 #include "dynamixel_motor.h"
 #include "robot_calibration.h"
 
+#include <algorithm>
 #include <iostream>
 #include <cmath>
 #include <thread>
@@ -16,6 +17,41 @@ int getMotorTolerance(int motorId)
     }
 
     return 10; // main arm joints stay more accurate
+}
+
+// Per-joint backlash overshoot margin (2026-07-30), replacing the earlier
+// single uniform BACKLASH_OVERSHOOT_TICKS=20 applied to all 7 joints.
+// Measured directly via the full 7-joint hand-verified below/target/above/
+// target reversal test (record_hand_poses.cpp + test_five_pose_ndi_
+// capture.cpp --quick-test, TARGET_POSES index 319-346; see CLAUDE.md's
+// kinematic-calibration section for the full mm-domain results and the
+// FK-lever-arm back-calculation converting them to these tick values).
+// Each value is the joint's own implied true backlash gap (in ticks) with
+// a modest safety margin -- NOT a generous one, since a prior direct test
+// (20 vs 35 vs 40 ticks, uniform) confirmed overshooting past the true gap
+// only adds settling-noise cost with zero additional correction benefit.
+// shoulder_roll/shoulder_pitch measured negligible backlash (0.28mm/1.01mm,
+// implied 0.3/1.3 ticks) and get a small nominal value rather than zero, to
+// avoid a special-cased "no compensation" branch for what's already a
+// near-harmless minimum overshoot.
+int getBacklashOvershootTicks(int motorId)
+{
+    static const int overshootPerJoint[7] = {
+        3,   // motor 0, shoulder_roll   -- measured ~0.28mm (negligible)
+        5,   // motor 1, shoulder_pitch  -- measured ~1.01mm (small)
+        10,  // motor 2, shoulder_yaw    -- measured ~3.20mm
+        15,  // motor 3, elbow_pitch     -- measured ~5.11mm
+        30,  // motor 4, elbow_yaw       -- measured ~7.68mm (largest)
+        23,  // motor 5, wrist_pitch     -- measured ~4.02mm
+        20,  // motor 6, wrist_roll      -- measured ~2.09mm
+    };
+
+    if (motorId >= 0 && motorId < 7)
+    {
+        return overshootPerJoint[motorId];
+    }
+
+    return 20; // fallback for any motor ID outside the 7-joint arm (e.g. a gripper)
 }
 
 DynamixelMotor::DynamixelMotor(
@@ -242,6 +278,113 @@ bool DynamixelMotor::disableTorque(int motorId)
     return checkCommResult(commResult, dxlError, motorId, "Disable torque");
 }
 
+bool DynamixelMotor::writeGoalPositionRaw(int motorId, uint16_t position)
+{
+    uint8_t dxlError = 0;
+
+    int commResult = packetHandler_->write2ByteTxRx(
+        portHandler_,
+        motorId,
+        ADDR_GOAL_POSITION,
+        position,
+        &dxlError
+    );
+
+    return checkCommResult(commResult, dxlError, motorId, "Set goal position");
+}
+
+bool DynamixelMotor::readComplianceMargins(int motorId, uint8_t& cwMargin, uint8_t& ccwMargin)
+{
+    uint8_t dxlError = 0;
+
+    int commResult = packetHandler_->read1ByteTxRx(
+        portHandler_, motorId, ADDR_CW_COMPLIANCE_MARGIN, &cwMargin, &dxlError
+    );
+    if (!checkCommResult(commResult, dxlError, motorId, "Read CW compliance margin"))
+    {
+        return false;
+    }
+
+    commResult = packetHandler_->read1ByteTxRx(
+        portHandler_, motorId, ADDR_CCW_COMPLIANCE_MARGIN, &ccwMargin, &dxlError
+    );
+    return checkCommResult(commResult, dxlError, motorId, "Read CCW compliance margin");
+}
+
+bool DynamixelMotor::writeComplianceMargins(int motorId, uint8_t cwMargin, uint8_t ccwMargin)
+{
+    uint8_t dxlError = 0;
+
+    int commResult = packetHandler_->write1ByteTxRx(
+        portHandler_, motorId, ADDR_CW_COMPLIANCE_MARGIN, cwMargin, &dxlError
+    );
+    if (!checkCommResult(commResult, dxlError, motorId, "Write CW compliance margin"))
+    {
+        return false;
+    }
+
+    commResult = packetHandler_->write1ByteTxRx(
+        portHandler_, motorId, ADDR_CCW_COMPLIANCE_MARGIN, ccwMargin, &dxlError
+    );
+    return checkCommResult(commResult, dxlError, motorId, "Write CCW compliance margin");
+}
+
+bool DynamixelMotor::readComplianceSlopes(int motorId, uint8_t& cwSlope, uint8_t& ccwSlope)
+{
+    uint8_t dxlError = 0;
+
+    int commResult = packetHandler_->read1ByteTxRx(
+        portHandler_, motorId, ADDR_CW_COMPLIANCE_SLOPE, &cwSlope, &dxlError
+    );
+    if (!checkCommResult(commResult, dxlError, motorId, "Read CW compliance slope"))
+    {
+        return false;
+    }
+
+    commResult = packetHandler_->read1ByteTxRx(
+        portHandler_, motorId, ADDR_CCW_COMPLIANCE_SLOPE, &ccwSlope, &dxlError
+    );
+    return checkCommResult(commResult, dxlError, motorId, "Read CCW compliance slope");
+}
+
+bool DynamixelMotor::writeComplianceSlopes(int motorId, uint8_t cwSlope, uint8_t ccwSlope)
+{
+    uint8_t dxlError = 0;
+
+    int commResult = packetHandler_->write1ByteTxRx(
+        portHandler_, motorId, ADDR_CW_COMPLIANCE_SLOPE, cwSlope, &dxlError
+    );
+    if (!checkCommResult(commResult, dxlError, motorId, "Write CW compliance slope"))
+    {
+        return false;
+    }
+
+    commResult = packetHandler_->write1ByteTxRx(
+        portHandler_, motorId, ADDR_CCW_COMPLIANCE_SLOPE, ccwSlope, &dxlError
+    );
+    return checkCommResult(commResult, dxlError, motorId, "Write CCW compliance slope");
+}
+
+bool DynamixelMotor::readPunch(int motorId, uint16_t& punch)
+{
+    uint8_t dxlError = 0;
+
+    int commResult = packetHandler_->read2ByteTxRx(
+        portHandler_, motorId, ADDR_PUNCH, &punch, &dxlError
+    );
+    return checkCommResult(commResult, dxlError, motorId, "Read punch");
+}
+
+bool DynamixelMotor::writePunch(int motorId, uint16_t punch)
+{
+    uint8_t dxlError = 0;
+
+    int commResult = packetHandler_->write2ByteTxRx(
+        portHandler_, motorId, ADDR_PUNCH, punch, &dxlError
+    );
+    return checkCommResult(commResult, dxlError, motorId, "Write punch");
+}
+
 bool DynamixelMotor::setGoalPosition(int motorId, uint16_t position)
 {
     if (position > MAX_RAW_POSITION)
@@ -259,17 +402,7 @@ bool DynamixelMotor::setGoalPosition(int motorId, uint16_t position)
         return false;
     }
 
-    uint8_t dxlError = 0;
-
-    int commResult = packetHandler_->write2ByteTxRx(
-        portHandler_,
-        motorId,
-        ADDR_GOAL_POSITION,
-        position,
-        &dxlError
-    );
-
-    return checkCommResult(commResult, dxlError, motorId, "Set goal position");
+    return writeGoalPositionRaw(motorId, position);
 }
 
 bool DynamixelMotor::setMovingSpeed(int motorId, uint16_t speed)
@@ -299,7 +432,8 @@ bool DynamixelMotor::setMovingSpeed(int motorId, uint16_t speed)
         uint16_t targetPosition,
         uint16_t speed,
         int tolerance,
-        int timeoutSeconds
+        int timeoutSeconds,
+        bool compensateBacklash
     )
     {
     if (!isPositionWithinLimit(motorId, targetPosition))
@@ -324,6 +458,72 @@ bool DynamixelMotor::setMovingSpeed(int motorId, uint16_t speed)
                   << " is outside the safe range for motor ID "
                   << motorId << std::endl;
         return false;
+    }
+
+    if (compensateBacklash && targetPosition < startPosition)
+    {
+        // This move would arrive by DECREASING the tick value. Overshoot
+        // below the target first so the real approach below always
+        // INCREASES instead -- see the header comment on this function
+        // for why (confirmed backlash finding, CLAUDE.md).
+        // Reduced from 40 (2026-07-29): the extra overshoot-and-return
+        // cycle this triggers has its own settling variance, which shows
+        // up as added noise in a joint's final landed position (observed
+        // directly: other-joint scatter went from 1-2 ticks to 3-8 ticks
+        // after this fix was introduced, likely from exactly this extra
+        // cycle, not from backlash itself getting worse). A uniform-margin
+        // sweep (20/35/40 ticks) confirmed overshooting past the true gap
+        // only adds settling-noise cost with zero additional correction
+        // benefit -- see CLAUDE.md's kinematic-calibration section. RESOLVED
+        // (2026-07-30): switched to a per-joint margin (getBacklashOvershoot
+        // Ticks()) once the true gap was measured directly for all 7 joints
+        // (0.28mm-7.68mm, a wide real range this single uniform value could
+        // never fit well for every joint at once).
+        int overshoot = static_cast<int>(targetPosition) -
+            getBacklashOvershootTicks(motorId);
+
+        const JointCalibration& joint = jointCalibrations[motorId];
+        if (overshoot < joint.minTick)
+        {
+            overshoot = joint.minTick;
+        }
+
+        std::cout << "Backlash compensation: overshooting motor " << motorId
+                  << " to " << overshoot << " before approaching "
+                  << targetPosition << " from below." << std::endl;
+
+        if (!moveJointSafely(
+                motorId,
+                static_cast<uint16_t>(overshoot),
+                speed,
+                tolerance,
+                timeoutSeconds,
+                /*compensateBacklash=*/false
+            ))
+        {
+            // Not fatal: the overshoot's purpose is just to get PAST the
+            // target in the right direction before the real approach --
+            // even landing short of the exact overshoot tick (e.g. due to
+            // friction/stall near a joint's range limit) almost certainly
+            // still served that purpose. Proceeding to the real move is
+            // far better than aborting it entirely, which would otherwise
+            // leave the joint sitting at an incomplete overshoot position
+            // instead of its actual intended target.
+            std::cerr << "Warning: backlash-compensation overshoot for "
+                       << "motor ID " << motorId
+                       << " did not fully converge; proceeding to the "
+                       << "real move anyway with whatever position was "
+                       << "reached." << std::endl;
+        }
+
+        // Re-read: the overshoot move above changed the real position,
+        // so the earlier startPosition read is now stale.
+        if (!readPosition(motorId, startPosition))
+        {
+            std::cerr << "Could not re-read position for motor ID "
+                      << motorId << " after backlash overshoot." << std::endl;
+            return false;
+        }
     }
 
     std::cout << "Motor " << motorId
@@ -417,7 +617,11 @@ bool DynamixelMotor::moveJointsSafely(
     uint16_t speed,
     int tolerance,
     int timeoutSeconds,
-    bool holdTorque
+    bool holdTorque,
+    int stallRepeatsToDetect,
+    bool enforceSafetyLimits,
+    bool compensateBacklash,
+    const std::vector<int>& compensateOnlyJointIds
 )
 {
     if (motorIds.size() != targetPositions.size())
@@ -432,6 +636,117 @@ bool DynamixelMotor::moveJointsSafely(
         return false;
     }
 
+    if (compensateBacklash)
+    {
+        // Per joint: if this move would arrive by DECREASING the tick
+        // value, overshoot below the target first so the real approach
+        // below always INCREASES instead -- see moveJointSafely()'s
+        // header comment for why (confirmed backlash finding, CLAUDE.md).
+        // Joints already approaching by increasing (or already at target)
+        // go straight to their real target here, unmodified.
+        // Reduced from 40 (2026-07-29): the extra overshoot-and-return
+        // cycle this triggers has its own settling variance, which shows
+        // up as added noise in a joint's final landed position (observed
+        // directly: other-joint scatter went from 1-2 ticks to 3-8 ticks
+        // after this fix was introduced, likely from exactly this extra
+        // cycle, not from backlash itself getting worse). A uniform-margin
+        // sweep (20/35/40 ticks) confirmed overshooting past the true gap
+        // only adds settling-noise cost with zero additional correction
+        // benefit -- see CLAUDE.md's kinematic-calibration section. RESOLVED
+        // (2026-07-30): switched to a per-joint margin (getBacklashOvershoot
+        // Ticks()) once the true gap was measured directly for all 7 joints
+        // (0.28mm-7.68mm, a wide real range this single uniform value could
+        // never fit well for every joint at once).
+
+        std::vector<uint16_t> overshootTargets;
+        overshootTargets.reserve(motorIds.size());
+        bool anyNeedsOvershoot = false;
+
+        for (size_t i = 0; i < motorIds.size(); ++i)
+        {
+            int motorId = motorIds[i];
+            uint16_t targetPosition = targetPositions[i];
+
+            uint16_t currentPosition = 0;
+            if (!readPosition(motorId, currentPosition))
+            {
+                std::cerr << "Could not read starting position for motor ID "
+                          << motorId << " during backlash pre-check."
+                          << std::endl;
+                return false;
+            }
+
+            const bool eligibleForCompensation =
+                compensateOnlyJointIds.empty() ||
+                std::find(
+                    compensateOnlyJointIds.begin(),
+                    compensateOnlyJointIds.end(),
+                    motorId
+                ) != compensateOnlyJointIds.end();
+
+            if (eligibleForCompensation && targetPosition < currentPosition)
+            {
+                anyNeedsOvershoot = true;
+
+                int overshoot = static_cast<int>(targetPosition) -
+                    getBacklashOvershootTicks(motorId);
+
+                if (enforceSafetyLimits)
+                {
+                    const JointCalibration& joint = jointCalibrations[motorId];
+                    if (overshoot < joint.minTick)
+                    {
+                        overshoot = joint.minTick;
+                    }
+                }
+                else if (overshoot < 0)
+                {
+                    overshoot = 0;
+                }
+
+                overshootTargets.push_back(static_cast<uint16_t>(overshoot));
+            }
+            else
+            {
+                overshootTargets.push_back(targetPosition);
+            }
+        }
+
+        if (anyNeedsOvershoot)
+        {
+            std::cout
+                << "Backlash compensation: overshooting below-target "
+                << "joints before the real move so every joint's final "
+                << "approach is in the same (increasing) direction."
+                << std::endl;
+
+            if (!moveJointsSafely(
+                    motorIds,
+                    overshootTargets,
+                    speed,
+                    tolerance,
+                    timeoutSeconds,
+                    /*holdTorque=*/true,
+                    stallRepeatsToDetect,
+                    enforceSafetyLimits,
+                    /*compensateBacklash=*/false
+                ))
+            {
+                // Not fatal -- see the identical reasoning in
+                // moveJointSafely() above: even an incomplete overshoot
+                // almost certainly still served its purpose, and aborting
+                // here would otherwise skip the real move entirely,
+                // leaving joints at an incomplete intermediate position
+                // instead of their actual intended targets.
+                std::cerr
+                    << "Warning: backlash-compensation overshoot did not "
+                    << "fully converge for all joints; proceeding to the "
+                    << "real move anyway with whatever positions were "
+                    << "reached." << std::endl;
+            }
+        }
+    }
+
     int initialTotalError = 0;
 
     for (size_t i = 0; i < motorIds.size(); ++i)
@@ -439,7 +754,7 @@ bool DynamixelMotor::moveJointsSafely(
         int motorId = motorIds[i];
         uint16_t targetPosition = targetPositions[i];
 
-        if (!isPositionWithinLimit(motorId, targetPosition))
+        if (enforceSafetyLimits && !isPositionWithinLimit(motorId, targetPosition))
         {
             std::cerr << "Target position " << targetPosition
                       << " is outside the safe range for motor ID "
@@ -456,7 +771,7 @@ bool DynamixelMotor::moveJointsSafely(
             return false;
         }
 
-        if (!isPositionWithinLimit(motorId, currentPosition))
+        if (enforceSafetyLimits && !isPositionWithinLimit(motorId, currentPosition))
         {
             std::cerr << "Starting position " << currentPosition
                       << " is outside the safe range for motor ID "
@@ -508,7 +823,11 @@ bool DynamixelMotor::moveJointsSafely(
 
     for (size_t i = 0; i < motorIds.size(); ++i)
     {
-        if (!setGoalPosition(motorIds[i], targetPositions[i]))
+        const bool goalAccepted = enforceSafetyLimits
+            ? setGoalPosition(motorIds[i], targetPositions[i])
+            : writeGoalPositionRaw(motorIds[i], targetPositions[i]);
+
+        if (!goalAccepted)
         {
             std::cerr << "Failed to set goal position for motor ID "
                       << motorIds[i] << std::endl;
@@ -529,8 +848,18 @@ bool DynamixelMotor::moveJointsSafely(
     bool midSnapshotCaptured = false;
     lastElectricalSnapshot_.clear();
 
+    constexpr int PRINT_EVERY_N_ITERATIONS = 10;
+    int iterationCount = 0;
+
+    int previousTotalError = -1;
+    int stallRepeatCount = 0;
+
     while (true)
     {
+        const bool shouldPrint =
+            (iterationCount % PRINT_EVERY_N_ITERATIONS) == 0;
+        ++iterationCount;
+
         bool allReached = true;
         int currentTotalError = 0;
 
@@ -554,15 +883,30 @@ bool DynamixelMotor::moveJointsSafely(
                 return false;
             }
 
-            if (!isPositionWithinLimit(motorId, currentPosition))
+            if (enforceSafetyLimits && !isPositionWithinLimit(motorId, currentPosition))
             {
                 std::cerr << "SAFETY STOP: motor " << motorId
                           << " moved outside safe range at position "
-                          << currentPosition << std::endl;
+                          << currentPosition << ". Freezing all motors "
+                          << "at their current position -- torque stays "
+                          << "enabled rather than being released."
+                          << std::endl;
 
+                // Command each motor's goal to wherever it already
+                // physically is, so it holds there instead of continuing
+                // toward the original (now-abandoned) target. Uses the
+                // raw writer, not setGoalPosition(), because the
+                // offending motor's OWN current position is by
+                // definition outside jointCalibrations here --
+                // setGoalPosition() would reject commanding it to hold
+                // exactly where it already is.
                 for (int id : motorIds)
                 {
-                    disableTorque(id);
+                    uint16_t freezePosition = 0;
+                    if (readPosition(id, freezePosition))
+                    {
+                        writeGoalPositionRaw(id, freezePosition);
+                    }
                 }
 
                 return false;
@@ -584,12 +928,15 @@ bool DynamixelMotor::moveJointsSafely(
                 motorTolerance = 35;
             }
 
-            std::cout << "Motor " << motorId
-                      << " | Current: " << currentPosition
-                      << " | Target: " << targetPosition
-                      << " | Error: " << error
-                      << " | Tolerance: " << motorTolerance
-                      << std::endl;
+            if (shouldPrint)
+            {
+                std::cout << "Motor " << motorId
+                          << " | Current: " << currentPosition
+                          << " | Target: " << targetPosition
+                          << " | Error: " << error
+                          << " | Tolerance: " << motorTolerance
+                          << std::endl;
+            }
 
             if (error > motorTolerance)
             {
@@ -604,9 +951,111 @@ bool DynamixelMotor::moveJointsSafely(
             midSnapshotCaptured = true;
         }
 
+        if (stallRepeatsToDetect > 0 && !allReached)
+        {
+            if (currentTotalError == previousTotalError)
+            {
+                ++stallRepeatCount;
+            }
+            else
+            {
+                stallRepeatCount = 1;
+                previousTotalError = currentTotalError;
+            }
+
+            if (stallRepeatCount >= stallRepeatsToDetect)
+            {
+                std::cerr
+                    << "Error values unchanged for " << stallRepeatCount
+                    << " consecutive checks -- motors have stopped "
+                    << "moving; accepting current position." << std::endl;
+
+                if (!holdTorque)
+                {
+                    for (int id : motorIds)
+                    {
+                        disableTorque(id);
+                    }
+                }
+                else
+                {
+                    std::cout << "Torque remains enabled to hold current position." << std::endl;
+                }
+
+                return false;
+            }
+        }
+
         if (allReached)
         {
             std::cout << "All target positions reached." << std::endl;
+
+            // Fine-correction pass (2026-07-29): the +-tolerance check
+            // above accepts a move once "close enough" (default 10
+            // ticks), but a real IK round-trip test showed several ticks
+            // of leftover commanded-vs-achieved gap on multiple joints
+            // at once, compounding into several extra mm of real-world
+            // position error beyond the kinematic model's own validated
+            // accuracy (see CLAUDE.md's kinematic-calibration section).
+            // Re-writing the SAME goal position again (not a new value)
+            // often lets a servo's own position-control loop nudge
+            // closer, since a fresh goal write is handled differently
+            // than continuing to hold an old one -- this is a real,
+            // commonly-used trick for squeezing extra settling precision
+            // out of position-control servos. Only touches joints still
+            // outside the tighter FINE_CORRECTION_TOLERANCE_TICKS of
+            // their real final target; harmless no-op for joints already
+            // that close.
+            constexpr int FINE_CORRECTION_TOLERANCE_TICKS = 3;
+            constexpr int FINE_CORRECTION_ATTEMPTS = 5;
+            constexpr int FINE_CORRECTION_WAIT_MS = 200;
+
+            for (int attempt = 0; attempt < FINE_CORRECTION_ATTEMPTS; ++attempt)
+            {
+                bool anyNeedsCorrection = false;
+
+                for (size_t i = 0; i < motorIds.size(); ++i)
+                {
+                    int motorId = motorIds[i];
+                    uint16_t targetPosition = targetPositions[i];
+
+                    uint16_t currentPosition = 0;
+                    if (!readPosition(motorId, currentPosition))
+                    {
+                        continue;
+                    }
+
+                    int fineError = static_cast<int>(targetPosition) -
+                                    static_cast<int>(currentPosition);
+                    if (fineError < 0)
+                    {
+                        fineError = -fineError;
+                    }
+
+                    if (fineError > FINE_CORRECTION_TOLERANCE_TICKS)
+                    {
+                        anyNeedsCorrection = true;
+                        const bool goalAccepted = enforceSafetyLimits
+                            ? setGoalPosition(motorId, targetPosition)
+                            : writeGoalPositionRaw(motorId, targetPosition);
+                        if (!goalAccepted)
+                        {
+                            std::cerr
+                                << "Fine-correction: failed to re-write "
+                                << "goal for motor " << motorId << std::endl;
+                        }
+                    }
+                }
+
+                if (!anyNeedsCorrection)
+                {
+                    break;
+                }
+
+                std::this_thread::sleep_for(
+                    std::chrono::milliseconds(FINE_CORRECTION_WAIT_MS)
+                );
+            }
 
             if (!midSnapshotCaptured)
             {
@@ -637,9 +1086,16 @@ bool DynamixelMotor::moveJointsSafely(
         {
             std::cerr << "Timeout: motors did not reach target in time." << std::endl;
 
-            for (int id : motorIds)
+            if (!holdTorque)
             {
-                disableTorque(id);
+                for (int id : motorIds)
+                {
+                    disableTorque(id);
+                }
+            }
+            else
+            {
+                std::cout << "Torque remains enabled to hold current position." << std::endl;
             }
 
             return false;
@@ -789,6 +1245,70 @@ void DynamixelMotor::emergencyShutdown(const std::vector<int>& motorIds)
     }
 
     disconnect();
+}
+
+bool DynamixelMotor::readAngleLimits(
+    int motorId,
+    uint16_t& cwLimit,
+    uint16_t& ccwLimit
+)
+{
+    uint8_t dxlError = 0;
+
+    int commResult = packetHandler_->read2ByteTxRx(
+        portHandler_,
+        motorId,
+        ADDR_CW_ANGLE_LIMIT,
+        &cwLimit,
+        &dxlError
+    );
+
+    if (!checkCommResult(commResult, dxlError, motorId, "Read CW angle limit"))
+    {
+        return false;
+    }
+
+    commResult = packetHandler_->read2ByteTxRx(
+        portHandler_,
+        motorId,
+        ADDR_CCW_ANGLE_LIMIT,
+        &ccwLimit,
+        &dxlError
+    );
+
+    return checkCommResult(commResult, dxlError, motorId, "Read CCW angle limit");
+}
+
+bool DynamixelMotor::writeAngleLimits(
+    int motorId,
+    uint16_t cwLimit,
+    uint16_t ccwLimit
+)
+{
+    uint8_t dxlError = 0;
+
+    int commResult = packetHandler_->write2ByteTxRx(
+        portHandler_,
+        motorId,
+        ADDR_CW_ANGLE_LIMIT,
+        cwLimit,
+        &dxlError
+    );
+
+    if (!checkCommResult(commResult, dxlError, motorId, "Write CW angle limit"))
+    {
+        return false;
+    }
+
+    commResult = packetHandler_->write2ByteTxRx(
+        portHandler_,
+        motorId,
+        ADDR_CCW_ANGLE_LIMIT,
+        ccwLimit,
+        &dxlError
+    );
+
+    return checkCommResult(commResult, dxlError, motorId, "Write CCW angle limit");
 }
 
 bool DynamixelMotor::readPosition(int motorId, uint16_t& position)
