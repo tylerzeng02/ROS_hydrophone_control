@@ -151,6 +151,40 @@ target_link_libraries(record_hand_poses
         dynamixel_sdk
 )
 
+add_executable(record_hand_poses_fixed_elbow_yaw
+    tests/record_hand_poses_fixed_elbow_yaw.cpp
+    src/dynamixel_motor.cpp
+    src/robot_calibration.cpp
+)
+
+target_include_directories(record_hand_poses_fixed_elbow_yaw
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/DynamixelSDK/c++/include
+)
+
+target_link_libraries(record_hand_poses_fixed_elbow_yaw
+    PRIVATE
+        dynamixel_sdk
+)
+
+add_executable(reset_compliance
+    tests/reset_compliance.cpp
+    src/dynamixel_motor.cpp
+    src/robot_calibration.cpp
+)
+
+target_include_directories(reset_compliance
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/DynamixelSDK/c++/include
+)
+
+target_link_libraries(reset_compliance
+    PRIVATE
+        dynamixel_sdk
+)
+
 # ------------------------------------------------------------
 # TRAC-IK targets
 # Only enabled when TRAC-IK exists

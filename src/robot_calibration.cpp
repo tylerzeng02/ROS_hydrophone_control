@@ -4,13 +4,13 @@
 
 std::vector<JointCalibration> jointCalibrations = {
     // id, zeroTick, direction, minTick, maxTick
-    {0, 2048, +1, 376, 3772},
+    {0, 2048, +1, 276, 3772},
     {1, 2048, +1, 851, 3231},
     {2, 2066, +1, 912, 3327},
-    {3, 2108, +1, 829, 3274},
-    {4, 2078, +1, 952, 3245},
+    {3, 2108, +1, 829, 3277},
+    {4, 2078, +1, 944, 3245},
     {5, 2048, +1, 751, 3344},
-    {6, 2048, +1, 335, 3755}
+    {6, 2048, +1, 335, 3761}
 };
 
 int radiansToTicks(const JointCalibration& joint, double radians)
