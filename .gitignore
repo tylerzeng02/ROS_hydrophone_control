@@ -8,6 +8,10 @@ cmake-build-*/
 *.so
 *.out
 
+# Python
+__pycache__/
+*.pyc
+
 # Future ROS 2 build output
 ros2_ws/build/
 ros2_ws/install/

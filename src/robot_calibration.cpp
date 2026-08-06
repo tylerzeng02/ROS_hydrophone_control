@@ -2,15 +2,48 @@
 
 #include <cmath>
 
+// Offset and scale corrections below (2026-08-06) come from the 60-param
+// kinematic calibration fit on the 374-pose elbow-yaw-locked dataset (see
+// CLAUDE.md's kinematic-calibration section) -- the best validated model in
+// the project (blocked-CV RMS 0.78mm; physically confirmed ~2.86mm mean /
+// 3.35mm RMS on genuinely new points). Offset is folded directly into
+// zeroTick (zeroTick_new = zeroTick_nominal - offset_rad*TICKS_PER_RADIAN/scale);
+// scale is the fitted gear-ratio correction, applied in radiansToTicks()/
+// ticksToRadians() below.
+//
+// Joints 0 (shoulder_roll) and 6 (wrist_roll) deliberately do NOT get their
+// fitted offset applied: each is the first/last joint in the chain with
+// nothing rotational between it and the base/tool frame respectively, so
+// its offset is provably entangled with that frame's (discarded, not used
+// at runtime) rotation -- applying it alone would silently introduce a new
+// error rather than fix one. Their fitted scale IS applied (scale's effect
+// grows with commanded angle rather than being a constant bias, so it does
+// not share this degeneracy -- same reasoning already validated for axis
+// tilt in this project, not yet independently re-verified for scale
+// specifically). Joint 4 (elbow_yaw) gets neither correction -- see its own
+// comment below for why.
 std::vector<JointCalibration> jointCalibrations = {
-    // id, zeroTick, direction, minTick, maxTick
-    {0, 2048, +1, 276, 3772},
-    {1, 2048, +1, 851, 3231},
-    {2, 2066, +1, 912, 3327},
-    {3, 2108, +1, 829, 3277},
-    {4, 2078, +1, 944, 3245},
-    {5, 2048, +1, 751, 3344},
-    {6, 2048, +1, 335, 3761}
+    // id, zeroTick, direction, minTick, maxTick, scale
+    {0, 2048, +1, 276, 3772, 0.988203},                  // offset skipped (base-frame degeneracy)
+    {1, 2047, +1, 851, 3231, 1.001931},                  // offset +0.0900deg
+    {2, 2060, +1, 912, 3327, 0.964711},                  // offset +0.5238deg
+    {3, 2102, +1, 829, 3277, 1.014467},                  // offset +0.5297deg
+    // Joint 4 (elbow_yaw) deliberately locked near its midpoint (2026-08-06):
+    // the single worst-measured backlash joint (7.68mm) and a confirmed
+    // joint-coupling/gravity-deflection hotspot -- locking it out of real
+    // motion planning was found to meaningfully improve the other 6 joints'
+    // calibration accuracy (see CLAUDE.md's kinematic-calibration section,
+    // "reduced-DOF breakthrough"). Was previously widened to a real,
+    // hand-verified-safe range of [944, 3245] earlier in that same session
+    // (before the lock decision) -- that wider range is not wrong, just no
+    // longer used now that this joint isn't meant to move in production.
+    // No offset/scale applied here either: this joint barely moved in the
+    // dataset it was fit on (locked the whole time), so its own correction
+    // is poorly identified and not trustworthy -- moot anyway since it's
+    // locked and never evaluated away from this narrow range.
+    {4, 2078, +1, 2075, 2115, 1.0},
+    {5, 2042, +1, 751, 3344, 1.006796},                  // offset +0.4909deg
+    {6, 2048, +1, 335, 3761, 1.002933}                   // offset skipped (tool-frame degeneracy)
 };
 
 int radiansToTicks(const JointCalibration& joint, double radians)
@@ -21,7 +54,7 @@ int radiansToTicks(const JointCalibration& joint, double radians)
     return static_cast<int>(
         std::round(
             joint.zeroTick
-            + joint.direction * radians * TICKS_PER_RADIAN
+            + joint.direction * radians * TICKS_PER_RADIAN / joint.scale
         )
     );
 }
@@ -31,5 +64,5 @@ double ticksToRadians(const JointCalibration& joint, int tick)
     constexpr double PI = 3.14159265358979323846;
     constexpr double TICKS_PER_RADIAN = 4096.0 / (2.0 * PI);
 
-    return joint.direction * (tick - joint.zeroTick) / TICKS_PER_RADIAN;
+    return joint.direction * joint.scale * (tick - joint.zeroTick) / TICKS_PER_RADIAN;
 }

@@ -5,17 +5,36 @@
   <!--
     KINEMATIC CALIBRATION USED FOR STANDALONE IK
 
-    URDF joint              Motor ID   zero tick   safe ticks
-    shoulder_roll_joint        0          2048      376..3772
-    shoulder_pitch_joint       1          2048      853..3231
-    shoulder_yaw_joint         2          2066      912..3327
-    elbow_pitch_joint          3          2108      829..3274
-    elbow_yaw_joint            4          2078      952..3245
-    wrist_pitch_joint          5          2048      751..3344
-    wrist_roll_joint           6          2048      335..3755
+    Updated 2026-08-06 with the fitted corrections from this project's NDI-
+    based kinematic calibration (see CLAUDE.md's kinematic-calibration
+    section for the full history/methodology). Per-joint <axis> and (for
+    elbow_pitch/shoulder_yaw/wrist_pitch) <origin xyz> below now reflect
+    those corrections; see each joint's own inline comment for the specific
+    change and its original nominal value.
+
+    URDF joint              Motor ID   zero tick   safe ticks     scale     corrected?
+    shoulder_roll_joint        0          2048      276..3772   0.988203   tilt only (offset skipped: base-frame degeneracy)
+    shoulder_pitch_joint       1          2047      851..3231   1.001931   offset+scale+tilt
+    shoulder_yaw_joint         2          2060      912..3327   0.964711   offset+scale+tilt+origin
+    elbow_pitch_joint          3          2102      829..3277   1.014467   offset+scale+tilt+origin
+    elbow_yaw_joint             4          2078     2075..2115  1.0        NONE — deliberately locked near
+                                                                              midpoint in production; its own fit
+                                                                              is poorly identified (joint barely
+                                                                              moved in the dataset used to fit it)
+    wrist_pitch_joint          5          2042      751..3344   1.006796   offset+scale+tilt+origin
+    wrist_roll_joint           6          2048      335..3761   1.002933   tilt only (offset skipped: tool-frame degeneracy)
 
     Motor ID 7 is the gripper and is intentionally excluded from the
     base_link -> virtual_endeffector IK chain.
+
+    NOT integrated here, and not representable in a static URDF at all:
+    joint-coupling (3 terms), gravity/elastostatic deflection (7 terms), and
+    the shoulder_pitch Fourier term — all pose-dependent, would need a
+    real-time correction layer in whatever control stack ends up driving
+    this robot, not a geometry change. Backlash compensation is separately
+    already implemented as C++ logic in src/dynamixel_motor.cpp (per-joint
+    overshoot on direction reversal) and needs porting into that same
+    control layer, not this file.
 
     The limits below were converted using 4096 ticks per revolution.
     Joint axes and positive directions must still be verified physically.
@@ -81,7 +100,13 @@
       lower="-2.564816"
       upper="2.644583"
       velocity="1.0"/>
-    <axis xyz="0 0 1"/>
+    <!-- Axis tilt correction applied 2026-08-06, from the kinematic
+         calibration fit (see CLAUDE.md's kinematic-calibration section).
+         Original nominal axis: 0 0 1. (This joint's fitted zero-offset was
+         NOT applied to zeroTick in robot_calibration.cpp — entangled with
+         the calibration-time base frame's rotation — but axis tilt does
+         not share that degeneracy and is safe to apply here.) -->
+    <axis xyz="0.013792 0.014877 0.999794"/>
   </joint>
 
   <link name="shoulder_roll">
@@ -116,7 +141,10 @@
       lower="-1.833107"
       upper="1.814699"
       velocity="1.0"/>
-    <axis xyz="1 0 0"/>
+    <!-- Axis tilt correction applied 2026-08-06, from the kinematic
+         calibration fit (see CLAUDE.md's kinematic-calibration section).
+         Original nominal axis: 1 0 0. -->
+    <axis xyz="0.998997 -0.043573 -0.010357"/>
   </joint>
 
   <link name="shoulder_pitch">
@@ -145,13 +173,18 @@
   <joint name="shoulder_yaw_joint" type="revolute">
     <parent link="shoulder_pitch"/>
     <child link="shoulder_yaw"/>
-    <origin rpy="0 0 0" xyz="-0.0215 -0.0205 0.1255"/>
+    <!-- Origin and axis tilt corrections applied 2026-08-06, from the
+         kinematic calibration fit (see CLAUDE.md's kinematic-calibration
+         section). Original nominal origin xyz: -0.0215 -0.0205 0.1255
+         (only x,z corrected; y untouched by the fit's parameterization).
+         Original nominal axis: 0 -1 0. -->
+    <origin rpy="0 0 0" xyz="-0.02478414 -0.0205 0.1308452"/>
     <limit
       effort="100.0"
       lower="-1.770214"
       upper="1.934350"
       velocity="1.0"/>
-    <axis xyz="0 -1 0"/>
+    <axis xyz="-0.027678 -0.999437 0.018973"/>
   </joint>
 
   <link name="shoulder_yaw">
@@ -180,13 +213,17 @@
   <joint name="elbow_pitch_joint" type="revolute">
     <parent link="shoulder_yaw"/>
     <child link="elbow_pitch"/>
-    <origin rpy="0 0 0" xyz="0.018 0.0206 0.1158"/>
+    <!-- Origin and axis tilt corrections applied 2026-08-06, from the
+         kinematic calibration fit (see CLAUDE.md's kinematic-calibration
+         section). Original nominal origin xyz: 0.018 0.0206 0.1158.
+         Original nominal axis: 1 0 0. -->
+    <origin rpy="0 0 0" xyz="0.01656849 0.02722018 0.11356304"/>
     <limit
       effort="100.0"
       lower="-1.961961"
       upper="1.788622"
       velocity="1.0"/>
-    <axis xyz="1 0 0"/>
+    <axis xyz="0.999677 -0.024005 0.008304"/>
   </joint>
 
   <link name="elbow_pitch">
@@ -215,11 +252,24 @@
   <joint name="elbow_yaw_joint" type="revolute">
     <parent link="elbow_pitch"/>
     <child link="elbow_yaw"/>
+    <!-- elbow_yaw_joint deliberately left UNCORRECTED (2026-08-06): this
+         joint is locked near its calibrated midpoint in production (see
+         src/robot_calibration.cpp's jointCalibrations comment and CLAUDE.md's
+         kinematic-calibration section, "reduced-DOF breakthrough") and barely
+         moved in the dataset used to fit it, so its own tilt/scale/offset
+         correction is poorly identified and not trustworthy — moot anyway
+         since it's not meant to move in real use. -->
     <origin rpy="0 0 0" xyz="-0.0171 -0.018 0.09746"/>
+    <!-- Limit tightened 2026-08-06 to match this joint's hardware lock
+         (jointCalibrations[4]'s minTick/maxTick = 2075/2115 in
+         robot_calibration.cpp) — MUST stay consistent with that C++ range,
+         not the original wide mechanical limit, or MoveIt will plan
+         trajectories the hardware safety clamp will reject. Original wide
+         limit was lower="-1.727262" upper="1.790156". -->
     <limit
       effort="100.0"
-      lower="-1.727262"
-      upper="1.790156"
+      lower="-0.004602"
+      upper="0.056757"
       velocity="1.0"/>
     <axis xyz="0 -1 0"/>
   </joint>
@@ -250,13 +300,17 @@
   <joint name="wrist_pitch_joint" type="revolute">
     <parent link="elbow_yaw"/>
     <child link="wrist_pitch"/>
-    <origin rpy="0 0 0" xyz="0.02626 0.018 0.0718"/>
+    <!-- Origin and axis tilt corrections applied 2026-08-06, from the
+         kinematic calibration fit (see CLAUDE.md's kinematic-calibration
+         section). Original nominal origin xyz: 0.02626 0.018 0.0718.
+         Original nominal axis: 1 0 0. -->
+    <origin rpy="0 0 0" xyz="0.02765348 0.01273746 0.07244612"/>
     <limit
       effort="100.0"
       lower="-1.989573"
       upper="1.988039"
       velocity="1.0"/>
-    <axis xyz="1 0 0"/>
+    <axis xyz="0.999044 0.042957 0.008105"/>
   </joint>
 
   <link name="wrist_pitch">
@@ -291,7 +345,13 @@
       lower="-2.627709"
       upper="2.618505"
       velocity="1.0"/>
-    <axis xyz="0 0 1"/>
+    <!-- Axis tilt correction applied 2026-08-06, from the kinematic
+         calibration fit (see CLAUDE.md's kinematic-calibration section).
+         Original nominal axis: 0 0 1. (This joint's fitted zero-offset was
+         NOT applied to zeroTick in robot_calibration.cpp — entangled with
+         the calibration-time tool frame's rotation — but axis tilt does
+         not share that degeneracy and is safe to apply here.) -->
+    <axis xyz="-0.006451 -0.018572 0.999807"/>
   </joint>
 
   <link name="wrist_roll">
