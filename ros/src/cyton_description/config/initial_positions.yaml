@@ -1,0 +1,18 @@
+# Initial joint positions (radians) for ros2_control -- used both by the
+# mock_components/GenericSystem plugin (its actual starting state) and as
+# the state-interface initial_value for the real hardware plugin (purely
+# cosmetic there: cyton_hardware overwrites these with a real encoder read
+# in on_activate()/the first read(), same as every other ros2_control
+# hardware interface).
+#
+# All-zero is a safe, in-range choice for every joint, including the
+# locked elbow_yaw_joint (0.0 rad corresponds to tick 2078, inside its
+# locked [2075, 2115] range -- see robot_calibration.cpp).
+initial_positions:
+  shoulder_roll_joint: 0.0
+  shoulder_pitch_joint: 0.0
+  shoulder_yaw_joint: 0.0
+  elbow_pitch_joint: 0.0
+  elbow_yaw_joint: 0.0
+  wrist_pitch_joint: 0.0
+  wrist_roll_joint: 0.0

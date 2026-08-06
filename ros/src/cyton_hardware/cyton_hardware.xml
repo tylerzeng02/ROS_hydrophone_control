@@ -1,0 +1,10 @@
+<library path="cyton_hardware">
+  <class name="cyton_hardware/CytonSystemHardware" type="cyton_hardware::CytonSystemHardware"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+      ros2_control SystemInterface for the Cyton Gamma 1500's 7 arm joints
+      (Dynamixel motor IDs 0-6), wrapping this repo's own DynamixelMotor /
+      robot_calibration.
+    </description>
+  </class>
+</library>
