@@ -1,0 +1,29 @@
+# Used by ros2_control's controller_manager (ros2_control_node), spawned by
+# demo.launch.py alongside move_group.
+controller_manager:
+  ros__parameters:
+    update_rate: 100  # Hz
+
+    arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+
+arm_controller:
+  ros__parameters:
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
+    joints:
+      - shoulder_roll_joint
+      - shoulder_pitch_joint
+      - shoulder_yaw_joint
+      - elbow_pitch_joint
+      - elbow_yaw_joint
+      - wrist_pitch_joint
+      - wrist_roll_joint
+    allow_nonzero_velocity_at_trajectory_end: true

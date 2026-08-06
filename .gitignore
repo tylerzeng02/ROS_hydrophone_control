@@ -17,10 +17,13 @@ cmake-build-*/
 __pycache__/
 *.pyc
 
-# Future ROS 2 build output
+# ROS 2 build output (colcon workspace lives at ros/, not ros2_ws/)
 ros2_ws/build/
 ros2_ws/install/
 ros2_ws/log/
+ros/build/
+ros/install/
+ros/log/
 
 # Editor and OS files
 .vscode/

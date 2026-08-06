@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematron="http://download.ros.org/schema/package_format3.xsd"?>
+<package format="3">
+  <name>cyton_hardware</name>
+  <version>0.1.0</version>
+  <description>
+    ros2_control SystemInterface plugin (cyton_hardware/CytonSystemHardware)
+    bridging the Cyton Gamma 1500's Dynamixel servos to ros2_control/MoveIt,
+    by directly compiling this repo's own src/dynamixel_motor.cpp and
+    src/robot_calibration.cpp (not a reimplementation -- see this package's
+    CMakeLists.txt). Requires external/DynamixelSDK to be populated at the
+    top-level repo root (see the top-level CLAUDE.md).
+  </description>
+  <maintainer email="tonizengedu@gmail.com">tyler zeng</maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <build_depend>hardware_interface</build_depend>
+  <build_depend>pluginlib</build_depend>
+  <build_depend>rclcpp</build_depend>
+  <build_depend>rclcpp_lifecycle</build_depend>
+
+  <exec_depend>hardware_interface</exec_depend>
+  <exec_depend>pluginlib</exec_depend>
+  <exec_depend>rclcpp</exec_depend>
+  <exec_depend>rclcpp_lifecycle</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+    <hardware_interface plugin="${prefix}/cyton_hardware.xml"/>
+  </export>
+</package>

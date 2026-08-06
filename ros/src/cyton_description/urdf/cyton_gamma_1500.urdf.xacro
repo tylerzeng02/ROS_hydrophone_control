@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="cyton_gamma_1500">
+
+  <xacro:arg name="hardware_type" default="mock_components"/>
+  <xacro:arg name="serial_port" default="/dev/ttyUSB0"/>
+  <xacro:arg name="baud_rate" default="1000000"/>
+  <xacro:arg name="protocol_version" default="1.0"/>
+  <xacro:arg name="initial_positions_file" default="$(find cyton_description)/config/initial_positions.yaml"/>
+
+  <!-- Robot geometry (links, joints, calibrated axes/origins/limits) -->
+  <xacro:include filename="$(find cyton_description)/urdf/cyton_gamma_1500_robot.xacro"/>
+
+  <!-- ros2_control hardware block -->
+  <xacro:include filename="$(find cyton_description)/urdf/cyton_gamma_1500.ros2_control.xacro"/>
+  <xacro:cyton_gamma_1500_ros2_control
+    name="CytonGamma1500"
+    hardware_type="$(arg hardware_type)"
+    serial_port="$(arg serial_port)"
+    baud_rate="$(arg baud_rate)"
+    protocol_version="$(arg protocol_version)"
+    initial_positions_file="$(arg initial_positions_file)"/>
+
+</robot>

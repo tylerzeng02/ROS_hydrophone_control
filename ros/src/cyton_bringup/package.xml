@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematron="http://download.ros.org/schema/package_format3.xsd"?>
+<package format="3">
+  <name>cyton_bringup</name>
+  <version>0.1.0</version>
+  <description>
+    Single top-level launch entry point for the Cyton Gamma 1500 ROS 2
+    workspace -- wraps cyton_moveit_config/launch/demo.launch.py.
+  </description>
+  <maintainer email="tonizengedu@gmail.com">tyler zeng</maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>cyton_moveit_config</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

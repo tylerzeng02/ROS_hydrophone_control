@@ -1,0 +1,51 @@
+# joint_limits.yaml augments the URDF's <limit> values for MoveIt's
+# trajectory time-parameterization (TOTG by default, see ompl_planning.yaml/
+# demo.launch.py's response_adapters).
+#
+# max_velocity below is copied straight from the URDF's own
+# velocity="1.0" on every joint -- which cyton_gamma_1500_robot.xacro's own
+# header comment already flags as "retained as an unverified planning
+# placeholder", not a measured servo spec. max_acceleration has NO source
+# at all (the URDF's <limit> tag has no acceleration field, and no
+# per-joint accel data has ever been measured in this project) -- the value
+# below is an arbitrary, equally-unverified placeholder of the same rough
+# magnitude, not a real number. Both need checking against the actual
+# Dynamixel MOVING_SPEED conventions used elsewhere in this repo (see
+# CLAUDE.md's kinematic-calibration section, e.g. MOVING_SPEED=40) before
+# trusting MoveIt's planned execution timing on real hardware.
+joint_limits:
+  shoulder_roll_joint:
+    has_velocity_limits: true
+    max_velocity: 1.0
+    has_acceleration_limits: true
+    max_acceleration: 1.0
+  shoulder_pitch_joint:
+    has_velocity_limits: true
+    max_velocity: 1.0
+    has_acceleration_limits: true
+    max_acceleration: 1.0
+  shoulder_yaw_joint:
+    has_velocity_limits: true
+    max_velocity: 1.0
+    has_acceleration_limits: true
+    max_acceleration: 1.0
+  elbow_pitch_joint:
+    has_velocity_limits: true
+    max_velocity: 1.0
+    has_acceleration_limits: true
+    max_acceleration: 1.0
+  elbow_yaw_joint:
+    has_velocity_limits: true
+    max_velocity: 1.0
+    has_acceleration_limits: true
+    max_acceleration: 1.0
+  wrist_pitch_joint:
+    has_velocity_limits: true
+    max_velocity: 1.0
+    has_acceleration_limits: true
+    max_acceleration: 1.0
+  wrist_roll_joint:
+    has_velocity_limits: true
+    max_velocity: 1.0
+    has_acceleration_limits: true
+    max_acceleration: 1.0

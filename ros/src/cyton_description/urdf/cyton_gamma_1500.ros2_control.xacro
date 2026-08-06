@@ -1,0 +1,102 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!--
+    ros2_control hardware block for the 7 arm joints (motor IDs 0-6;
+    motor 7, the gripper, is intentionally excluded  -  same as the base
+    URDF's IK chain, see cyton_gamma_1500_robot.xacro).
+
+    hardware_type="mock_components" (the default) uses ros2_control's
+    built-in mock_components/GenericSystem plugin, which just echoes
+    commands back as state with no real servo involved  -  safe for
+    exercising the whole MoveIt pipeline (RViz, planning, execution) with
+    zero hardware risk. Set it to "real" to load
+    cyton_hardware/CytonSystemHardware instead, which talks to the real
+    Dynamixel servos via DynamixelMotor  -  only do this with the physical
+    arm connected, powered, and clear to move.
+    (hardware_type is compared as a string, not a xacro/Python boolean  - 
+    xacro args always arrive as strings, and "false" is truthy to Python's
+    bare eval(), so a boolean-looking parameter here would silently always
+    take the "true" branch. String equality avoids that trap.)
+
+    position is the only command/state interface exposed. velocity is
+    exposed as state-only (always reported 0.0 by cyton_hardware, since
+    DynamixelMotor's read path only reads present position here) so that
+    joint_trajectory_controller's default state_interfaces list (position
+    + velocity) is satisfied without a real velocity feedback source.
+  -->
+  <xacro:macro name="cyton_gamma_1500_ros2_control"
+               params="name hardware_type serial_port baud_rate protocol_version initial_positions_file">
+    <xacro:property name="initial_positions"
+                     value="${xacro.load_yaml(initial_positions_file)['initial_positions']}"/>
+
+    <ros2_control name="${name}" type="system">
+      <hardware>
+        <xacro:if value="${hardware_type == 'mock_components'}">
+          <plugin>mock_components/GenericSystem</plugin>
+        </xacro:if>
+        <xacro:if value="${hardware_type == 'real'}">
+          <plugin>cyton_hardware/CytonSystemHardware</plugin>
+          <param name="serial_port">${serial_port}</param>
+          <param name="baud_rate">${baud_rate}</param>
+          <param name="protocol_version">${protocol_version}</param>
+        </xacro:if>
+      </hardware>
+
+      <joint name="shoulder_roll_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['shoulder_roll_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="shoulder_pitch_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['shoulder_pitch_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="shoulder_yaw_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['shoulder_yaw_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="elbow_pitch_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['elbow_pitch_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <!-- elbow_yaw_joint: locked in production (see robot_calibration.cpp
+           and this file's own header comment)  -  still exposed as a normal
+           command/state interface since the URDF's own <limit> already
+           restricts it to a ~2 degree window, so MoveIt/ros2_control can't
+           command it anywhere meaningful even if a planner tries. -->
+      <joint name="elbow_yaw_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['elbow_yaw_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="wrist_pitch_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['wrist_pitch_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+      <joint name="wrist_roll_joint">
+        <command_interface name="position"/>
+        <state_interface name="position">
+          <param name="initial_value">${initial_positions['wrist_roll_joint']}</param>
+        </state_interface>
+        <state_interface name="velocity"/>
+      </joint>
+    </ros2_control>
+  </xacro:macro>
+</robot>

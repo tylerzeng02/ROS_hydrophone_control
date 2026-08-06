@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Hand-written (not MoveIt Setup Assistant-generated  -  there was no prior
+  SRDF for this robot at all). Mirrors what Setup Assistant would produce
+  for a single-chain arm with no separate end-effector group.
+
+  No <end_effector> tag: this project's URDF intentionally excludes the
+  gripper (motor 7) from the base_link->virtual_endeffector IK chain (see
+  cyton_gamma_1500_robot.xacro), so there is no separate gripper group to
+  attach one to  -  "arm"'s own tip_link (virtual_endeffector) already
+  serves as the end-effector frame for planning purposes.
+
+  disable_collisions below only covers physically-adjacent link pairs
+  (always expected to touch/overlap at their shared joint). It does NOT
+  include a computed default collision matrix (Setup Assistant's usual
+  sampling-based "Never"/"Default" pairs) because there is currently no
+  <collision> geometry on any link except base_link  -  see CLAUDE.md's
+  ROS/MoveIt readiness section. Revisit this file once collision geometry
+  is added; the adjacent-pair disables below will still be valid, they
+  just won't be the complete picture.
+-->
+<robot name="cyton_gamma_1500">
+  <group name="arm">
+    <chain base_link="base_link" tip_link="virtual_endeffector"/>
+  </group>
+
+  <group_state name="home" group="arm">
+    <joint name="shoulder_roll_joint" value="0"/>
+    <joint name="shoulder_pitch_joint" value="0"/>
+    <joint name="shoulder_yaw_joint" value="0"/>
+    <joint name="elbow_pitch_joint" value="0"/>
+    <joint name="elbow_yaw_joint" value="0"/>
+    <joint name="wrist_pitch_joint" value="0"/>
+    <joint name="wrist_roll_joint" value="0"/>
+  </group_state>
+
+  <!-- The arm is bolted to a fixed base  -  "fixed", not "floating"
+       (floating would be for a mobile base or a free-floating object). -->
+  <virtual_joint name="virtual_joint" type="fixed" parent_frame="world" child_link="base_footprint"/>
+
+  <disable_collisions link1="base_footprint" link2="base_link" reason="Adjacent"/>
+  <disable_collisions link1="base_link" link2="shoulder_roll" reason="Adjacent"/>
+  <disable_collisions link1="shoulder_roll" link2="shoulder_pitch" reason="Adjacent"/>
+  <disable_collisions link1="shoulder_pitch" link2="shoulder_yaw" reason="Adjacent"/>
+  <disable_collisions link1="shoulder_yaw" link2="elbow_pitch" reason="Adjacent"/>
+  <disable_collisions link1="elbow_pitch" link2="elbow_yaw" reason="Adjacent"/>
+  <disable_collisions link1="elbow_yaw" link2="wrist_pitch" reason="Adjacent"/>
+  <disable_collisions link1="wrist_pitch" link2="wrist_roll" reason="Adjacent"/>
+  <disable_collisions link1="wrist_roll" link2="virtual_endeffector" reason="Adjacent"/>
+</robot>

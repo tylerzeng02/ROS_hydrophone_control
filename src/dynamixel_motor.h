@@ -6,6 +6,14 @@
 #include <string>
 #include "dynamixel_sdk/dynamixel_sdk.h"
 
+// Per-joint backlash overshoot margin (ticks), tuned per motor from the
+// hand-verified reversal tests documented in CLAUDE.md's kinematic-
+// calibration section. Defined in dynamixel_motor.cpp; declared here (not
+// just file-scope there) so other translation units -- notably the
+// ros2_control hardware interface in ros/src/cyton_hardware -- can reuse
+// the same tuned values instead of re-deriving/duplicating them.
+int getBacklashOvershootTicks(int motorId);
+
 class DynamixelMotor
 {
 public:
