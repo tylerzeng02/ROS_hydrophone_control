@@ -1,5 +1,10 @@
-# CMake build output
-build/
+# CMake build output -- but track the real collected/measured data files
+# that live in build/ (that's just where every program in this project
+# reads/writes them by default), not the actual build artifacts.
+build/*
+!build/*.csv
+!build/*.md
+!build/archive/
 cmake-build-*/
 
 # Compiled files
