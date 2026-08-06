@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematron="http://download.ros.org/schema/package_format3.xsd"?>
+<package format="3">
+  <name>cyton_pose_commander</name>
+  <version>0.1.0</version>
+  <description>
+    Drives the arm through a CSV list of tick-domain joint targets via
+    MoveIt's MoveGroupInterface (plan+execute, collision-aware) instead of
+    commanding raw ticks directly -- the "move" half of the MoveIt-driven
+    NDI accuracy check, paired with cyton_ndi_capture's ndi_measure (the
+    "measure" half, run separately/manually per pose). See CLAUDE.md's
+    kinematic-calibration section for the origin of the tick data this
+    reads and why tick-to-radian conversion must go through
+    robot_calibration.cpp, not a reimplementation.
+  </description>
+  <maintainer email="tonizengedu@gmail.com">tyler zeng</maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <build_depend>rclcpp</build_depend>
+  <build_depend>moveit_ros_planning_interface</build_depend>
+
+  <exec_depend>rclcpp</exec_depend>
+  <exec_depend>moveit_ros_planning_interface</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

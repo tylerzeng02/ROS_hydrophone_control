@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematron="http://download.ros.org/schema/package_format3.xsd"?>
+<package format="3">
+  <name>cyton_ndi_capture</name>
+  <version>0.1.0</version>
+  <description>
+    Standalone NDI Polaris measurement tool (ndi_measure) for checking
+    MoveIt-commanded poses against independent NDI ground truth: position
+    the arm via MoveIt/RViz, press Enter here to record a measurement, and
+    it logs the live /joint_states alongside the NDI-measured moving-tool
+    pose to CSV. This is the NDI *measurement* half only (the NdiTracker
+    class and its dependencies, extracted from tests/
+    test_five_pose_ndi_capture.cpp and adapted: the Windows-only
+    &lt;conio.h&gt; interactive pause/skip controls are stripped, and it reads
+    the robot's current joint state from live ROS /joint_states instead of
+    driving the arm itself via DynamixelMotor -- MoveIt does the moving now.
+    See CLAUDE.md's kinematic-calibration section for the original
+    methodology this reuses.
+  </description>
+  <maintainer email="tonizengedu@gmail.com">tyler zeng</maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <build_depend>rclcpp</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+
+  <exec_depend>rclcpp</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
