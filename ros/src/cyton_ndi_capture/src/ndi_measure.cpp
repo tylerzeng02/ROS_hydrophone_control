@@ -3,7 +3,8 @@
 //
 // Workflow: position the arm however you like via MoveIt/RViz (this tool
 // never commands the arm itself), then press Enter here to record one
-// measurement -- it logs the live /joint_states alongside the NDI-measured
+// measurement -- it logs the live /joint_states and MoveGroupInterface's
+// own live getCurrentPose() (base_link frame) alongside the NDI-measured
 // moving-tool-relative-to-fixed-tool pose to CSV. Repeat for as many poses
 // as you want; Ctrl+C to quit.
 //
@@ -11,7 +12,7 @@
 // only -- the NdiTracker class and its direct dependencies (structs,
 // quaternion math, BX polling/averaging) are ported over close to verbatim,
 // since that code is already hardware-validated (see CLAUDE.md's
-// kinematic-calibration section for the full history). Two real changes
+// kinematic-calibration section for the full history). Real changes
 // from the original:
 //   1. The Windows-only <conio.h> pause/skip/manual-mode hotkeys are
 //      stripped entirely (handleUserControls() is now a no-op) -- this tool
@@ -23,6 +24,18 @@
 //   2. Joint values come from live ROS /joint_states (whatever MoveIt/
 //      ros2_control last reported), not from directly reading Dynamixel
 //      ticks -- this tool has no DynamixelMotor dependency at all.
+//   3. Each capture also logs MoveGroupInterface::getCurrentPose() (added
+//      2026-08-10): pairing that MoveIt-frame pose with the same capture's
+//      NDI-frame pose is exactly the input a Kabsch/Procrustes fit needs to
+//      re-derive move_between_points.cpp's hardcoded NDI-to-MoveIt rotation
+//      -- e.g. after discovering (via calibration/current/
+//      check_fixed_marker_drift.py) that the fixed marker's orientation had
+//      drifted ~6.3deg from the batch2 calibration session that rotation
+//      was originally fit from. Using MoveIt's own live pose here, rather
+//      than recomputing FK offline in Python from the joint angles, means
+//      this is exactly what MoveIt itself believes the pose is -- no risk
+//      of a subtle mismatch between an offline reimplementation and
+//      whatever the real URDF/robot_state is doing internally.
 
 #include <algorithm>
 #include <array>
@@ -41,6 +54,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
+#include "moveit/move_group_interface/move_group_interface.hpp"
 
 #include "ndicapi.h"
 
@@ -58,6 +72,14 @@ constexpr const char* DEFAULT_MOVING_TOOL_ROM =
 constexpr const char* DEFAULT_FIXED_TOOL_ROM =
     "/home/temp/Downloads/8700449- Polaris Passive 4-Marker Rigid Body 3(1).rom";
 constexpr const char* DEFAULT_OUTPUT_CSV = "moveit_ndi_accuracy_check.csv";
+
+// Same planning group as move_between_points.cpp/run_accuracy_check.cpp.
+// Logging MoveGroupInterface's own live getCurrentPose() here (rather than
+// recomputing FK offline from the joint angles) means this tool's output
+// is exactly what MoveIt itself believes the pose is -- no risk of a
+// subtle mismatch between an offline Python FK reimplementation and
+// whatever the real URDF/robot_state is doing internally.
+constexpr const char* PLANNING_GROUP = "arm";
 
 constexpr int NDI_REQUIRED_VALID_SAMPLES = 30;
 constexpr int NDI_SAMPLE_INTERVAL_MS = 20;
@@ -609,11 +631,28 @@ void writePoseFields(std::ofstream& csv, const std::string& prefix) {
         << prefix << "_visible_markers";
 }
 
+// MoveGroupInterface's own live pose (base_link frame) -- the MoveIt-frame
+// side of the NDI-frame/MoveIt-frame pairs a Kabsch/Procrustes fit needs to
+// re-derive move_between_points.cpp's NDI-to-MoveIt rotation. Position is
+// converted m -> mm to match every other length unit already in this CSV.
+void writeMoveitPoseFields(std::ofstream& csv) {
+    csv << ",moveit_pose_x_mm,moveit_pose_y_mm,moveit_pose_z_mm,"
+           "moveit_pose_qw,moveit_pose_qx,moveit_pose_qy,moveit_pose_qz";
+}
+
+void appendMoveitPoseFields(std::ofstream& csv, const geometry_msgs::msg::PoseStamped& pose) {
+    csv << ',' << std::setprecision(12) << (pose.pose.position.x * 1000.0) << ','
+        << (pose.pose.position.y * 1000.0) << ',' << (pose.pose.position.z * 1000.0) << ','
+        << pose.pose.orientation.w << ',' << pose.pose.orientation.x << ','
+        << pose.pose.orientation.y << ',' << pose.pose.orientation.z;
+}
+
 void writeCsvHeader(std::ofstream& csv) {
     csv << "capture_id,timestamp_ms";
     for (const char* name : JOINT_NAMES) {
         csv << ',' << name << "_rad";
     }
+    writeMoveitPoseFields(csv);
     writePoseFields(csv, "moving_camera");
     csv << ",moving_accepted_samples";
     writePoseFields(csv, "fixed_camera");
@@ -630,7 +669,7 @@ void appendPoseFields(std::ofstream& csv, const NdiPoseSample& pose) {
 
 void appendCsvRow(
     std::ofstream& csv, int captureId, const std::array<double, 7>& jointRadians,
-    const DualToolCapture& ndi
+    const geometry_msgs::msg::PoseStamped& moveitPose, const DualToolCapture& ndi
 ) {
     const auto timestampMs = std::chrono::duration_cast<std::chrono::milliseconds>(
                                   std::chrono::system_clock::now().time_since_epoch()
@@ -640,6 +679,7 @@ void appendCsvRow(
     for (double radians : jointRadians) {
         csv << ',' << std::setprecision(12) << radians;
     }
+    appendMoveitPoseFields(csv, moveitPose);
     appendPoseFields(csv, ndi.movingInCamera.pose);
     csv << ',' << ndi.movingInCamera.acceptedSamples;
     appendPoseFields(csv, ndi.fixedInCamera.pose);
@@ -690,6 +730,9 @@ int main(int argc, char** argv) {
 
     int exitCode = 0;
     try {
+        std::cout << "Connecting to MoveGroupInterface (group '" << PLANNING_GROUP << "')...\n";
+        moveit::planning_interface::MoveGroupInterface moveGroup(node, PLANNING_GROUP);
+
         std::cout << "Connecting to NDI tracker on " << device << "...\n";
         NdiTracker tracker(device, movingRom, fixedRom);
         tracker.initialize();
@@ -738,6 +781,8 @@ int main(int argc, char** argv) {
                 continue;
             }
 
+            const geometry_msgs::msg::PoseStamped moveitPose = moveGroup.getCurrentPose();
+
             DualToolCapture capture = tracker.collectBothTools();
             ++captureId;
 
@@ -746,9 +791,13 @@ int main(int argc, char** argv) {
                 std::cout << "  " << JOINT_NAMES[i] << ": " << std::fixed << std::setprecision(6)
                           << jointRadians[i] << " rad\n";
             }
+            std::cout << "  MoveIt pose (base_link, mm): ["
+                      << moveitPose.pose.position.x * 1000.0 << ", "
+                      << moveitPose.pose.position.y * 1000.0 << ", "
+                      << moveitPose.pose.position.z * 1000.0 << "]\n";
             printPose("Moving relative to fixed", capture.movingRelativeToFixed);
 
-            appendCsvRow(csv, captureId, jointRadians, capture);
+            appendCsvRow(csv, captureId, jointRadians, moveitPose, capture);
         }
 
         tracker.shutdown();

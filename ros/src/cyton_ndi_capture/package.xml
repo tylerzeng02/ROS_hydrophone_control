@@ -7,8 +7,13 @@
     Standalone NDI Polaris measurement tool (ndi_measure) for checking
     MoveIt-commanded poses against independent NDI ground truth: position
     the arm via MoveIt/RViz, press Enter here to record a measurement, and
-    it logs the live /joint_states alongside the NDI-measured moving-tool
-    pose to CSV. This is the NDI *measurement* half only (the NdiTracker
+    it logs the live /joint_states and MoveGroupInterface's live
+    getCurrentPose() (base_link frame) alongside the NDI-measured
+    moving-tool pose to CSV -- the paired NDI-frame/MoveIt-frame poses this
+    produces are what a Kabsch/Procrustes fit needs to re-derive the
+    NDI-to-MoveIt rotation used by move_between_points.cpp, without
+    re-running a full kinematic calibration. This is the NDI *measurement*
+    half only (the NdiTracker
     class and its dependencies, extracted from tests/
     test_five_pose_ndi_capture.cpp and adapted: the Windows-only
     &lt;conio.h&gt; interactive pause/skip controls are stripped, and it reads
@@ -24,9 +29,11 @@
 
   <build_depend>rclcpp</build_depend>
   <build_depend>sensor_msgs</build_depend>
+  <build_depend>moveit_ros_planning_interface</build_depend>
 
   <exec_depend>rclcpp</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>moveit_ros_planning_interface</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

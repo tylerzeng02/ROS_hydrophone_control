@@ -9,6 +9,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(moveit_ros_planning_interface REQUIRED)
 
 # Builds the top-level repo's own external/ndicapi directly (same pattern
 # as cyton_hardware's CMakeLists.txt building external/DynamixelSDK) so
@@ -41,6 +42,7 @@ target_include_directories(ndi_measure PRIVATE
 ament_target_dependencies(ndi_measure
   rclcpp
   sensor_msgs
+  moveit_ros_planning_interface
 )
 
 target_link_libraries(ndi_measure ndicapi)
