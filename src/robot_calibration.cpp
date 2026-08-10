@@ -27,7 +27,21 @@ std::vector<JointCalibration> jointCalibrations = {
     {0, 2048, +1, 276, 3772, 0.988203},                  // offset skipped (base-frame degeneracy)
     {1, 2047, +1, 851, 3231, 1.001931},                  // offset +0.0900deg
     {2, 2060, +1, 912, 3327, 0.964711},                  // offset +0.5238deg
-    {3, 2102, +1, 829, 3277, 1.014467},                  // offset +0.5297deg
+    // minTick/maxTick widened 30 ticks each side (2026-08-07, was
+    // [829, 3277]) after repeated real-hardware MoveIt sessions showed the
+    // arm's actual settled position occasionally landing a few ticks to
+    // ~25 ticks past this joint's exact hand-verified extreme -- ordinary
+    // servo settling/backlash noise, not a real safety concern (this
+    // margin is well inside MOTOR_TOLERANCE_TICKS-scale noise, not a
+    // meaningful extension into unverified territory), but MoveIt's
+    // CheckStartStateBounds planning adapter has zero tolerance for it and
+    // refuses to plan at all once the arm is even slightly outside the
+    // declared range -- and since nothing then corrects that state, every
+    // subsequent planning request fails the same way until a human (or
+    // pose_commander's own recovery logic, see cyton_pose_commander)
+    // manually nudges the joint back inside bounds. See CLAUDE.md's
+    // kinematic-calibration section for the specific incidents.
+    {3, 2102, +1, 799, 3307, 1.014467},                  // offset +0.5297deg
     // Joint 4 (elbow_yaw) deliberately locked near its midpoint (2026-08-06):
     // the single worst-measured backlash joint (7.68mm) and a confirmed
     // joint-coupling/gravity-deflection hotspot -- locking it out of real
@@ -41,7 +55,15 @@ std::vector<JointCalibration> jointCalibrations = {
     // dataset it was fit on (locked the whole time), so its own correction
     // is poorly identified and not trustworthy -- moot anyway since it's
     // locked and never evaluated away from this narrow range.
-    {4, 2078, +1, 2075, 2115, 1.0},
+    //
+    // minTick/maxTick widened 15 ticks each side (2026-08-07, was
+    // [2075, 2115]) for the identical reason as elbow_pitch above -- this
+    // joint hit the same zero-margin-bounds problem too. Still a
+    // deliberately tiny ~70-tick (~4 degree) window, nowhere close to this
+    // joint's real, wider mechanical range -- it stays "locked" in every
+    // practical sense, just with enough slack to absorb real settling
+    // noise instead of tripping MoveIt's bounds check on it.
+    {4, 2078, +1, 2060, 2130, 1.0},
     {5, 2042, +1, 751, 3344, 1.006796},                  // offset +0.4909deg
     {6, 2048, +1, 335, 3761, 1.002933}                   // offset skipped (tool-frame degeneracy)
 };

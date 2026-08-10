@@ -1,17 +1,18 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematron="http://download.ros.org/schema/package_format3.xsd"?>
 <package format="3">
-  <name>cyton_pose_commander</name>
+  <name>cyton_accuracy_check</name>
   <version>0.1.0</version>
   <description>
-    Drives the arm through a CSV list of tick-domain joint targets via
-    MoveIt's MoveGroupInterface (plan+execute, collision-aware) instead of
-    commanding raw ticks directly -- the "move" half of the MoveIt-driven
-    NDI accuracy check, paired with cyton_ndi_capture's ndi_measure (the
-    "measure" half, run separately/manually per pose). See CLAUDE.md's
-    kinematic-calibration section for the origin of the tick data this
-    reads and why tick-to-radian conversion must go through
-    robot_calibration.cpp, not a reimplementation.
+    Single combined program (run_accuracy_check) that both commands the arm
+    via MoveIt and captures each pose's NDI measurement in one synchronized
+    loop -- same shape as the original tests/test_five_pose_ndi_capture.cpp
+    (move, settle, capture, repeat, no manual cross-terminal coordination),
+    but with MoveIt doing the moving instead of raw Dynamixel ticks. Built
+    after cyton_pose_commander + cyton_ndi_capture's separate two-terminal
+    workflow was found to be vulnerable to a real timing race (a capture
+    landing before the move had actually finished) -- see CLAUDE.md's
+    kinematic-calibration section.
   </description>
   <maintainer email="tonizengedu@gmail.com">tyler zeng</maintainer>
   <license>BSD</license>

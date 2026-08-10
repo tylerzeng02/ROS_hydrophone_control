@@ -10,6 +10,23 @@
   attach one to  -  "arm"'s own tip_link (virtual_endeffector) already
   serves as the end-effector frame for planning purposes.
 
+  elbow_yaw_joint marked <passive_joint> (2026-08-07): elbow_yaw (motor 4)
+  is permanently locked in src/robot_calibration.cpp to a ~4-degree-wide
+  tick range (see CLAUDE.md's "elbow_yaw permanently locked" section), but
+  a <chain>-based group still exposes every joint in the chain to IK as an
+  equally-free variable  -  the random-seeded IK sampler used for Cartesian
+  goals (setPoseTarget) has no awareness that this one joint has almost no
+  usable range, and can fail with GOAL_STATE_INVALID / "Unable to sample
+  any valid states for goal tree" even when a solution respecting the
+  limit exists, simply because a random seed rarely lands inside such a
+  narrow window. Marking it passive excludes it from that random search
+  entirely  -  IK now only varies the other 6 joints, which is also exactly
+  determined for a 6-DOF Cartesian target (position+orientation), so this
+  doesn't reduce reachability the way it would on a joint the arm actually
+  needs. Verified against a real, working example (this exact placement,
+  nested inside a <group>) in the installed moveit_resources_panda_
+  moveit_config package's panda.srdf before relying on it here.
+
   disable_collisions below only covers physically-adjacent link pairs
   (always expected to touch/overlap at their shared joint). It does NOT
   include a computed default collision matrix (Setup Assistant's usual
@@ -22,6 +39,7 @@
 <robot name="cyton_gamma_1500">
   <group name="arm">
     <chain base_link="base_link" tip_link="virtual_endeffector"/>
+    <passive_joint name="elbow_yaw_joint"/>
   </group>
 
   <group_state name="home" group="arm">

@@ -16,8 +16,8 @@
     shoulder_roll_joint        0          2048      276..3772   0.988203   tilt only (offset skipped: base-frame degeneracy)
     shoulder_pitch_joint       1          2047      851..3231   1.001931   offset+scale+tilt
     shoulder_yaw_joint         2          2060      912..3327   0.964711   offset+scale+tilt+origin
-    elbow_pitch_joint          3          2102      829..3277   1.014467   offset+scale+tilt+origin
-    elbow_yaw_joint             4          2078     2075..2115  1.0        NONE — deliberately locked near
+    elbow_pitch_joint          3          2102      799..3307   1.014467   offset+scale+tilt+origin (widened 2026-08-07, was 829..3277, see joint's own comment)
+    elbow_yaw_joint             4          2078     2060..2130  1.0        NONE — deliberately locked near
                                                                               midpoint in production; its own fit
                                                                               is poorly identified (joint barely
                                                                               moved in the dataset used to fit it)
@@ -218,10 +218,25 @@
          section). Original nominal origin xyz: 0.018 0.0206 0.1158.
          Original nominal axis: 1 0 0. -->
     <origin rpy="0 0 0" xyz="0.01656849 0.02722018 0.11356304"/>
+    <!-- Limit widened 2026-08-07 (was lower="-1.961961" upper="1.788622")
+         to add a 30-tick margin on each side of jointCalibrations[3]'s
+         minTick/maxTick (robot_calibration.cpp) - real-hardware MoveIt
+         sessions repeatedly showed the arm's actual settled position
+         landing a few ticks up to ~25 ticks past the exact hand-verified
+         extreme (ordinary servo settling/backlash noise), which
+         MoveIt's CheckStartStateBounds check has zero tolerance for and
+         will not plan past. Recomputed directly from the widened
+         [799, 3307] tick range, not just delta-adjusted from the old
+         values - doing so surfaced that the *previous* limit here had
+         quietly drifted ~12-26 ticks tighter than jointCalibrations'
+         then-current [829, 3277] anyway (likely stale from an earlier
+         zeroTick/scale revision that was never propagated here), so this
+         edit also fixes that pre-existing mismatch, not just adds
+         margin. -->
     <limit
       effort="100.0"
-      lower="-1.961961"
-      upper="1.788622"
+      lower="-2.027693"
+      upper="1.875188"
       velocity="1.0"/>
     <axis xyz="0.999677 -0.024005 0.008304"/>
   </joint>
@@ -261,15 +276,21 @@
          since it's not meant to move in real use. -->
     <origin rpy="0 0 0" xyz="-0.0171 -0.018 0.09746"/>
     <!-- Limit tightened 2026-08-06 to match this joint's hardware lock
-         (jointCalibrations[4]'s minTick/maxTick = 2075/2115 in
-         robot_calibration.cpp) — MUST stay consistent with that C++ range,
-         not the original wide mechanical limit, or MoveIt will plan
-         trajectories the hardware safety clamp will reject. Original wide
-         limit was lower="-1.727262" upper="1.790156". -->
+         (jointCalibrations[4]'s minTick/maxTick, robot_calibration.cpp)
+         — MUST stay consistent with that C++ range, not the original wide
+         mechanical limit, or MoveIt will plan trajectories the hardware
+         safety clamp will reject. Original wide limit was
+         lower="-1.727262" upper="1.790156".
+         Widened slightly again 2026-08-07 (was lower="-0.004602"
+         upper="0.056757") - 15 ticks of margin added each side of
+         jointCalibrations[4]'s range (now [2060, 2130]), same real-
+         hardware-settling-noise reasoning as elbow_pitch_joint's limit
+         above. Still a deliberately tiny ~4 degree window; this joint
+         stays "locked" in every practical sense. -->
     <limit
       effort="100.0"
-      lower="-0.004602"
-      upper="0.056757"
+      lower="-0.027612"
+      upper="0.079767"
       velocity="1.0"/>
     <axis xyz="0 -1 0"/>
   </joint>

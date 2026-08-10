@@ -100,6 +100,25 @@ target_link_libraries(read_motor_positions
         dynamixel_sdk
 )
 
+# One-off recovery utility (2026-08-07, see the .cpp's own comment) --
+# not meant to be permanent, safe to remove once no longer needed.
+add_executable(recover_motor4
+    tests/recover_motor4.cpp
+    src/dynamixel_motor.cpp
+    src/robot_calibration.cpp
+)
+
+target_include_directories(recover_motor4
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/DynamixelSDK/c++/include
+)
+
+target_link_libraries(recover_motor4
+    PRIVATE
+        dynamixel_sdk
+)
+
 add_executable(test_ticks
     tests/test_ticks.cpp
     src/dynamixel_motor.cpp

@@ -210,10 +210,20 @@
          fit). Original nominal origin xyz: 0.018 0.0206 0.1158.
          Original nominal axis: 1 0 0. -->
     <origin rpy="0 0 0" xyz="0.01656849 0.02722018 0.11356304"/>
+    <!-- Limit widened 2026-08-07 (was lower="-1.961961" upper="1.788622")
+         to add a 30-tick margin on each side of jointCalibrations[3]'s
+         minTick/maxTick (robot_calibration.cpp)  -  real-hardware MoveIt
+         sessions repeatedly showed the arm's actual settled position
+         landing a few ticks up to ~25 ticks past the exact hand-verified
+         extreme (ordinary servo settling/backlash noise), which MoveIt's
+         CheckStartStateBounds check has zero tolerance for. See
+         references/cyton_gamma_1500_trac_ik.urdf's matching joint comment
+         for the full explanation, including a pre-existing (now fixed)
+         mismatch this recomputation also caught. -->
     <limit
       effort="100.0"
-      lower="-1.961961"
-      upper="1.788622"
+      lower="-2.027693"
+      upper="1.875188"
       velocity="1.0"/>
     <axis xyz="0.999677 -0.024005 0.008304"/>
   </joint>
@@ -254,15 +264,21 @@
          use. -->
     <origin rpy="0 0 0" xyz="-0.0171 -0.018 0.09746"/>
     <!-- Limit tightened 2026-08-06 to match this joint's hardware lock
-         (jointCalibrations[4]'s minTick/maxTick = 2075/2115 in
-         robot_calibration.cpp)  -  MUST stay consistent with that C++
-         range, not the original wide mechanical limit, or MoveIt will
-         plan trajectories the hardware safety clamp will reject. Original
-         wide limit was lower="-1.727262" upper="1.790156". -->
+         (jointCalibrations[4]'s minTick/maxTick, robot_calibration.cpp)
+          -  MUST stay consistent with that C++ range, not the original
+         wide mechanical limit, or MoveIt will plan trajectories the
+         hardware safety clamp will reject. Original wide limit was
+         lower="-1.727262" upper="1.790156".
+         Widened slightly again 2026-08-07 (was lower="-0.004602"
+         upper="0.056757")  -  15 ticks of margin added each side of
+         jointCalibrations[4]'s range (now [2060, 2130]), same real-
+         hardware-settling-noise reasoning as elbow_pitch_joint's limit
+         above. Still a deliberately tiny ~4 degree window; this joint
+         stays "locked" in every practical sense. -->
     <limit
       effort="100.0"
-      lower="-0.004602"
-      upper="0.056757"
+      lower="-0.027612"
+      upper="0.079767"
       velocity="1.0"/>
     <axis xyz="0 -1 0"/>
   </joint>
