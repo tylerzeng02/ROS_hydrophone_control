@@ -24,9 +24,17 @@
     DynamixelMotor's read path only reads present position here) so that
     joint_trajectory_controller's default state_interfaces list (position
     + velocity) is satisfied without a real velocity feedback source.
+
+    compensate_backlash (2026-08-13, default "false", string not boolean -
+    same xacro-arg-stringification trap as hardware_type above) enables
+    cyton_hardware's streaming-compatible backlash compensator. Only
+    meaningful on the "real" branch; harmless (and unused) if passed under
+    mock_components. See CytonSystemHardware's own header comment for what
+    this does and its validation status - NOT the same, already-validated
+    fix as dynamixel_motor.cpp's blocking moves.
   -->
   <xacro:macro name="cyton_gamma_1500_ros2_control"
-               params="name hardware_type serial_port baud_rate protocol_version initial_positions_file">
+               params="name hardware_type serial_port baud_rate protocol_version initial_positions_file compensate_backlash:='false'">
     <xacro:property name="initial_positions"
                      value="${xacro.load_yaml(initial_positions_file)['initial_positions']}"/>
 
@@ -40,6 +48,7 @@
           <param name="serial_port">${serial_port}</param>
           <param name="baud_rate">${baud_rate}</param>
           <param name="protocol_version">${protocol_version}</param>
+          <param name="compensate_backlash">${compensate_backlash}</param>
         </xacro:if>
       </hardware>
 

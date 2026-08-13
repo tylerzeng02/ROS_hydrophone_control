@@ -11,6 +11,11 @@
 // scale is the fitted gear-ratio correction, applied in radiansToTicks()/
 // ticksToRadians() below.
 //
+// (2026-08-13: scale was briefly reset to 1.0 for every joint, as one step
+// in an "isolate each correction's contribution" comparison series -- now
+// REVERTED back to these fitted values, since this is the production/
+// "optimal" configuration again, not that comparison.)
+//
 // Joints 0 (shoulder_roll) and 6 (wrist_roll) deliberately do NOT get their
 // fitted offset applied: each is the first/last joint in the chain with
 // nothing rotational between it and the base/tool frame respectively, so
@@ -42,27 +47,24 @@ std::vector<JointCalibration> jointCalibrations = {
     // manually nudges the joint back inside bounds. See CLAUDE.md's
     // kinematic-calibration section for the specific incidents.
     {3, 2102, +1, 799, 3307, 1.014467},                  // offset +0.5297deg
-    // Joint 4 (elbow_yaw) deliberately locked near its midpoint (2026-08-06):
-    // the single worst-measured backlash joint (7.68mm) and a confirmed
-    // joint-coupling/gravity-deflection hotspot -- locking it out of real
-    // motion planning was found to meaningfully improve the other 6 joints'
-    // calibration accuracy (see CLAUDE.md's kinematic-calibration section,
-    // "reduced-DOF breakthrough"). Was previously widened to a real,
-    // hand-verified-safe range of [944, 3245] earlier in that same session
-    // (before the lock decision) -- that wider range is not wrong, just no
-    // longer used now that this joint isn't meant to move in production.
-    // No offset/scale applied here either: this joint barely moved in the
-    // dataset it was fit on (locked the whole time), so its own correction
-    // is poorly identified and not trustworthy -- moot anyway since it's
-    // locked and never evaluated away from this narrow range.
-    //
-    // minTick/maxTick widened 15 ticks each side (2026-08-07, was
-    // [2075, 2115]) for the identical reason as elbow_pitch above -- this
-    // joint hit the same zero-margin-bounds problem too. Still a
-    // deliberately tiny ~70-tick (~4 degree) window, nowhere close to this
-    // joint's real, wider mechanical range -- it stays "locked" in every
-    // practical sense, just with enough slack to absorb real settling
-    // noise instead of tripping MoveIt's bounds check on it.
+    // Joint 4 (elbow_yaw) RE-LOCKED (2026-08-13): was briefly widened to
+    // [944, 3245] for a 7-DOF "original/raw" uncalibrated-URDF comparison
+    // test, now REVERTED back to its normal production lock, since this is
+    // the "optimal" configuration again, not that comparison. Locked near
+    // its midpoint because it's the single worst-measured backlash joint
+    // (7.68mm) and a confirmed joint-coupling/gravity-deflection hotspot --
+    // locking it out of real motion planning was found to meaningfully
+    // improve the other 6 joints' calibration accuracy (see CLAUDE.md's
+    // kinematic-calibration section, "reduced-DOF breakthrough"). No offset/
+    // scale applied here either: this joint barely moved in the dataset it
+    // was fit on (locked the whole time), so its own correction is poorly
+    // identified and not trustworthy -- moot anyway since it's locked and
+    // never evaluated away from this narrow range. Still a deliberately
+    // tiny ~70-tick (~4 degree) window, nowhere close to this joint's real,
+    // wider mechanical range -- it stays "locked" in every practical sense,
+    // just with enough slack (widened 15 ticks each side, 2026-08-07, from
+    // [2075, 2115]) to absorb real settling noise instead of tripping
+    // MoveIt's bounds check on it.
     {4, 2078, +1, 2060, 2130, 1.0},
     {5, 2042, +1, 751, 3344, 1.006796},                  // offset +0.4909deg
     {6, 2048, +1, 335, 3761, 1.002933}                   // offset skipped (tool-frame degeneracy)

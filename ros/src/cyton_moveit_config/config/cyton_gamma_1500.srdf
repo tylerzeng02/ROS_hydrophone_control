@@ -65,4 +65,5 @@
   <disable_collisions link1="elbow_yaw" link2="wrist_pitch" reason="Adjacent"/>
   <disable_collisions link1="wrist_pitch" link2="wrist_roll" reason="Adjacent"/>
   <disable_collisions link1="wrist_roll" link2="virtual_endeffector" reason="Adjacent"/>
+  <disable_collisions link1="virtual_endeffector" link2="hydrophone_rod" reason="Adjacent"/>
 </robot>

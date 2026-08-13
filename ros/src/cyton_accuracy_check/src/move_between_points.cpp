@@ -37,6 +37,24 @@
 // (themselves copied from cyton_ndi_capture/src/ndi_measure.cpp) --
 // already hardware-validated NDI connect/BX-polling/averaging code, not
 // reimplemented here.
+//
+// Orientation-target fix (2026-08-13): before this, targetPose's
+// orientation was always copied from moveGroup.getCurrentPose() -- i.e.
+// "preserve whatever orientation the arm currently has," NOT "restore the
+// orientation recorded when the trajectory was built." With nothing ever
+// pulling orientation back toward what was actually intended, small
+// per-hop drift (IK convergence tolerance, execution error) accumulated
+// uncorrected over a long run -- confirmed on a real run where a
+// perpendicular-to-the-ground trajectory ended up visibly bent by the
+// last point. Fixed by reading the orientation that was ALREADY recorded
+// per-point in any ndi_measure/record_waypoints-format CSV: moveit_pose_
+// qw/qx/qy/qz (MoveIt/base_link frame -- used directly as the IK target's
+// orientation, no conversion needed) and moving_relative_fixed_q0/qx/qy/
+// qz (NDI frame -- used directly to measure orientation error against the
+// NDI-measured "after" pose, again no conversion needed, since each is
+// already expressed in the frame it's used in). Falls back to the old
+// current-orientation behavior (with a printed warning) if a CSV lacks
+// these columns.
 
 #include <algorithm>
 #include <array>
@@ -591,6 +609,17 @@ private:
 
 struct TargetPoint {
     double txMm = 0.0, tyMm = 0.0, tzMm = 0.0;
+    // Target ORIENTATION, present only if the input CSV carries the
+    // ndi_measure/record_waypoints columns (see the file header comment).
+    // moveitQ* is the recorded MoveGroupInterface::getCurrentPose()
+    // orientation (MoveIt/base_link frame) -- used directly as the IK
+    // target's orientation. ndiQ* is the recorded moving_relative_fixed
+    // orientation (NDI frame) -- used directly to measure orientation
+    // error against the NDI-measured "after" pose. No frame conversion
+    // needed for either: each is already stored in the frame it's used in.
+    double moveitQw = 1.0, moveitQx = 0.0, moveitQy = 0.0, moveitQz = 0.0;
+    double ndiQ0 = 1.0, ndiQx = 0.0, ndiQy = 0.0, ndiQz = 0.0;
+    bool hasOrientation = false;
 };
 
 std::vector<TargetPoint> loadTargetPoints(const std::string& path) {
@@ -614,16 +643,37 @@ std::vector<TargetPoint> loadTargetPoints(const std::string& path) {
     }
 
     int txCol = -1, tyCol = -1, tzCol = -1;
+    int moveitQwCol = -1, moveitQxCol = -1, moveitQyCol = -1, moveitQzCol = -1;
+    int ndiQ0Col = -1, ndiQxCol = -1, ndiQyCol = -1, ndiQzCol = -1;
     for (std::size_t i = 0; i < columns.size(); ++i) {
         if (columns[i] == "moving_relative_fixed_tx_mm") txCol = static_cast<int>(i);
         if (columns[i] == "moving_relative_fixed_ty_mm") tyCol = static_cast<int>(i);
         if (columns[i] == "moving_relative_fixed_tz_mm") tzCol = static_cast<int>(i);
+        if (columns[i] == "moveit_pose_qw") moveitQwCol = static_cast<int>(i);
+        if (columns[i] == "moveit_pose_qx") moveitQxCol = static_cast<int>(i);
+        if (columns[i] == "moveit_pose_qy") moveitQyCol = static_cast<int>(i);
+        if (columns[i] == "moveit_pose_qz") moveitQzCol = static_cast<int>(i);
+        if (columns[i] == "moving_relative_fixed_q0") ndiQ0Col = static_cast<int>(i);
+        if (columns[i] == "moving_relative_fixed_qx") ndiQxCol = static_cast<int>(i);
+        if (columns[i] == "moving_relative_fixed_qy") ndiQyCol = static_cast<int>(i);
+        if (columns[i] == "moving_relative_fixed_qz") ndiQzCol = static_cast<int>(i);
     }
     if (txCol < 0 || tyCol < 0 || tzCol < 0) {
         throw std::runtime_error(
             "Input CSV " + path + " is missing moving_relative_fixed_tx_mm/_ty_mm/_tz_mm columns "
             "-- expected the format written by cyton_ndi_capture's ndi_measure."
         );
+    }
+
+    const bool orientationColumnsPresent =
+        moveitQwCol >= 0 && moveitQxCol >= 0 && moveitQyCol >= 0 && moveitQzCol >= 0 &&
+        ndiQ0Col >= 0 && ndiQxCol >= 0 && ndiQyCol >= 0 && ndiQzCol >= 0;
+    if (!orientationColumnsPresent) {
+        std::cout << "WARNING: input CSV has no recorded orientation columns (moveit_pose_qw/qx/qy/qz, "
+                     "moving_relative_fixed_q0/qx/qy/qz) -- falling back to the OLD behavior of "
+                     "preserving whatever orientation the arm currently has at each hop, which drifts "
+                     "uncorrected over a long run instead of tracking the originally-recorded target. "
+                     "Use a CSV from ndi_measure/record_waypoints to fix this.\n";
     }
 
     std::vector<TargetPoint> points;
@@ -646,6 +696,21 @@ std::vector<TargetPoint> loadTargetPoints(const std::string& path) {
         point.txMm = std::stod(fields[static_cast<std::size_t>(txCol)]);
         point.tyMm = std::stod(fields[static_cast<std::size_t>(tyCol)]);
         point.tzMm = std::stod(fields[static_cast<std::size_t>(tzCol)]);
+
+        if (orientationColumnsPresent &&
+            static_cast<int>(fields.size()) >
+                std::max({moveitQwCol, moveitQxCol, moveitQyCol, moveitQzCol, ndiQ0Col, ndiQxCol,
+                          ndiQyCol, ndiQzCol})) {
+            point.moveitQw = std::stod(fields[static_cast<std::size_t>(moveitQwCol)]);
+            point.moveitQx = std::stod(fields[static_cast<std::size_t>(moveitQxCol)]);
+            point.moveitQy = std::stod(fields[static_cast<std::size_t>(moveitQyCol)]);
+            point.moveitQz = std::stod(fields[static_cast<std::size_t>(moveitQzCol)]);
+            point.ndiQ0 = std::stod(fields[static_cast<std::size_t>(ndiQ0Col)]);
+            point.ndiQx = std::stod(fields[static_cast<std::size_t>(ndiQxCol)]);
+            point.ndiQy = std::stod(fields[static_cast<std::size_t>(ndiQyCol)]);
+            point.ndiQz = std::stod(fields[static_cast<std::size_t>(ndiQzCol)]);
+            point.hasOrientation = true;
+        }
         points.push_back(point);
     }
 
@@ -654,6 +719,20 @@ std::vector<TargetPoint> loadTargetPoints(const std::string& path) {
 
 double distanceMm(double dx, double dy, double dz) {
     return std::sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+// Angle (degrees) between two orientations expressed as quaternions in the
+// SAME frame -- both callers here pass a pair that's already co-frame (NDI
+// vs. NDI), so no conversion is needed. abs() on the dot product handles
+// quaternion double-cover (q and -q are the same rotation); clamped to
+// [-1, 1] to guard against a >1.0 float-rounding value reaching acos().
+double quaternionAngleDeg(
+    double w1, double x1, double y1, double z1, double w2, double x2, double y2, double z2
+) {
+    double dot = w1 * w2 + x1 * x2 + y1 * y2 + z1 * z2;
+    dot = std::min(1.0, std::max(-1.0, std::fabs(dot)));
+    constexpr double kPi = 3.14159265358979323846;
+    return 2.0 * std::acos(dot) * (180.0 / kPi);
 }
 
 void printUsage(const char* argv0) {
@@ -688,6 +767,30 @@ int main(int argc, char** argv) {
     rclcpp::init(argc, argv);
     auto node = std::make_shared<rclcpp::Node>("move_between_points");
 
+    // setJointValueTarget(pose) (added 2026-08-11, see its call site below)
+    // computes IK LOCALLY inside this process via MoveGroupInterface's own
+    // private RobotModel/RobotState, unlike setPoseTarget()/
+    // computeCartesianPath(), which just hand a constraint downstream to
+    // move_group (which already has its own kinematics.yaml loaded). A bare
+    // `ros2 run` node has no robot_description_kinematics parameter at all,
+    // so that local RobotModel has no IK plugin configured for group "arm"
+    // -- "No kinematics solver instantiated for group 'arm'". Rather than
+    // requiring every future launch of this tool to remember an extra
+    // --ros-args --params-file flag, declare the same solver config
+    // cyton_moveit_config/config/kinematics.yaml already uses for "arm"
+    // directly on this node, before MoveGroupInterface is constructed
+    // (it reads these at construction time).
+    node->declare_parameter<std::string>(
+        "robot_description_kinematics.arm.kinematics_solver",
+        "kdl_kinematics_plugin/KDLKinematicsPlugin"
+    );
+    node->declare_parameter<double>(
+        "robot_description_kinematics.arm.kinematics_solver_search_resolution", 0.005
+    );
+    node->declare_parameter<double>(
+        "robot_description_kinematics.arm.kinematics_solver_timeout", 0.05
+    );
+
     rclcpp::executors::SingleThreadedExecutor executor;
     executor.add_node(node);
     std::thread spinThread([&executor]() { executor.spin(); });
@@ -718,10 +821,12 @@ int main(int argc, char** argv) {
                "after_tx_mm,after_ty_mm,after_tz_mm,"
                "commanded_delta_ndi_mm_x,commanded_delta_ndi_mm_y,commanded_delta_ndi_mm_z,"
                "achieved_delta_ndi_mm_x,achieved_delta_ndi_mm_y,achieved_delta_ndi_mm_z,"
-               "error_mm\n";
+               "error_mm,orientation_error_deg\n";
 
         std::vector<double> errors;
         errors.reserve(points.size());
+        std::vector<double> orientationErrors;
+        orientationErrors.reserve(points.size());
 
         for (std::size_t i = 0; i < points.size(); ++i) {
             const TargetPoint& target = points[i];
@@ -757,7 +862,42 @@ int main(int argc, char** argv) {
             targetPose.pose.position.y += deltaMoveItM[1];
             targetPose.pose.position.z += deltaMoveItM[2];
 
-            moveGroup.setPoseTarget(targetPose);
+            if (target.hasOrientation) {
+                // Pin orientation to the ORIGINALLY-RECORDED target for this
+                // point instead of copying whatever orientation the arm
+                // currently happens to have -- see the file header comment
+                // for why the old behavior let orientation drift uncorrected
+                // over a long run.
+                targetPose.pose.orientation.w = target.moveitQw;
+                targetPose.pose.orientation.x = target.moveitQx;
+                targetPose.pose.orientation.y = target.moveitQy;
+                targetPose.pose.orientation.z = target.moveitQz;
+            }
+
+            // Orientation must stay constrained here (unlike the earlier
+            // position-only attempt) -- an unconstrained orientation can
+            // rotate the moving marker away from the NDI tracker's line of
+            // sight, breaking the very measurement this tool exists to take.
+            //
+            // Instead of setPoseTarget() (which hands a live Cartesian
+            // constraint to OMPL and makes it randomly sample goal states --
+            // the thing that was timing out against elbow_yaw's ~4-degree
+            // locked window), use setJointValueTarget(pose): this computes
+            // ONE IK solution up front, seeded from the arm's CURRENT joint
+            // state (already elbow_yaw-compliant, and each hop is only a
+            // small move), then hands the planner a single known joint-space
+            // goal to connect to -- a much easier problem than searching for
+            // *any* valid goal state from scratch, and it fails fast (no IK
+            // solution found) instead of burning the full 30s planning
+            // budget. See setJointValueTarget's own doc comment in
+            // move_group_interface.hpp for this exact behavior.
+            const bool ikFound = moveGroup.setJointValueTarget(targetPose);
+            if (!ikFound) {
+                std::cout << "  IK FAILED to find a joint solution for this target "
+                             "-- skipping this point, continuing to the next.\n";
+                continue;
+            }
+
             std::cout << "  Planning and executing...\n";
             auto result = moveGroup.move();
 
@@ -787,12 +927,32 @@ int main(int argc, char** argv) {
 
             std::cout << "  Error vs. target: " << errorMm << " mm\n";
 
+            bool orientationErrorValid = false;
+            double orientationErrorDeg = 0.0;
+            if (target.hasOrientation) {
+                // Both quaternions are already in the NDI frame -- afterPose
+                // is the just-measured moving_relative_fixed orientation,
+                // target.ndiQ* is the recorded moving_relative_fixed
+                // orientation for this point. No conversion needed.
+                orientationErrorDeg = quaternionAngleDeg(
+                    afterPose.q0, afterPose.qx, afterPose.qy, afterPose.qz, target.ndiQ0, target.ndiQx,
+                    target.ndiQy, target.ndiQz
+                );
+                orientationErrors.push_back(orientationErrorDeg);
+                orientationErrorValid = true;
+                std::cout << "  Orientation error vs. target: " << orientationErrorDeg << " deg\n";
+            }
+
             csv << i << ',' << target.txMm << ',' << target.tyMm << ',' << target.tzMm << ','
                 << beforePose.txMm << ',' << beforePose.tyMm << ',' << beforePose.tzMm << ','
                 << afterPose.txMm << ',' << afterPose.tyMm << ',' << afterPose.tzMm << ','
                 << deltaNdiMm[0] << ',' << deltaNdiMm[1] << ',' << deltaNdiMm[2] << ','
                 << achievedDeltaMm[0] << ',' << achievedDeltaMm[1] << ',' << achievedDeltaMm[2] << ','
-                << errorMm << '\n';
+                << errorMm << ',';
+            if (orientationErrorValid) {
+                csv << orientationErrorDeg;
+            }
+            csv << '\n';
             csv.flush();
         }
 
@@ -808,8 +968,22 @@ int main(int argc, char** argv) {
                       << errors.size() << " of " << points.size() << " points reached and measured.\n"
                       << "Mean error: " << mean << " mm\n"
                       << "RMS error:  " << rms << " mm\n"
-                      << "Max error:  " << maxError << " mm\n"
-                      << "Saved data to " << outputCsv << '\n';
+                      << "Max error:  " << maxError << " mm\n";
+
+            if (!orientationErrors.empty()) {
+                const double oSum = std::accumulate(orientationErrors.begin(), orientationErrors.end(), 0.0);
+                const double oMean = oSum / static_cast<double>(orientationErrors.size());
+                const double oMax = *std::max_element(orientationErrors.begin(), orientationErrors.end());
+                const double oSumSq = std::inner_product(
+                    orientationErrors.begin(), orientationErrors.end(), orientationErrors.begin(), 0.0
+                );
+                const double oRms = std::sqrt(oSumSq / static_cast<double>(orientationErrors.size()));
+                std::cout << "Mean orientation error: " << oMean << " deg\n"
+                          << "RMS orientation error:  " << oRms << " deg\n"
+                          << "Max orientation error:  " << oMax << " deg\n";
+            }
+
+            std::cout << "Saved data to " << outputCsv << '\n';
         } else {
             std::cout << "\nNo points were successfully reached and measured.\n";
         }

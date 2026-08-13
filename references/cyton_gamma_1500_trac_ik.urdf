@@ -416,4 +416,43 @@
     </visual>
   </link>
 
+  <!-- Hydrophone probe rod (2026-08-11): a thin cylindrical rod attached
+       rigidly to virtual_endeffector, representing the physical hydrophone
+       probe used to measure ultrasound propagation at points on a skull
+       phantom. Visual/collision attachment only, by explicit user choice -
+       MoveIt's planning group tip_link deliberately stays at
+       virtual_endeffector (not the rod tip), so IK/Cartesian targets still
+       refer to the original wrist-mounted point; the rod's length (10cm)
+       must be accounted for manually when picking targets. Dimensions
+       below are nominal design values (10cm length, 4mm diameter), not
+       independently calibrated - verify against the physical probe if
+       precise real-world accuracy at the rod tip matters. Extends along
+       +Z, matching this URDF's existing convention (every joint's origin
+       in this chain has its dominant offset along the parent's +Z, i.e.
+       +Z is "outward along the arm's reach" throughout). -->
+
+  <joint name="hydrophone_rod_joint" type="fixed">
+    <parent link="virtual_endeffector"/>
+    <child link="hydrophone_rod"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+  </joint>
+
+  <link name="hydrophone_rod">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0.05"/>
+      <geometry>
+        <cylinder radius="0.002" length="0.10"/>
+      </geometry>
+      <material name="grey">
+        <color rgba="0.6 0.6 0.6 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0.05"/>
+      <geometry>
+        <cylinder radius="0.002" length="0.10"/>
+      </geometry>
+    </collision>
+  </link>
+
 </robot>
