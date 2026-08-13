@@ -66,6 +66,11 @@ def launch_setup(context, *args, **kwargs):
         else "cyton_gamma_1500.urdf.xacro"
     )
 
+    ik_solver = LaunchConfiguration("ik_solver").perform(context)
+    if ik_solver not in ("kdl", "trac_ik"):
+        raise ValueError(f"ik_solver must be 'kdl' or 'trac_ik', got '{ik_solver}'")
+    kinematics_filename = "config/kinematics_trac_ik.yaml" if ik_solver == "trac_ik" else "config/kinematics.yaml"
+
     moveit_config = (
         MoveItConfigsBuilder("cyton_gamma_1500", package_name="cyton_moveit_config")
         .robot_description(
@@ -82,7 +87,7 @@ def launch_setup(context, *args, **kwargs):
             },
         )
         .robot_description_semantic(file_path="config/cyton_gamma_1500.srdf")
-        .robot_description_kinematics(file_path="config/kinematics.yaml")
+        .robot_description_kinematics(file_path=kinematics_filename)
         .joint_limits(file_path="config/joint_limits.yaml")
         .trajectory_execution(file_path="config/moveit_controllers.yaml")
         .planning_pipelines(pipelines=["ompl"])
@@ -200,6 +205,13 @@ def generate_launch_description():
         "with hardware_type:=real). Default false. Not yet validated against real hardware -- "
         "see CytonSystemHardware's own header comment.",
     )
+    ik_solver_arg = DeclareLaunchArgument(
+        "ik_solver",
+        default_value="kdl",
+        description="'kdl' (default, production-proven) or 'trac_ik' (cyton_trac_ik_kinematics_"
+        "plugin, 2026-08-13, brand new and not yet hardware-validated -- see that plugin's own "
+        "header comment). Selects config/kinematics.yaml vs. config/kinematics_trac_ik.yaml.",
+    )
 
     return LaunchDescription(
         [
@@ -209,6 +221,7 @@ def generate_launch_description():
             rviz_config_arg,
             urdf_variant_arg,
             compensate_backlash_arg,
+            ik_solver_arg,
             OpaqueFunction(function=launch_setup),
         ]
     )

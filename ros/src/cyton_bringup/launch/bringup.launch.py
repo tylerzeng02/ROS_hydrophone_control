@@ -20,6 +20,10 @@ Streaming backlash compensation (2026-08-13): pass compensate_backlash:=true
 (only meaningful with hardware_type:=real) to enable cyton_hardware's new
 reversal-triggered hold-point compensator -- NOT yet validated against real
 hardware. See CytonSystemHardware's own header comment.
+
+TRAC-IK (2026-08-13): pass ik_solver:=trac_ik to use
+cyton_trac_ik_kinematics_plugin instead of KDL -- brand new, not yet
+hardware-validated. See that plugin's own header comment.
 """
 
 from launch import LaunchDescription
@@ -57,6 +61,12 @@ def generate_launch_description():
         description="Enable cyton_hardware's streaming backlash compensator (only meaningful "
         "with hardware_type:=real). Default false, not yet validated against real hardware.",
     )
+    ik_solver_arg = DeclareLaunchArgument(
+        "ik_solver",
+        default_value="kdl",
+        description="'kdl' (default, production-proven) or 'trac_ik' (brand new, not yet "
+        "hardware-validated) -- see demo.launch.py's docstring.",
+    )
 
     demo_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -70,6 +80,7 @@ def generate_launch_description():
             "baud_rate": LaunchConfiguration("baud_rate"),
             "urdf_variant": LaunchConfiguration("urdf_variant"),
             "compensate_backlash": LaunchConfiguration("compensate_backlash"),
+            "ik_solver": LaunchConfiguration("ik_solver"),
         }.items(),
     )
 
@@ -80,6 +91,7 @@ def generate_launch_description():
             baud_rate_arg,
             urdf_variant_arg,
             compensate_backlash_arg,
+            ik_solver_arg,
             demo_launch,
         ]
     )

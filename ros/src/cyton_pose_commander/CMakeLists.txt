@@ -99,9 +99,37 @@ ament_target_dependencies(replay_ndi_capture_sim
   moveit_ros_planning_interface
 )
 
+# constrained_pose_ik_test (2026-08-13): replicates the ORIGINAL, harder
+# setPoseTarget() IK scenario (position + orientation both constrained,
+# OMPL random-seeded goal sampling) that move_between_points.cpp used
+# before its seeded-IK fix -- built specifically to A/B compare ik_solver:=
+# kdl vs. ik_solver:=trac_ik on that exact scenario. No NDI dependency.
+add_executable(constrained_pose_ik_test
+  src/constrained_pose_ik_test.cpp
+)
+
+ament_target_dependencies(constrained_pose_ik_test
+  rclcpp
+  moveit_ros_planning_interface
+)
+
+# record_waypoints (2026-08-13): jog/plan the arm via RViz, press Enter to
+# record the current joint state to a CSV -- no NDI tracker involved.
+# Output uses the same column schema replay_ndi_capture/
+# replay_ndi_capture_sim already read, so recorded waypoints can be
+# replayed automatically with either of those existing tools unchanged.
+add_executable(record_waypoints
+  src/record_waypoints.cpp
+)
+
+ament_target_dependencies(record_waypoints
+  rclcpp
+  moveit_ros_planning_interface
+)
+
 install(
   TARGETS pose_commander cartesian_path_demo waypoint_sequence_demo replay_ndi_capture
-          replay_ndi_capture_sim
+          replay_ndi_capture_sim constrained_pose_ik_test record_waypoints
   DESTINATION lib/${PROJECT_NAME}
 )
 

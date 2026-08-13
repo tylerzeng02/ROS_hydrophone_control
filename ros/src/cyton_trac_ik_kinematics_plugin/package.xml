@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematron="http://download.ros.org/schema/package_format3.xsd"?>
+<package format="3">
+  <name>cyton_trac_ik_kinematics_plugin</name>
+  <version>0.1.0</version>
+  <description>
+    MoveIt2-native TRAC-IK kinematics plugin for the Cyton Gamma 1500,
+    wrapping external/trac_ik's core solver (trac_ik_lib, compiled directly
+    from that submodule) behind a fresh implementation of MoveIt2's
+    kinematics::KinematicsBase interface -- built to A/B compare against the
+    KDL plugin already used by cyton_moveit_config. Not a port of the
+    original ROS1/catkin trac_ik_kinematics_plugin package (that one depends
+    on roscpp/tf_conversions/the ROS1 parameter server, none of which exist
+    here); see the plugin header's own comment for the full explanation.
+  </description>
+  <maintainer email="tonizengedu@gmail.com">tyler zeng</maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <build_depend>rclcpp</build_depend>
+  <build_depend>moveit_core</build_depend>
+  <build_depend>pluginlib</build_depend>
+  <build_depend>kdl_parser</build_depend>
+  <build_depend>urdf</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>moveit_msgs</build_depend>
+
+  <exec_depend>rclcpp</exec_depend>
+  <exec_depend>moveit_core</exec_depend>
+  <exec_depend>pluginlib</exec_depend>
+  <exec_depend>kdl_parser</exec_depend>
+  <exec_depend>urdf</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>moveit_msgs</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+    <moveit_core plugin="${prefix}/trac_ik_kinematics_description.xml"/>
+  </export>
+</package>

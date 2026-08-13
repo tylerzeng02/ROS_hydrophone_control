@@ -64,6 +64,24 @@ ament_target_dependencies(move_x_test
 
 target_link_libraries(move_x_test ndicapi)
 
+# move_xyz_test (2026-08-13): like move_x_test, but commands a delta on all
+# three axes at once (dx, dy, dz all plugged in on the command line)
+# instead of one axis at a time -- see the .cpp's own header comment.
+add_executable(move_xyz_test
+  src/move_xyz_test.cpp
+)
+
+target_include_directories(move_xyz_test PRIVATE
+  "${CYTON_REPO_ROOT}/external/ndicapi"
+)
+
+ament_target_dependencies(move_xyz_test
+  rclcpp
+  moveit_ros_planning_interface
+)
+
+target_link_libraries(move_xyz_test ndicapi)
+
 # move_between_points (2026-08-07): visits a sequence of real, NDI-measured
 # target points (collected separately via cyton_ndi_capture's ndi_measure)
 # by commanding a relative Cartesian move from the arm's live current
@@ -85,7 +103,7 @@ ament_target_dependencies(move_between_points
 target_link_libraries(move_between_points ndicapi)
 
 install(
-  TARGETS run_accuracy_check move_x_test move_between_points
+  TARGETS run_accuracy_check move_x_test move_xyz_test move_between_points
   DESTINATION lib/${PROJECT_NAME}
 )
 

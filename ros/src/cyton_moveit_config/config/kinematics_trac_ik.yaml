@@ -1,0 +1,23 @@
+# IK solver for the "arm" planning group -- TRAC-IK variant, built
+# 2026-08-13 specifically to A/B compare against kinematics.yaml's KDL
+# default. cyton_trac_ik_kinematics_plugin is a fresh MoveIt2-native
+# implementation (not a port of the old ROS1 trac_ik_kinematics_plugin,
+# which depends on roscpp/tf_conversions/the ROS1 parameter server and
+# cannot build in ROS2 at all) wrapping external/trac_ik/trac_ik_lib's core
+# solver, compiled directly from that submodule (same pattern as
+# cyton_hardware compiling dynamixel_motor.cpp).
+#
+# kinematics_solver_timeout here is passed straight to this project's KDL
+# config's own value (0.05s) for a like-for-like comparison -- but note
+# TRAC-IK's per-call solve timeout is NOT actually threaded through from
+# this value at runtime the way KDL's is; see
+# TracIKKinematicsPlugin::initialize()'s own comment (default_timeout_
+# solver_ member) for the exact mechanism.
+#
+# Brand new, NOT yet hardware-validated -- select via demo.launch.py's
+# ik_solver:=trac_ik argument. Default remains kdl (kinematics.yaml) until
+# this has been proven out.
+arm:
+  kinematics_solver: cyton_trac_ik_kinematics_plugin/TracIKKinematicsPlugin
+  kinematics_solver_search_resolution: 0.005
+  kinematics_solver_timeout: 0.05

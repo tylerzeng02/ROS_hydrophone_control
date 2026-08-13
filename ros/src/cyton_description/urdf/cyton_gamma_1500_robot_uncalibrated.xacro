@@ -277,31 +277,24 @@
   <joint name="elbow_yaw_joint" type="revolute">
     <parent link="elbow_pitch"/>
     <child link="elbow_yaw"/>
-    <!-- elbow_yaw_joint deliberately left UNCORRECTED (2026-08-06): this
-         joint is locked near its calibrated midpoint in production (see
-         src/robot_calibration.cpp's jointCalibrations comment and
-         CLAUDE.md's kinematic-calibration section, "reduced-DOF
-         breakthrough") and barely moved in the dataset used to fit it, so
-         its own tilt/scale/offset correction is poorly identified and not
-         trustworthy  -  moot anyway since it's not meant to move in real
-         use. -->
+    <!-- elbow_yaw_joint left UNCORRECTED geometrically (no tilt/scale/
+         offset applied - was never trusted, since this joint barely moved
+         in the dataset it was fit on while locked). -->
     <origin rpy="0 0 0" xyz="-0.0171 -0.018 0.09746"/>
-    <!-- Limit tightened 2026-08-06 to match this joint's hardware lock
-         (jointCalibrations[4]'s minTick/maxTick, robot_calibration.cpp)
-          -  MUST stay consistent with that C++ range, not the original
-         wide mechanical limit, or MoveIt will plan trajectories the
-         hardware safety clamp will reject. Original wide limit was
-         lower="-1.727262" upper="1.790156".
-         Widened slightly again 2026-08-07 (was lower="-0.004602"
-         upper="0.056757")  -  15 ticks of margin added each side of
-         jointCalibrations[4]'s range (now [2060, 2130]), same real-
-         hardware-settling-noise reasoning as elbow_pitch_joint's limit
-         above. Still a deliberately tiny ~4 degree window; this joint
-         stays "locked" in every practical sense. -->
+    <!-- Limit UNLOCKED (2026-08-13, deliberate, user-confirmed): restored
+         to the full original mechanical range, matching
+         robot_calibration.cpp's jointCalibrations[4] now being widened to
+         [944, 3245] for this same 7-DOF "original/raw" comparison test -
+         MUST stay consistent with that C++ range (recomputed directly via
+         ticksToRadians with this joint's zeroTick=2078/scale=1.0, not
+         delta-adjusted from the prior locked-window values). See that
+         file's own comment for the full rationale and the reminder that
+         this is a SHARED change affecting every launch, not scoped to just
+         this comparison. -->
     <limit
       effort="100.0"
-      lower="-0.027612"
-      upper="0.079767"
+      lower="-1.739534"
+      upper="1.790156"
       velocity="1.0"/>
     <axis xyz="0 -1 0"/>
   </joint>

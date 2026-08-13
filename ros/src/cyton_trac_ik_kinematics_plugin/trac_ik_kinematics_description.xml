@@ -1,0 +1,13 @@
+<library path="cyton_trac_ik_kinematics_plugin">
+  <class name="cyton_trac_ik_kinematics_plugin/TracIKKinematicsPlugin"
+         type="cyton_trac_ik_kinematics_plugin::TracIKKinematicsPlugin"
+         base_class_type="kinematics::KinematicsBase">
+    <description>
+      MoveIt2-native TRAC-IK kinematics plugin for the Cyton Gamma 1500 --
+      wraps external/trac_ik's core solver (compiled directly, not a copy),
+      built specifically to A/B compare against the KDL plugin. See
+      trac_ik_kinematics_plugin.hpp's own header comment for what this is
+      and is not (not a port of the ROS1 trac_ik_kinematics_plugin.cpp).
+    </description>
+  </class>
+</library>
