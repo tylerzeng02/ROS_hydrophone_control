@@ -61,8 +61,47 @@ ament_target_dependencies(waypoint_sequence_demo
   tf2_geometry_msgs
 )
 
+# replay_ndi_capture (2026-08-11): reads a cyton_ndi_capture/ndi_measure
+# output CSV (joint angles already in radians as named columns) and drives
+# the arm back through each recorded pose via MoveIt -- see the .cpp's own
+# header comment. Reuses pose_commander's plan-preview-confirm workflow and
+# out-of-bounds recovery logic, so it needs the same robot_calibration.cpp
+# dependency for jointCalibrations/ticksToRadians.
+add_executable(replay_ndi_capture
+  src/replay_ndi_capture.cpp
+  "${CYTON_REPO_ROOT}/src/robot_calibration.cpp"
+)
+
+target_include_directories(replay_ndi_capture PRIVATE
+  "${CYTON_REPO_ROOT}/src"
+)
+
+ament_target_dependencies(replay_ndi_capture
+  rclcpp
+  moveit_ros_planning_interface
+)
+
+# replay_ndi_capture_sim (2026-08-11): automatic-animation version of
+# replay_ndi_capture -- visits every pose in order, pausing 1s between
+# each, no per-pose Enter confirmation. Built for demo/simulation purposes
+# (mock hardware by default) -- see the .cpp's own header comment.
+add_executable(replay_ndi_capture_sim
+  src/replay_ndi_capture_sim.cpp
+  "${CYTON_REPO_ROOT}/src/robot_calibration.cpp"
+)
+
+target_include_directories(replay_ndi_capture_sim PRIVATE
+  "${CYTON_REPO_ROOT}/src"
+)
+
+ament_target_dependencies(replay_ndi_capture_sim
+  rclcpp
+  moveit_ros_planning_interface
+)
+
 install(
-  TARGETS pose_commander cartesian_path_demo waypoint_sequence_demo
+  TARGETS pose_commander cartesian_path_demo waypoint_sequence_demo replay_ndi_capture
+          replay_ndi_capture_sim
   DESTINATION lib/${PROJECT_NAME}
 )
 

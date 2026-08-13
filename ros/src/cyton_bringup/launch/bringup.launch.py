@@ -8,6 +8,18 @@ Safe, hardware-free default:
 
 Real hardware (arm connected, powered, clear to move):
     ros2 launch cyton_bringup bringup.launch.py hardware_type:=real serial_port:=/dev/ttyUSB0
+
+Uncalibrated-comparison A/B test (2026-08-12): pass urdf_variant:=uncalibrated
+to have MoveIt plan against the original, uncorrected joint geometry instead
+of this project's fitted kinematic calibration -- e.g.
+    ros2 launch cyton_bringup bringup.launch.py hardware_type:=real serial_port:=/dev/ttyUSB0 urdf_variant:=uncalibrated
+See cyton_moveit_config/launch/demo.launch.py's own docstring for exactly
+what this does and doesn't change.
+
+Streaming backlash compensation (2026-08-13): pass compensate_backlash:=true
+(only meaningful with hardware_type:=real) to enable cyton_hardware's new
+reversal-triggered hold-point compensator -- NOT yet validated against real
+hardware. See CytonSystemHardware's own header comment.
 """
 
 from launch import LaunchDescription
@@ -33,6 +45,18 @@ def generate_launch_description():
     baud_rate_arg = DeclareLaunchArgument(
         "baud_rate", default_value="1000000", description="Dynamixel bus baud rate"
     )
+    urdf_variant_arg = DeclareLaunchArgument(
+        "urdf_variant",
+        default_value="calibrated",
+        description="'calibrated' (default) or 'uncalibrated' -- see demo.launch.py's "
+        "docstring for what this A/B toggle does.",
+    )
+    compensate_backlash_arg = DeclareLaunchArgument(
+        "compensate_backlash",
+        default_value="false",
+        description="Enable cyton_hardware's streaming backlash compensator (only meaningful "
+        "with hardware_type:=real). Default false, not yet validated against real hardware.",
+    )
 
     demo_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -44,6 +68,8 @@ def generate_launch_description():
             "hardware_type": LaunchConfiguration("hardware_type"),
             "serial_port": LaunchConfiguration("serial_port"),
             "baud_rate": LaunchConfiguration("baud_rate"),
+            "urdf_variant": LaunchConfiguration("urdf_variant"),
+            "compensate_backlash": LaunchConfiguration("compensate_backlash"),
         }.items(),
     )
 
@@ -52,6 +78,8 @@ def generate_launch_description():
             hardware_type_arg,
             serial_port_arg,
             baud_rate_arg,
+            urdf_variant_arg,
+            compensate_backlash_arg,
             demo_launch,
         ]
     )

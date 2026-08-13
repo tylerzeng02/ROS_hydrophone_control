@@ -1,0 +1,466 @@
+<?xml version="1.0"?>
+
+<!--
+  UNCALIBRATED comparison variant (2026-08-12) - derived from
+  cyton_gamma_1500_robot.xacro (the real, deployed, calibrated fragment;
+  see that file's own header for its full provenance) by reverting exactly
+  the joint <origin>/<axis> values that carry a fitted kinematic-calibration
+  correction back to their documented "original nominal" values - each
+  reverted value is copied verbatim from that correction's own inline
+  comment in the calibrated file (e.g. "Original nominal axis: 1 0 0"),
+  not re-derived from the third-party SteveMacenski/GertKanter
+  cyton_gamma_1500_description repos independently, since those nominal
+  values are already the exact baseline this project's own fit was
+  performed against.
+
+  Built to answer one specific question: how much did the URDF GEOMETRY
+  correction (axis tilt + link origin fixes) alone contribute to real-
+  world positioning accuracy, isolated from robot_calibration.cpp's
+  separate per-joint offset/scale correction (which is NOT reverted here
+  - the real servos are still driven by the exact same calibrated
+  tick<->radian conversion as every other launch of this robot, so this
+  comparison changes only what MoveIt PLANS with, not what actually gets
+  sent to the hardware). See CLAUDE.md and the conversation that motivated
+  this file for the full reasoning behind that scope choice.
+
+  Reverted (6 joints): shoulder_roll (axis), shoulder_pitch (axis),
+  shoulder_yaw (origin x,z + axis), elbow_pitch (origin + axis),
+  wrist_pitch (origin + axis), wrist_roll (axis).
+  NOT reverted: elbow_yaw - it was already left at its nominal geometry
+  in the calibrated file (that joint's own fit was never trusted, see its
+  inline comment there), so there is nothing to revert here either.
+  Joint <limit> values are UNCHANGED from the calibrated file (the widened
+  margins there are a real-hardware settling-noise safety accommodation,
+  not a calibration correction, and reverting them would risk real
+  CheckStartStateBounds rejections against a live locked joint for no
+  benefit to this comparison).
+
+  DO NOT hand-edit this file to add new corrections - if the calibrated
+  file's corrections change, regenerate this file's reverted values from
+  its updated "Original nominal" comments instead.
+
+  Still NOT included here, per the same reasoning as the calibrated file:
+  - Collision geometry (only base_link has a <collision>; deferred
+    deliberately, see CLAUDE.md's ROS/MoveIt readiness section).
+  - Inertial values are still placeholders (fine for pure kinematic
+    planning; not meant for dynamics/Gazebo use as-is).
+  - Pose-dependent corrections (joint coupling, gravity/elastostatic
+    deflection, the shoulder_pitch Fourier term) and backlash compensation
+    are not representable in static URDF geometry at all  -  backlash is
+    implemented in src/dynamixel_motor.cpp and (experimentally, disabled
+    by default) ported into cyton_hardware's write(); joint coupling and
+    gravity deflection have no runtime implementation anywhere yet.
+  - Joint 4 (elbow_yaw) is permanently locked near its calibrated midpoint
+    in production (see robot_calibration.cpp's jointCalibrations comment)
+     -  its <limit> below reflects that lock, not the wider mechanical range.
+-->
+
+<robot name="cyton_gamma_1500" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- base -->
+
+  <link name="base_footprint">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <sphere radius="0.001"/>
+      </geometry>
+      <material name="white">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+  </link>
+
+  <joint name="base_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin rpy="0 0 0" xyz="0.0 0.0 0.0"/>
+  </joint>
+
+  <link name="base_link">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://cyton_description/meshes/base.dae"/>
+      </geometry>
+    </visual>
+
+    <inertial>
+      <mass value="100.0"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <inertia
+        ixx="1.1027"
+        iyy="1.1027"
+        izz="1.1027"
+        ixy="0"
+        ixz="0"
+        iyz="0"/>
+    </inertial>
+
+    <collision>
+      <origin xyz="0 0.0115 0.047"/>
+      <geometry>
+        <box size="0.154 0.177 0.094"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- shoulder roll -->
+
+  <joint name="shoulder_roll_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="shoulder_roll"/>
+    <origin rpy="0 0 0" xyz="0 0 0.05315"/>
+    <limit
+      effort="100.0"
+      lower="-2.564816"
+      upper="2.644583"
+      velocity="1.0"/>
+    <!-- Axis tilt correction REVERTED for this uncalibrated comparison
+         variant - calibrated value was "0.013792 0.014877 0.999794";
+         restored to original nominal. -->
+    <axis xyz="0 0 1"/>
+  </joint>
+
+  <link name="shoulder_roll">
+    <visual>
+      <origin rpy="1.5708 0 0.384" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://cyton_description/meshes/shoulder_roll.dae"/>
+      </geometry>
+    </visual>
+
+    <inertial>
+      <mass value="50.0"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <inertia
+        ixx=".1027"
+        iyy=".1027"
+        izz=".1027"
+        ixy="0"
+        ixz="0"
+        iyz="0"/>
+    </inertial>
+  </link>
+
+  <!-- shoulder pitch -->
+
+  <joint name="shoulder_pitch_joint" type="revolute">
+    <parent link="shoulder_roll"/>
+    <child link="shoulder_pitch"/>
+    <origin rpy="0 0 0" xyz="0.0205 0 0.12435"/>
+    <limit
+      effort="100.0"
+      lower="-1.833107"
+      upper="1.814699"
+      velocity="1.0"/>
+    <!-- Axis tilt correction REVERTED for this uncalibrated comparison
+         variant - calibrated value was "0.998997 -0.043573 -0.010357";
+         restored to original nominal. -->
+    <axis xyz="1 0 0"/>
+  </joint>
+
+  <link name="shoulder_pitch">
+    <visual>
+      <origin rpy="1.5708 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://cyton_description/meshes/shoulder_pitch.dae"/>
+      </geometry>
+    </visual>
+
+    <inertial>
+      <mass value="20.0"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <inertia
+        ixx=".0827"
+        iyy=".0827"
+        izz=".0827"
+        ixy="0"
+        ixz="0"
+        iyz="0"/>
+    </inertial>
+  </link>
+
+  <!-- shoulder yaw -->
+
+  <joint name="shoulder_yaw_joint" type="revolute">
+    <parent link="shoulder_pitch"/>
+    <child link="shoulder_yaw"/>
+    <!-- Origin and axis tilt corrections REVERTED for this uncalibrated
+         comparison variant - calibrated origin was
+         "-0.02478414 -0.0205 0.1308452", calibrated axis was
+         "-0.027678 -0.999437 0.018973"; both restored to original
+         nominal. -->
+    <origin rpy="0 0 0" xyz="-0.0215 -0.0205 0.1255"/>
+    <limit
+      effort="100.0"
+      lower="-1.770214"
+      upper="1.934350"
+      velocity="1.0"/>
+    <axis xyz="0 -1 0"/>
+  </joint>
+
+  <link name="shoulder_yaw">
+    <visual>
+      <origin rpy="1.5708 0 -1.5708" xyz="0 0 0.0"/>
+      <geometry>
+        <mesh filename="package://cyton_description/meshes/shoulder_yaw.dae"/>
+      </geometry>
+    </visual>
+
+    <inertial>
+      <mass value="10.0"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <inertia
+        ixx=".0627"
+        iyy=".0627"
+        izz=".0627"
+        ixy="0"
+        ixz="0"
+        iyz="0"/>
+    </inertial>
+  </link>
+
+  <!-- elbow pitch -->
+
+  <joint name="elbow_pitch_joint" type="revolute">
+    <parent link="shoulder_yaw"/>
+    <child link="elbow_pitch"/>
+    <!-- Origin and axis tilt corrections REVERTED for this uncalibrated
+         comparison variant - calibrated origin was
+         "0.01656849 0.02722018 0.11356304", calibrated axis was
+         "0.999677 -0.024005 0.008304"; both restored to original nominal.
+         Limit below is UNCHANGED (safety-margin widening, not a
+         calibration correction - see this file's header). -->
+    <origin rpy="0 0 0" xyz="0.018 0.0206 0.1158"/>
+    <!-- Limit widened 2026-08-07 (was lower="-1.961961" upper="1.788622")
+         to add a 30-tick margin on each side of jointCalibrations[3]'s
+         minTick/maxTick (robot_calibration.cpp)  -  real-hardware MoveIt
+         sessions repeatedly showed the arm's actual settled position
+         landing a few ticks up to ~25 ticks past the exact hand-verified
+         extreme (ordinary servo settling/backlash noise), which MoveIt's
+         CheckStartStateBounds check has zero tolerance for. See
+         references/cyton_gamma_1500_trac_ik.urdf's matching joint comment
+         for the full explanation, including a pre-existing (now fixed)
+         mismatch this recomputation also caught. -->
+    <limit
+      effort="100.0"
+      lower="-2.027693"
+      upper="1.875188"
+      velocity="1.0"/>
+    <axis xyz="1 0 0"/>
+  </joint>
+
+  <link name="elbow_pitch">
+    <visual>
+      <origin rpy="1.5708 0 3.1416" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://cyton_description/meshes/elbow_pitch.dae"/>
+      </geometry>
+    </visual>
+
+    <inertial>
+      <mass value="10.0"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <inertia
+        ixx=".0327"
+        iyy=".0327"
+        izz=".0327"
+        ixy="0"
+        ixz="0"
+        iyz="0"/>
+    </inertial>
+  </link>
+
+  <!-- elbow yaw -->
+
+  <joint name="elbow_yaw_joint" type="revolute">
+    <parent link="elbow_pitch"/>
+    <child link="elbow_yaw"/>
+    <!-- elbow_yaw_joint deliberately left UNCORRECTED (2026-08-06): this
+         joint is locked near its calibrated midpoint in production (see
+         src/robot_calibration.cpp's jointCalibrations comment and
+         CLAUDE.md's kinematic-calibration section, "reduced-DOF
+         breakthrough") and barely moved in the dataset used to fit it, so
+         its own tilt/scale/offset correction is poorly identified and not
+         trustworthy  -  moot anyway since it's not meant to move in real
+         use. -->
+    <origin rpy="0 0 0" xyz="-0.0171 -0.018 0.09746"/>
+    <!-- Limit tightened 2026-08-06 to match this joint's hardware lock
+         (jointCalibrations[4]'s minTick/maxTick, robot_calibration.cpp)
+          -  MUST stay consistent with that C++ range, not the original
+         wide mechanical limit, or MoveIt will plan trajectories the
+         hardware safety clamp will reject. Original wide limit was
+         lower="-1.727262" upper="1.790156".
+         Widened slightly again 2026-08-07 (was lower="-0.004602"
+         upper="0.056757")  -  15 ticks of margin added each side of
+         jointCalibrations[4]'s range (now [2060, 2130]), same real-
+         hardware-settling-noise reasoning as elbow_pitch_joint's limit
+         above. Still a deliberately tiny ~4 degree window; this joint
+         stays "locked" in every practical sense. -->
+    <limit
+      effort="100.0"
+      lower="-0.027612"
+      upper="0.079767"
+      velocity="1.0"/>
+    <axis xyz="0 -1 0"/>
+  </joint>
+
+  <link name="elbow_yaw">
+    <visual>
+      <origin rpy="1.5708 0 1.5708" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://cyton_description/meshes/elbow_yaw.dae"/>
+      </geometry>
+    </visual>
+
+    <inertial>
+      <mass value="10.0"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <inertia
+        ixx=".0227"
+        iyy=".0227"
+        izz=".0227"
+        ixy="0"
+        ixz="0"
+        iyz="0"/>
+    </inertial>
+  </link>
+
+  <!-- wrist pitch -->
+
+  <joint name="wrist_pitch_joint" type="revolute">
+    <parent link="elbow_yaw"/>
+    <child link="wrist_pitch"/>
+    <!-- Origin and axis tilt corrections REVERTED for this uncalibrated
+         comparison variant - calibrated origin was
+         "0.02765348 0.01273746 0.07244612", calibrated axis was
+         "0.999044 0.042957 0.008105"; both restored to original nominal. -->
+    <origin rpy="0 0 0" xyz="0.02626 0.018 0.0718"/>
+    <limit
+      effort="100.0"
+      lower="-1.989573"
+      upper="1.988039"
+      velocity="1.0"/>
+    <axis xyz="1 0 0"/>
+  </joint>
+
+  <link name="wrist_pitch">
+    <visual>
+      <origin rpy="1.5708 0 1.5708" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://cyton_description/meshes/wrist_pitch.dae"/>
+      </geometry>
+    </visual>
+
+    <inertial>
+      <mass value="10.0"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <inertia
+        ixx=".0127"
+        iyy=".0127"
+        izz=".0127"
+        ixy="0"
+        ixz="0"
+        iyz="0"/>
+    </inertial>
+  </link>
+
+  <!-- wrist roll -->
+
+  <joint name="wrist_roll_joint" type="revolute">
+    <parent link="wrist_pitch"/>
+    <child link="wrist_roll"/>
+    <origin rpy="0 0 0" xyz="-0.026255 0 0.051425"/>
+    <limit
+      effort="100.0"
+      lower="-2.627709"
+      upper="2.618505"
+      velocity="1.0"/>
+    <!-- Axis tilt correction REVERTED for this uncalibrated comparison
+         variant - calibrated value was "-0.006451 -0.018572 0.999807";
+         restored to original nominal. -->
+    <axis xyz="0 0 1"/>
+  </joint>
+
+  <link name="wrist_roll">
+    <visual>
+      <origin rpy="3.1416 0 -1.5708" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="package://cyton_description/meshes/wrist_roll.dae"/>
+      </geometry>
+    </visual>
+
+    <inertial>
+      <mass value="10.0"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <inertia
+        ixx=".0027"
+        iyy=".0027"
+        izz=".0027"
+        ixy="0"
+        ixz="0"
+        iyz="0"/>
+    </inertial>
+  </link>
+
+  <!-- virtual end effector -->
+
+  <joint name="virtual_endeffector_joint" type="fixed">
+    <parent link="wrist_roll"/>
+    <child link="virtual_endeffector"/>
+    <origin rpy="0 0 0" xyz="-0.002316 0.0079 0.079425"/>
+  </joint>
+
+  <link name="virtual_endeffector">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <sphere radius="0.002"/>
+      </geometry>
+      <material name="grey">
+        <color rgba="0.7 0.7 0.7 0.8"/>
+      </material>
+    </visual>
+  </link>
+
+  <!-- Hydrophone probe rod (2026-08-11): a thin cylindrical rod attached
+       rigidly to virtual_endeffector, representing the physical hydrophone
+       probe used to measure ultrasound propagation at points on a skull
+       phantom. Visual/collision attachment only, by explicit user choice -
+       MoveIt's planning group tip_link deliberately stays at
+       virtual_endeffector (not the rod tip), so IK/Cartesian targets still
+       refer to the original wrist-mounted point; the rod's length (10cm)
+       must be accounted for manually when picking targets. Dimensions
+       below are nominal design values (10cm length, 4mm diameter), not
+       independently calibrated - verify against the physical probe if
+       precise real-world accuracy at the rod tip matters. Extends along
+       +Z, matching this URDF's existing convention (every joint's origin
+       in this chain has its dominant offset along the parent's +Z, i.e.
+       +Z is "outward along the arm's reach" throughout). -->
+
+  <joint name="hydrophone_rod_joint" type="fixed">
+    <parent link="virtual_endeffector"/>
+    <child link="hydrophone_rod"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+  </joint>
+
+  <link name="hydrophone_rod">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0.05"/>
+      <geometry>
+        <cylinder radius="0.002" length="0.10"/>
+      </geometry>
+      <material name="grey">
+        <color rgba="0.6 0.6 0.6 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0.05"/>
+      <geometry>
+        <cylinder radius="0.002" length="0.10"/>
+      </geometry>
+    </collision>
+  </link>
+
+</robot>

@@ -13,12 +13,40 @@ hardware_type defaults to "mock_components" (ros2_control's built-in
 mock_components/GenericSystem -- no real servo involved, safe for
 exercising the whole pipeline). Only pass hardware_type:=real with the
 physical arm connected, powered, and clear to move.
+
+urdf_variant (added 2026-08-12) defaults to "calibrated" (the real,
+deployed cyton_gamma_1500.urdf.xacro). Pass urdf_variant:=uncalibrated to
+instead load cyton_gamma_1500_uncalibrated.urdf.xacro -- same robot, same
+ros2_control/hardware plugin, but MoveIt plans against the ORIGINAL,
+uncorrected joint geometry (see that file's own header) instead of this
+project's fitted kinematic calibration. Built specifically to A/B compare
+real-world positioning accuracy with vs. without the geometry correction,
+using the exact same accuracy-check tools either way. Does NOT affect
+robot_calibration.cpp's separate real-servo tick<->radian calibration --
+only what MoveIt's planner believes the robot's geometry is.
+
+compensate_backlash (added 2026-08-13) defaults to "false". Pass
+compensate_backlash:=true (only meaningful with hardware_type:=real) to
+enable cyton_hardware's new streaming-compatible backlash compensator --
+see CytonSystemHardware's own header comment for exactly what this does
+and its (not yet real-hardware-validated) status. Unrelated to
+dynamixel_motor.cpp's separate, already-validated blocking-move fix, which
+this pipeline never uses.
+
+Implementation note: which URDF file to load has to be resolved to a plain
+Python string BEFORE MoveItConfigsBuilder runs (moveit_configs_utils joins
+file_path with a pathlib.Path internally, which can't accept a launch
+Substitution object) -- so, unlike every other argument here, urdf_variant
+can't just be threaded through as a LaunchConfiguration passed to
+.robot_description(). Everything that depends on it is built inside an
+OpaqueFunction instead, which runs at launch time with a real LaunchContext
+that LaunchConfiguration.perform(context) can resolve to an actual string.
 """
 
 import os
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
@@ -26,23 +54,16 @@ from ament_index_python.packages import get_package_share_directory
 from moveit_configs_utils import MoveItConfigsBuilder
 
 
-def generate_launch_description():
-    hardware_type_arg = DeclareLaunchArgument(
-        "hardware_type",
-        default_value="mock_components",
-        description="ros2_control hardware plugin to load: mock_components (safe, no real "
-        "hardware) or real (cyton_hardware/CytonSystemHardware, talks to the physical arm)",
-    )
-    serial_port_arg = DeclareLaunchArgument(
-        "serial_port",
-        default_value="/dev/ttyUSB0",
-        description="Serial device for the Dynamixel bus (only used when hardware_type:=real)",
-    )
-    baud_rate_arg = DeclareLaunchArgument(
-        "baud_rate", default_value="1000000", description="Dynamixel bus baud rate"
-    )
-    rviz_config_arg = DeclareLaunchArgument(
-        "rviz_config", default_value="moveit.rviz", description="RViz configuration file"
+def launch_setup(context, *args, **kwargs):
+    urdf_variant = LaunchConfiguration("urdf_variant").perform(context)
+    if urdf_variant not in ("calibrated", "uncalibrated"):
+        raise ValueError(
+            f"urdf_variant must be 'calibrated' or 'uncalibrated', got '{urdf_variant}'"
+        )
+    urdf_filename = (
+        "cyton_gamma_1500_uncalibrated.urdf.xacro"
+        if urdf_variant == "uncalibrated"
+        else "cyton_gamma_1500.urdf.xacro"
     )
 
     moveit_config = (
@@ -51,12 +72,13 @@ def generate_launch_description():
             file_path=os.path.join(
                 get_package_share_directory("cyton_description"),
                 "urdf",
-                "cyton_gamma_1500.urdf.xacro",
+                urdf_filename,
             ),
             mappings={
                 "hardware_type": LaunchConfiguration("hardware_type"),
                 "serial_port": LaunchConfiguration("serial_port"),
                 "baud_rate": LaunchConfiguration("baud_rate"),
+                "compensate_backlash": LaunchConfiguration("compensate_backlash"),
             },
         )
         .robot_description_semantic(file_path="config/cyton_gamma_1500.srdf")
@@ -134,18 +156,59 @@ def generate_launch_description():
         arguments=["arm_controller", "-c", "/controller_manager"],
     )
 
+    return [
+        static_tf_node,
+        robot_state_publisher_node,
+        move_group_node,
+        rviz_node,
+        ros2_control_node,
+        joint_state_broadcaster_spawner,
+        arm_controller_spawner,
+    ]
+
+
+def generate_launch_description():
+    hardware_type_arg = DeclareLaunchArgument(
+        "hardware_type",
+        default_value="mock_components",
+        description="ros2_control hardware plugin to load: mock_components (safe, no real "
+        "hardware) or real (cyton_hardware/CytonSystemHardware, talks to the physical arm)",
+    )
+    serial_port_arg = DeclareLaunchArgument(
+        "serial_port",
+        default_value="/dev/ttyUSB0",
+        description="Serial device for the Dynamixel bus (only used when hardware_type:=real)",
+    )
+    baud_rate_arg = DeclareLaunchArgument(
+        "baud_rate", default_value="1000000", description="Dynamixel bus baud rate"
+    )
+    rviz_config_arg = DeclareLaunchArgument(
+        "rviz_config", default_value="moveit.rviz", description="RViz configuration file"
+    )
+    urdf_variant_arg = DeclareLaunchArgument(
+        "urdf_variant",
+        default_value="calibrated",
+        description="Which top-level URDF xacro MoveIt plans against: 'calibrated' (real, "
+        "deployed kinematic corrections -- default) or 'uncalibrated' (original, uncorrected "
+        "joint geometry -- see cyton_gamma_1500_robot_uncalibrated.xacro's header). Does not "
+        "affect robot_calibration.cpp's real-servo calibration either way.",
+    )
+    compensate_backlash_arg = DeclareLaunchArgument(
+        "compensate_backlash",
+        default_value="false",
+        description="Enable cyton_hardware's streaming backlash compensator (only meaningful "
+        "with hardware_type:=real). Default false. Not yet validated against real hardware -- "
+        "see CytonSystemHardware's own header comment.",
+    )
+
     return LaunchDescription(
         [
             hardware_type_arg,
             serial_port_arg,
             baud_rate_arg,
             rviz_config_arg,
-            static_tf_node,
-            robot_state_publisher_node,
-            move_group_node,
-            rviz_node,
-            ros2_control_node,
-            joint_state_broadcaster_spawner,
-            arm_controller_spawner,
+            urdf_variant_arg,
+            compensate_backlash_arg,
+            OpaqueFunction(function=launch_setup),
         ]
     )

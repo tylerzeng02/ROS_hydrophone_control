@@ -1,5 +1,7 @@
 #include "cyton_hardware/cyton_system_hardware.hpp"
 
+#include <algorithm>
+
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "rclcpp/logging.hpp"
 
@@ -12,6 +14,24 @@ rclcpp::Logger logger()
 {
   return rclcpp::get_logger("cyton_hardware");
 }
+
+// Same lesson already documented in cyton_gamma_1500.ros2_control.xacro for
+// hardware_type: xacro args always arrive as strings, and xacro's ${...}
+// property substitution runs values through YAML-style type coercion
+// before re-stringifying, so a lowercase "true" typed on the command line
+// can arrive here as "True" or "TRUE" by the time it reaches this plugin.
+// Accept all the case variants rather than trusting exact case to survive
+// that pipeline.
+bool parseBoolParam(const std::string & value)
+{
+  return value == "true" || value == "True" || value == "TRUE" || value == "1";
+}
+
+// Ordinary trajectory-following noise near a momentary hold shouldn't look
+// like a direction reversal. Untuned guess (see this file's own header
+// comment on backlash compensation) -- not yet validated against real
+// hardware.
+constexpr int kDirectionDeadbandTicks = 2;
 }  // namespace
 
 hardware_interface::CallbackReturn CytonSystemHardware::on_init(
@@ -59,6 +79,7 @@ hardware_interface::CallbackReturn CytonSystemHardware::on_init(
   baud_rate_ = std::stoi(getParam("baud_rate", "1000000"));
   protocol_version_ = std::stof(getParam("protocol_version", "1.0"));
   moving_speed_ = static_cast<uint16_t>(std::stoi(getParam("moving_speed", "40")));
+  compensate_backlash_ = parseBoolParam(getParam("compensate_backlash", "false"));
 
   hw_positions_.fill(0.0);
   hw_velocities_.fill(0.0);
@@ -94,6 +115,24 @@ std::vector<hardware_interface::CommandInterface> CytonSystemHardware::export_co
 hardware_interface::CallbackReturn CytonSystemHardware::on_activate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
+  // Fresh backlash-compensation state every activation -- no stale
+  // direction/hold data carried over from a previous run.
+  last_raw_tick_.fill(0);
+  last_direction_.fill(0);
+  has_previous_tick_.fill(false);
+  hold_active_.fill(false);
+  hold_point_tick_.fill(0);
+  hold_direction_.fill(0);
+
+  if (compensate_backlash_)
+  {
+    RCLCPP_WARN(
+      logger(),
+      "compensate_backlash is ENABLED -- this is a NEW, real design (not a guess) but has "
+      "NEVER been validated against real hardware, unlike dynamixel_motor.cpp's blocking-move "
+      "fix. Watch closely.");
+  }
+
   motor_ = std::make_unique<DynamixelMotor>(serial_port_.c_str(), baud_rate_, protocol_version_);
 
   if (!motor_->connect())
@@ -201,7 +240,7 @@ hardware_interface::return_type CytonSystemHardware::write(
   for (int i = 0; i < kNumJoints; ++i)
   {
     const JointCalibration & calibration = jointCalibrations[static_cast<size_t>(i)];
-    const int tick = radiansToTicks(calibration, hw_commands_[static_cast<size_t>(i)]);
+    int tick = radiansToTicks(calibration, hw_commands_[static_cast<size_t>(i)]);
 
     if (tick < 0 || tick > 4095)
     {
@@ -211,10 +250,17 @@ hardware_interface::return_type CytonSystemHardware::write(
       continue;
     }
 
+    if (compensate_backlash_)
+    {
+      tick = applyBacklashCompensation(i, tick);
+    }
+
     // setGoalPosition() re-checks jointCalibrations' min/maxTick itself
     // (isPositionWithinLimit) before writing -- this is the same safety
     // gate every other motor-facing program in this repo goes through, not
-    // a weaker one specific to this interface.
+    // a weaker one specific to this interface. Also the final backstop
+    // against applyBacklashCompensation() ever proposing an out-of-range
+    // hold point, on top of that function's own internal clamp.
     if (!motor_->setGoalPosition(calibration.id, static_cast<uint16_t>(tick)))
     {
       RCLCPP_ERROR(
@@ -224,6 +270,103 @@ hardware_interface::return_type CytonSystemHardware::write(
   }
 
   return hardware_interface::return_type::OK;
+}
+
+// Reversal-triggered hold-point backlash compensator. See this class's own
+// header comment for the design rationale (why not a per-cycle port of
+// dynamixel_motor.cpp's blocking-move overshoot fix). Algorithm, per
+// joint, per write() cycle:
+//
+//   1. Compare this cycle's raw commanded tick against last cycle's to
+//      determine the RAW target's own direction of travel (+1/-1),
+//      ignoring moves smaller than kDirectionDeadbandTicks (ordinary
+//      trajectory-interpolation jitter near a momentary hold).
+//   2. A genuine reversal is: we already had an established direction
+//      (not the very first movement since activation), and this cycle's
+//      direction is established too, and it's the opposite of the last
+//      established one. On a reversal, pin a hold point at
+//      raw_tick +/- getBacklashOvershootTicks(jointIndex) in the NEW
+//      direction (clamped to this joint's safety range).
+//   3. While a hold is active, clamp the tick actually sent to the servo
+//      to be at least as far along as the hold point, in the hold
+//      direction (max() for +1, min() for -1) -- so the servo is always
+//      commanded at or beyond the hold point until the raw trajectory
+//      itself naturally reaches/passes it, at which point the hold
+//      releases and plain 1:1 tracking resumes automatically.
+//
+// This only engages once per genuine reversal (not every cycle of a
+// monotonic trajectory segment), unlike a naive per-cycle port -- see the
+// header comment for why that distinction is the whole point.
+int CytonSystemHardware::applyBacklashCompensation(int jointIndex, int rawTick)
+{
+  const size_t idx = static_cast<size_t>(jointIndex);
+  const JointCalibration & calibration = jointCalibrations[idx];
+
+  int currentDirection = 0;
+  if (has_previous_tick_[idx])
+  {
+    const int diff = rawTick - last_raw_tick_[idx];
+    if (diff > kDirectionDeadbandTicks)
+    {
+      currentDirection = 1;
+    }
+    else if (diff < -kDirectionDeadbandTicks)
+    {
+      currentDirection = -1;
+    }
+  }
+
+  const int previousDirection = last_direction_[idx];
+  const bool isRealReversal = has_previous_tick_[idx] && previousDirection != 0 &&
+    currentDirection != 0 && currentDirection != previousDirection;
+
+  if (isRealReversal)
+  {
+    const int overshoot = getBacklashOvershootTicks(jointIndex);
+    int holdPoint = rawTick + currentDirection * overshoot;
+    holdPoint = std::clamp(holdPoint, calibration.minTick, calibration.maxTick);
+
+    hold_active_[idx] = true;
+    hold_direction_[idx] = currentDirection;
+    hold_point_tick_[idx] = holdPoint;
+
+    RCLCPP_INFO(
+      logger(), "Backlash reversal on %s: raw target=%d, holding at %d (overshoot %d ticks) "
+      "until the raw target catches up",
+      kJointNames[jointIndex], rawTick, holdPoint, overshoot);
+  }
+
+  int effectiveTick = rawTick;
+  if (hold_active_[idx])
+  {
+    if (hold_direction_[idx] > 0)
+    {
+      effectiveTick = std::max(rawTick, hold_point_tick_[idx]);
+      if (rawTick >= hold_point_tick_[idx])
+      {
+        hold_active_[idx] = false;  // raw target caught up on its own -- release the hold
+      }
+    }
+    else
+    {
+      effectiveTick = std::min(rawTick, hold_point_tick_[idx]);
+      if (rawTick <= hold_point_tick_[idx])
+      {
+        hold_active_[idx] = false;
+      }
+    }
+  }
+
+  effectiveTick = std::clamp(effectiveTick, calibration.minTick, calibration.maxTick);
+
+  if (currentDirection != 0)
+  {
+    last_direction_[idx] = currentDirection;
+  }
+  last_raw_tick_[idx] = rawTick;
+  has_previous_tick_[idx] = true;
+
+  return effectiveTick;
 }
 
 CytonSystemHardware::~CytonSystemHardware()
