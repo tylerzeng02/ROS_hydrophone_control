@@ -27,12 +27,14 @@ import sys
 
 import numpy as np
 
-# The rotation move_between_points.cpp currently hardcodes (from the
-# batch2-only 12-param fit) -- printed alongside the new one for comparison.
+# The rotation currently deployed in move_between_points.cpp (refit
+# 2026-08-13 from moveit_ndi_accuracy_check_new13_replay_clean.csv, 13 valid
+# pairs) -- printed alongside any new fit for comparison / drift-since-then
+# check.
 CURRENT_R_MOVEIT_TO_NDI = np.array([
-    [-0.0352, 0.8862, 0.4619],
-    [0.6846, 0.3581, -0.6349],
-    [-0.7281, 0.2939, -0.6193],
+    [0.0033, 0.8971, 0.4418],
+    [0.6142, 0.3469, -0.7088],
+    [-0.7891, 0.2737, -0.5499],
 ])
 
 

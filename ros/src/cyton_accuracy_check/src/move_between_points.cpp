@@ -119,10 +119,14 @@ constexpr double MAX_NDI_ERROR = 0.50;
 // MoveIt coordinates to command a move), use the transpose (R is a proper
 // rotation matrix, so R^-1 == R^T):
 //     v_moveit = R^T * v_ndi
+// Refit 2026-08-13 from moveit_ndi_accuracy_check_new13_replay_clean.csv (13
+// valid paired poses, 1 getCurrentPose()-failed sentinel row auto-rejected).
+// Only 0.46deg from the prior fit -- effectively confirms no meaningful
+// marker drift, but deployed anyway per direct request.
 constexpr double R_MOVEIT_TO_NDI[3][3] = {
-    {0.0055, 0.8989, 0.4380},
-    {0.6117, 0.3435, -0.7126},
-    {-0.7911, 0.2719, -0.5480},
+    {0.0033, 0.8971, 0.4418},
+    {0.6142, 0.3469, -0.7088},
+    {-0.7891, 0.2737, -0.5499},
 };
 
 std::array<double, 3> rotateNdiDeltaToMoveIt(const std::array<double, 3>& deltaNdi) {
