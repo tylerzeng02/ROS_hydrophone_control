@@ -92,11 +92,24 @@ constexpr double MAX_NDI_ERROR = 0.50;
 // ---------------------------------------------------------------------
 // NDI-frame -> MoveIt-frame ROTATION (only the rotation, not the full
 // base-frame transform -- see the file header comment for why that's
-// sufficient here). Hardcoded from the 12-param base/tool-frame fit on
-// the batch2-only dataset (calibration/current/deployed_model_predictions.py,
-// 2026-08-07): base_rpy = (-25.384deg, 133.274deg, -87.055deg), converted
-// to a rotation matrix offline (Rotation.from_euler('xyz', ...)) rather
-// than re-deriving Euler angles in C++.
+// sufficient here).
+//
+// REFIT 2026-08-10 (calibration/current/refit_moveit_ndi_rotation.py):
+// the previous batch2-derived rotation below was found to be stale --
+// calibration/current/check_fixed_marker_drift.py measured ~6.31deg of
+// drift in the fixed marker's own orientation since the batch2 session,
+// and this independently-derived Kabsch fit (12 fresh paired NDI/MoveIt
+// poses, collected via the 2026-08-10 ndi_measure change that logs
+// MoveGroupInterface::getCurrentPose() alongside each NDI capture) agrees
+// closely: 6.21deg between the old and new matrices, via a completely
+// different method (delta-vector Kabsch fit vs. raw quaternion comparison)
+// -- strong cross-validation that the drift is real, not a measurement
+// artifact. RMS delta-vector error on the 12-pose fit data dropped from
+// 6.03mm (old matrix) to 3.44mm (this one).
+// Old (batch2-derived, now stale) rotation, kept for reference:
+//     {-0.0352, 0.8862, 0.4619},
+//     {0.6846, 0.3581, -0.6349},
+//     {-0.7281, 0.2939, -0.6193},
 //
 // Convention (matches calibrate_kinematics.py's build_base_transform()):
 // this matrix R maps a vector expressed in MoveIt/base_link coordinates to
@@ -106,10 +119,14 @@ constexpr double MAX_NDI_ERROR = 0.50;
 // MoveIt coordinates to command a move), use the transpose (R is a proper
 // rotation matrix, so R^-1 == R^T):
 //     v_moveit = R^T * v_ndi
+// Refit 2026-08-13 from moveit_ndi_accuracy_check_new13_replay_clean.csv (13
+// valid paired poses, 1 getCurrentPose()-failed sentinel row auto-rejected).
+// Only 0.46deg from the prior fit -- effectively confirms no meaningful
+// marker drift, but deployed anyway per direct request.
 constexpr double R_MOVEIT_TO_NDI[3][3] = {
-    {-0.0352, 0.8862, 0.4619},
-    {0.6846, 0.3581, -0.6349},
-    {-0.7281, 0.2939, -0.6193},
+    {0.0033, 0.8971, 0.4418},
+    {0.6142, 0.3469, -0.7088},
+    {-0.7891, 0.2737, -0.5499},
 };
 
 std::array<double, 3> rotateNdiDeltaToMoveIt(const std::array<double, 3>& deltaNdi) {
