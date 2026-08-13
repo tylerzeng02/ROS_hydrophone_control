@@ -204,6 +204,91 @@ target_link_libraries(reset_compliance
         dynamixel_sdk
 )
 
+add_executable(test_compliance_punch
+    tests/test_compliance_punch.cpp
+    src/dynamixel_motor.cpp
+    src/robot_calibration.cpp
+)
+
+target_include_directories(test_compliance_punch
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/DynamixelSDK/c++/include
+)
+
+target_link_libraries(test_compliance_punch
+    PRIVATE
+        dynamixel_sdk
+)
+
+add_executable(check_servo_model
+    tests/check_servo_model.cpp
+    src/dynamixel_motor.cpp
+    src/robot_calibration.cpp
+)
+
+target_include_directories(check_servo_model
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/DynamixelSDK/c++/include
+)
+
+target_link_libraries(check_servo_model
+    PRIVATE
+        dynamixel_sdk
+)
+
+add_executable(test_i_gain
+    tests/test_i_gain.cpp
+    src/dynamixel_motor.cpp
+    src/robot_calibration.cpp
+)
+
+target_include_directories(test_i_gain
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/DynamixelSDK/c++/include
+)
+
+target_link_libraries(test_i_gain
+    PRIVATE
+        dynamixel_sdk
+)
+
+add_executable(autotune_i_gain
+    tests/autotune_i_gain.cpp
+    src/dynamixel_motor.cpp
+    src/robot_calibration.cpp
+)
+
+target_include_directories(autotune_i_gain
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/DynamixelSDK/c++/include
+)
+
+target_link_libraries(autotune_i_gain
+    PRIVATE
+        dynamixel_sdk
+)
+
+add_executable(set_i_gain
+    tests/set_i_gain.cpp
+    src/dynamixel_motor.cpp
+    src/robot_calibration.cpp
+)
+
+target_include_directories(set_i_gain
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/DynamixelSDK/c++/include
+)
+
+target_link_libraries(set_i_gain
+    PRIVATE
+        dynamixel_sdk
+)
+
 # ------------------------------------------------------------
 # TRAC-IK targets
 # Only enabled when TRAC-IK exists

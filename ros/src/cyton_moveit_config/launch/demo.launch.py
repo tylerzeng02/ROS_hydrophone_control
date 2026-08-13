@@ -84,6 +84,7 @@ def launch_setup(context, *args, **kwargs):
                 "serial_port": LaunchConfiguration("serial_port"),
                 "baud_rate": LaunchConfiguration("baud_rate"),
                 "compensate_backlash": LaunchConfiguration("compensate_backlash"),
+                "compensate_pose_dependent": LaunchConfiguration("compensate_pose_dependent"),
             },
         )
         .robot_description_semantic(file_path="config/cyton_gamma_1500.srdf")
@@ -205,6 +206,15 @@ def generate_launch_description():
         "with hardware_type:=real). Default false. Not yet validated against real hardware -- "
         "see CytonSystemHardware's own header comment.",
     )
+    compensate_pose_dependent_arg = DeclareLaunchArgument(
+        "compensate_pose_dependent",
+        default_value="false",
+        description="Enable the ported joint-coupling/gravity-deflection/shoulder_pitch-Fourier "
+        "correction (src/pose_dependent_correction.cpp, only meaningful with hardware_type:="
+        "real). Default false. Numerically verified against the Python model it ports, but "
+        "never validated as live control against real hardware -- see CytonSystemHardware's own "
+        "header comment.",
+    )
     ik_solver_arg = DeclareLaunchArgument(
         "ik_solver",
         default_value="kdl",
@@ -221,6 +231,7 @@ def generate_launch_description():
             rviz_config_arg,
             urdf_variant_arg,
             compensate_backlash_arg,
+            compensate_pose_dependent_arg,
             ik_solver_arg,
             OpaqueFunction(function=launch_setup),
         ]

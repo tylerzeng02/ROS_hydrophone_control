@@ -14,6 +14,7 @@
 
 #include "dynamixel_motor.h"
 #include "robot_calibration.h"
+#include "pose_dependent_correction.h"
 
 namespace cyton_hardware
 {
@@ -47,6 +48,18 @@ namespace cyton_hardware
 // version hasn't had any of that yet. Enable deliberately and watch
 // closely, not as a default. See CLAUDE.md's kinematic-calibration
 // section for the full backlash history.
+//
+// Pose-dependent correction (2026-08-13, opt-in via the
+// "compensate_pose_dependent" hardware param, default "false"): applies
+// pose_dependent_correction::computeCorrection() (joint coupling, lumped
+// gravity/elastostatic deflection, shoulder_pitch Fourier term -- see that
+// module's own header comment for the exact math and the control-direction
+// derivation) to every joint's commanded angle, every write() cycle,
+// before the existing static tick/radian conversion and backlash
+// compensation. Same standing as compensate_backlash when it was first
+// written: the underlying math is checked against the Python model it
+// ports, but this has never been validated as LIVE CONTROL against real
+// hardware. Enable deliberately and watch closely, not as a default.
 class CytonSystemHardware : public hardware_interface::SystemInterface
 {
 public:
@@ -96,6 +109,7 @@ private:
   int baud_rate_ = 1000000;
   float protocol_version_ = 1.0f;
   uint16_t moving_speed_ = 40;  // matches this project's established MOVING_SPEED convention
+  bool compensate_pose_dependent_ = false;
 
   // ros2_control state/command storage. hw_velocities_ is always reported
   // 0.0 -- DynamixelMotor::readPosition() only reads present position, not

@@ -32,9 +32,17 @@
     mock_components. See CytonSystemHardware's own header comment for what
     this does and its validation status - NOT the same, already-validated
     fix as dynamixel_motor.cpp's blocking moves.
+
+    compensate_pose_dependent (2026-08-13, default "false", same string-
+    not-boolean convention as above) enables the ported joint-coupling/
+    gravity-deflection/shoulder_pitch-Fourier correction
+    (src/pose_dependent_correction.cpp). Only meaningful on the "real"
+    branch. Numerically verified against the Python model it ports, but
+    NEVER validated as live control against real hardware - see
+    CytonSystemHardware's header comment.
   -->
   <xacro:macro name="cyton_gamma_1500_ros2_control"
-               params="name hardware_type serial_port baud_rate protocol_version initial_positions_file compensate_backlash:='false'">
+               params="name hardware_type serial_port baud_rate protocol_version initial_positions_file compensate_backlash:='false' compensate_pose_dependent:='false'">
     <xacro:property name="initial_positions"
                      value="${xacro.load_yaml(initial_positions_file)['initial_positions']}"/>
 
@@ -49,6 +57,7 @@
           <param name="baud_rate">${baud_rate}</param>
           <param name="protocol_version">${protocol_version}</param>
           <param name="compensate_backlash">${compensate_backlash}</param>
+          <param name="compensate_pose_dependent">${compensate_pose_dependent}</param>
         </xacro:if>
       </hardware>
 

@@ -21,6 +21,13 @@ Streaming backlash compensation (2026-08-13): pass compensate_backlash:=true
 reversal-triggered hold-point compensator -- NOT yet validated against real
 hardware. See CytonSystemHardware's own header comment.
 
+Pose-dependent correction (2026-08-13): pass compensate_pose_dependent:=true
+(only meaningful with hardware_type:=real) to enable the ported joint-
+coupling/gravity-deflection/shoulder_pitch-Fourier correction
+(src/pose_dependent_correction.cpp) -- numerically verified against the
+Python model it ports, but NOT yet validated as live control against real
+hardware. See CytonSystemHardware's own header comment.
+
 TRAC-IK (2026-08-13): pass ik_solver:=trac_ik to use
 cyton_trac_ik_kinematics_plugin instead of KDL -- brand new, not yet
 hardware-validated. See that plugin's own header comment.
@@ -61,6 +68,13 @@ def generate_launch_description():
         description="Enable cyton_hardware's streaming backlash compensator (only meaningful "
         "with hardware_type:=real). Default false, not yet validated against real hardware.",
     )
+    compensate_pose_dependent_arg = DeclareLaunchArgument(
+        "compensate_pose_dependent",
+        default_value="false",
+        description="Enable the ported joint-coupling/gravity-deflection/shoulder_pitch-Fourier "
+        "correction (only meaningful with hardware_type:=real). Default false, not yet "
+        "validated as live control against real hardware.",
+    )
     ik_solver_arg = DeclareLaunchArgument(
         "ik_solver",
         default_value="kdl",
@@ -80,6 +94,7 @@ def generate_launch_description():
             "baud_rate": LaunchConfiguration("baud_rate"),
             "urdf_variant": LaunchConfiguration("urdf_variant"),
             "compensate_backlash": LaunchConfiguration("compensate_backlash"),
+            "compensate_pose_dependent": LaunchConfiguration("compensate_pose_dependent"),
             "ik_solver": LaunchConfiguration("ik_solver"),
         }.items(),
     )
@@ -91,6 +106,7 @@ def generate_launch_description():
             baud_rate_arg,
             urdf_variant_arg,
             compensate_backlash_arg,
+            compensate_pose_dependent_arg,
             ik_solver_arg,
             demo_launch,
         ]

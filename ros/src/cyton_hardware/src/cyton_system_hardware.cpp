@@ -80,6 +80,7 @@ hardware_interface::CallbackReturn CytonSystemHardware::on_init(
   protocol_version_ = std::stof(getParam("protocol_version", "1.0"));
   moving_speed_ = static_cast<uint16_t>(std::stoi(getParam("moving_speed", "40")));
   compensate_backlash_ = parseBoolParam(getParam("compensate_backlash", "false"));
+  compensate_pose_dependent_ = parseBoolParam(getParam("compensate_pose_dependent", "false"));
 
   hw_positions_.fill(0.0);
   hw_velocities_.fill(0.0);
@@ -131,6 +132,15 @@ hardware_interface::CallbackReturn CytonSystemHardware::on_activate(
       "compensate_backlash is ENABLED -- this is a NEW, real design (not a guess) but has "
       "NEVER been validated against real hardware, unlike dynamixel_motor.cpp's blocking-move "
       "fix. Watch closely.");
+  }
+
+  if (compensate_pose_dependent_)
+  {
+    RCLCPP_WARN(
+      logger(),
+      "compensate_pose_dependent is ENABLED -- joint-coupling/gravity/shoulder_pitch-Fourier "
+      "correction, ported from the offline calibration model, has NEVER been validated as live "
+      "control against real hardware. Watch closely.");
   }
 
   motor_ = std::make_unique<DynamixelMotor>(serial_port_.c_str(), baud_rate_, protocol_version_);
@@ -237,10 +247,28 @@ hardware_interface::return_type CytonSystemHardware::write(
     return hardware_interface::return_type::ERROR;
   }
 
+  // Pose-dependent correction needs all 7 joints' commanded angles at once
+  // (coupling/gravity are cross-joint), so it's computed ONCE per write()
+  // cycle here, ahead of the per-joint loop below, rather than per-joint
+  // inside it. Defaults to a zero correction on every joint when disabled.
+  std::array<double, kNumJoints> poseDependentCorrection{};
+  if (compensate_pose_dependent_)
+  {
+    poseDependentCorrection = pose_dependent_correction::computeCorrection(hw_commands_);
+  }
+
   for (int i = 0; i < kNumJoints; ++i)
   {
     const JointCalibration & calibration = jointCalibrations[static_cast<size_t>(i)];
-    int tick = radiansToTicks(calibration, hw_commands_[static_cast<size_t>(i)]);
+    // Subtract the predicted pose-dependent deviation before the static
+    // tick conversion -- see pose_dependent_correction.h's header comment
+    // for the control-direction derivation (this is a feedforward
+    // correction: command less than the desired angle by however much the
+    // coupling/gravity/Fourier effects are predicted to add back once
+    // physically realized).
+    const double correctedCommand =
+      hw_commands_[static_cast<size_t>(i)] - poseDependentCorrection[static_cast<size_t>(i)];
+    int tick = radiansToTicks(calibration, correctedCommand);
 
     if (tick < 0 || tick > 4095)
     {

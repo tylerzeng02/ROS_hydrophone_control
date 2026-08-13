@@ -385,6 +385,68 @@ bool DynamixelMotor::writePunch(int motorId, uint16_t punch)
     return checkCommResult(commResult, dxlError, motorId, "Write punch");
 }
 
+bool DynamixelMotor::readModelNumber(int motorId, uint16_t& modelNumber)
+{
+    uint8_t dxlError = 0;
+
+    int commResult = packetHandler_->read2ByteTxRx(
+        portHandler_, motorId, ADDR_MODEL_NUMBER, &modelNumber, &dxlError
+    );
+    return checkCommResult(commResult, dxlError, motorId, "Read model number");
+}
+
+bool DynamixelMotor::readGains(int motorId, uint8_t& dGain, uint8_t& iGain, uint8_t& pGain)
+{
+    uint8_t dxlError = 0;
+
+    int commResult = packetHandler_->read1ByteTxRx(
+        portHandler_, motorId, ADDR_D_GAIN, &dGain, &dxlError
+    );
+    if (!checkCommResult(commResult, dxlError, motorId, "Read D gain"))
+    {
+        return false;
+    }
+
+    commResult = packetHandler_->read1ByteTxRx(
+        portHandler_, motorId, ADDR_I_GAIN, &iGain, &dxlError
+    );
+    if (!checkCommResult(commResult, dxlError, motorId, "Read I gain"))
+    {
+        return false;
+    }
+
+    commResult = packetHandler_->read1ByteTxRx(
+        portHandler_, motorId, ADDR_P_GAIN, &pGain, &dxlError
+    );
+    return checkCommResult(commResult, dxlError, motorId, "Read P gain");
+}
+
+bool DynamixelMotor::writeGains(int motorId, uint8_t dGain, uint8_t iGain, uint8_t pGain)
+{
+    uint8_t dxlError = 0;
+
+    int commResult = packetHandler_->write1ByteTxRx(
+        portHandler_, motorId, ADDR_D_GAIN, dGain, &dxlError
+    );
+    if (!checkCommResult(commResult, dxlError, motorId, "Write D gain"))
+    {
+        return false;
+    }
+
+    commResult = packetHandler_->write1ByteTxRx(
+        portHandler_, motorId, ADDR_I_GAIN, iGain, &dxlError
+    );
+    if (!checkCommResult(commResult, dxlError, motorId, "Write I gain"))
+    {
+        return false;
+    }
+
+    commResult = packetHandler_->write1ByteTxRx(
+        portHandler_, motorId, ADDR_P_GAIN, pGain, &dxlError
+    );
+    return checkCommResult(commResult, dxlError, motorId, "Write P gain");
+}
+
 bool DynamixelMotor::setGoalPosition(int motorId, uint16_t position)
 {
     if (position > MAX_RAW_POSITION)
