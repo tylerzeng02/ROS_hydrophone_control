@@ -1,0 +1,6 @@
+term,value
+"shoulder_pitch Fourier a (sin coeff, rad)",-0.002404
+"shoulder_pitch Fourier b (cos coeff, rad)",0.012840
+coupling: shoulder_roll*shoulder_yaw -> shoulder_yaw (rad^-1),0.002638
+coupling: shoulder_yaw*elbow_yaw -> elbow_yaw (rad^-1),-0.000372
+coupling: shoulder_pitch*elbow_pitch -> elbow_pitch (rad^-1),0.002293

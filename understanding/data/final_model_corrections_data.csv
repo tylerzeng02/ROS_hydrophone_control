@@ -1,0 +1,8 @@
+joint,offset_deg,scale,axis_tilt_deg,origin_dx_mm,origin_dy_mm,origin_dz_mm,gravity_coeff_rad_per_m
+shoulder_roll,+0.0007,0.988203,1.162,,,,0.001382
+shoulder_pitch,+0.0900,1.001931,2.567,,,,0.002937
+shoulder_yaw,+0.5238,0.964711,1.923,-3.284,0.000,5.345,0.000380
+elbow_pitch,+0.5297,1.014467,1.456,-1.432,6.620,-2.237,0.011437
+elbow_yaw,+0.3182,1.002897,0.366,,,,-0.001249
+wrist_pitch,+0.4909,1.006796,2.505,1.393,-5.263,0.646,0.000190
+wrist_roll,+0.8648,1.002933,1.127,,,,0.000000
