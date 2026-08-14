@@ -60,7 +60,7 @@ constexpr int POSES_PER_JOINT = 4;
 constexpr uint16_t FULL_RANGE_CW_LIMIT = 0;
 constexpr uint16_t FULL_RANGE_CCW_LIMIT = 4095;
 
-constexpr const char* OUTPUT_CSV = "recorded_hand_poses.csv";
+constexpr const char* OUTPUT_CSV = "recorded_hand_poses_PID.csv",
 constexpr const char* OUTPUT_CPP_SNIPPET = "recorded_hand_poses_target_poses.txt";
 
 struct RecordedPose {
