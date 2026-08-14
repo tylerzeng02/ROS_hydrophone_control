@@ -215,21 +215,21 @@ std::chrono::milliseconds handleUserControls(bool& manualModeEnabled) {
 constexpr std::size_t JOINT_COUNT = 7;
 constexpr std::size_t POSE_COUNT = 1619;
 
-// Ported to Linux 2026-08-07 (see CLAUDE.md) -- device paths and ROM paths
-// updated to this machine's actual values (matches cyton_ndi_capture's/
-// cyton_hardware's already-established assignment: arm on ttyUSB0, tracker
-// on ttyUSB1).
-constexpr const char* CYTON_DEVICE = "/dev/ttyUSB0";
+// Reverted to Windows 2026-08-14 -- this machine is Windows again (was
+// ported to Linux 2026-08-07, see CLAUDE.md, for the ROS/MoveIt machine).
+// Original Windows values restored from git history (commit that made the
+// Linux port).
+constexpr const char* CYTON_DEVICE = "COM4";
 constexpr int CYTON_BAUD_RATE = 1000000;
 constexpr float CYTON_PROTOCOL_VERSION = 1.0F;
 
-constexpr const char* NDI_DEVICE = "/dev/ttyUSB1";
+constexpr const char* NDI_DEVICE = "COM3";
 
 constexpr const char* MOVING_TOOL_ROM =
-    "/home/temp/Downloads/8700339- Polaris Passive 4-Marker Rigid Body 2(1).rom";
+    R"(C:\Users\ConformalUser\Desktop\Spectra\8700339- Polaris Passive 4-Marker Rigid Body 2(1).rom)";
 
 constexpr const char* FIXED_TOOL_ROM =
-    "/home/temp/Downloads/8700449- Polaris Passive 4-Marker Rigid Body 3(1).rom";
+    R"(C:\Users\ConformalUser\Desktop\Spectra\8700449- Polaris Passive 4-Marker Rigid Body 3(1).rom)";
 
 constexpr const char* OUTPUT_CSV = "five_pose_ndi_capture.csv";
 

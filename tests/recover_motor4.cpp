@@ -17,7 +17,7 @@
 #include "dynamixel_motor.h"
 
 namespace {
-constexpr const char* CYTON_DEVICE = "/dev/ttyUSB0";
+constexpr const char* CYTON_DEVICE = "COM4";
 constexpr int CYTON_BAUD_RATE = 1000000;
 constexpr float CYTON_PROTOCOL_VERSION = 1.0F;
 

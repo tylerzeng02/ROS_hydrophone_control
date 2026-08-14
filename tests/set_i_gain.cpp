@@ -23,9 +23,11 @@ int main(int argc, char** argv) {
     const int motorId = std::stoi(argv[1]);
     const uint8_t iGain = static_cast<uint8_t>(std::stoi(argv[2]));
 
-    DynamixelMotor motor("/dev/ttyUSB0", 1000000, 1.0F);
+    // Reverted to Windows COM4 2026-08-14 (this file was last touched on the
+    // Linux machine -- see test_five_pose_ndi_capture.cpp's matching note).
+    DynamixelMotor motor("COM4", 1000000, 1.0F);
     if (!motor.connect()) {
-        std::cerr << "Could not connect to /dev/ttyUSB0.\n";
+        std::cerr << "Could not connect to COM4.\n";
         return 1;
     }
     if (!motor.pingMotor(motorId)) {
