@@ -119,6 +119,23 @@ target_link_libraries(recover_motor4
         dynamixel_sdk
 )
 
+add_executable(disable_torque_prompt
+    tests/disable_torque_prompt.cpp
+    src/dynamixel_motor.cpp
+    src/robot_calibration.cpp
+)
+
+target_include_directories(disable_torque_prompt
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/DynamixelSDK/c++/include
+)
+
+target_link_libraries(disable_torque_prompt
+    PRIVATE
+        dynamixel_sdk
+)
+
 add_executable(test_ticks
     tests/test_ticks.cpp
     src/dynamixel_motor.cpp

@@ -11,7 +11,7 @@
 
 namespace {
 
-constexpr const char* CYTON_DEVICE = "/dev/ttyUSB0";
+constexpr const char* CYTON_DEVICE = "COM4";
 constexpr int CYTON_BAUD_RATE = 1000000;
 constexpr float CYTON_PROTOCOL_VERSION = 1.0F;
 
@@ -47,7 +47,7 @@ constexpr int LOCK_MOVE_TIMEOUT_SECONDS = 10;
 constexpr uint16_t FULL_RANGE_CW_LIMIT = 0;
 constexpr uint16_t FULL_RANGE_CCW_LIMIT = 4095;
 
-constexpr const char* OUTPUT_CSV = "recorded_hand_poses_fixed_elbow_yaw(3).csv";
+constexpr const char* OUTPUT_CSV = "pid_tuning_data.csv";
 
 void waitForEnter(const std::string& message) {
     std::cout << message << std::flush;
