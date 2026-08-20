@@ -16,6 +16,7 @@ ros/archive/
 tests/archive/
 trash/
 understanding/
+notes/
 
 # Compiled files
 *.o
