@@ -27,7 +27,7 @@ are not being fit.
 IMPORTANT: angles are recomputed from each CSV row's actual_tick_* columns
 via this script's own ticks_to_deployed_radians(), NOT read from the CSV's
 actual_rad_* columns. Those columns are written by whatever version of
-ticksToRadians() was compiled into test_five_pose_ndi_capture.cpp at
+ticksToRadians() was compiled into ndi_capture_and_validate.cpp at
 capture time -- the 374-pose deployed_model_training_dataset_374pose.csv (this
 dataset) was captured BEFORE the 2026-08-06 deployment (pre-correction angles), while
 the new batch2 data was captured with the current, already-corrected
@@ -289,7 +289,7 @@ def main():
                   f"({pred_mm[0]:.2f}, {pred_mm[1]:.2f}, {pred_mm[2]:.2f})")
 
     print(f"\nWrote {len(ticks_rows)} predicted test points (deployed model) to {args.out}")
-    print(f"Run on the arm with: ./test_five_pose_ndi_capture --validate {args.out}")
+    print(f"Run on the arm with: ./ndi_capture_and_validate --validate {args.out}")
 
 
 if __name__ == "__main__":

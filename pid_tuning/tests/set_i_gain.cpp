@@ -3,7 +3,7 @@
 // always restore the original value at the end. This is for actually
 // applying a candidate value found by autotune_i_gain.cpp so its real
 // effect can be measured against a full accuracy test (e.g.
-// test_five_pose_ndi_capture --validate), not just the tick-error sweep
+// ndi_capture_and_validate --validate), not just the tick-error sweep
 // that found it.
 //
 // Reminder (see dynamixel_motor.h's compliance-margin comment block): this
@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
     const uint8_t iGain = static_cast<uint8_t>(std::stoi(argv[2]));
 
     // Reverted to Windows COM4 2026-08-14 (this file was last touched on the
-    // Linux machine -- see test_five_pose_ndi_capture.cpp's matching note).
+    // Linux machine -- see ndi_capture_and_validate.cpp's matching note).
     DynamixelMotor motor("COM4", 1000000, 1.0F);
     if (!motor.connect()) {
         std::cerr << "Could not connect to COM4.\n";

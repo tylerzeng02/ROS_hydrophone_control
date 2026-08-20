@@ -8,7 +8,7 @@
 // moving-tool-relative-to-fixed-tool pose to CSV. Repeat for as many poses
 // as you want; Ctrl+C to quit.
 //
-// This is the NDI *measurement* half of tests/test_five_pose_ndi_capture.cpp
+// This is the NDI *measurement* half of calibration/collection/ndi_capture_and_validate.cpp
 // only -- the NdiTracker class and its direct dependencies (structs,
 // quaternion math, BX polling/averaging) are ported over close to verbatim,
 // since that code is already hardware-validated (see CLAUDE.md's
@@ -62,7 +62,7 @@ namespace {
 
 // ---------------------------------------------------------------------
 // Configuration -- machine-specific, same spirit as the hardcoded values
-// in test_five_pose_ndi_capture.cpp (that file's own comment: "expect to
+// in ndi_capture_and_validate.cpp (that file's own comment: "expect to
 // update them per machine"). Override via command-line args if needed;
 // see printUsage() below.
 // ---------------------------------------------------------------------
@@ -95,7 +95,7 @@ constexpr std::array<const char*, 7> JOINT_NAMES = {
 };
 
 // ---------------------------------------------------------------------
-// Ported near-verbatim from test_five_pose_ndi_capture.cpp -- see that
+// Ported near-verbatim from ndi_capture_and_validate.cpp -- see that
 // file for the full derivation history of these types/functions.
 // ---------------------------------------------------------------------
 

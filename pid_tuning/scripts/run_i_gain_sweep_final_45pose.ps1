@@ -33,7 +33,7 @@ foreach ($i in $candidates) {
     }
 
     Write-Host "=== Running validate on $inputCsv (I=$i) ===" -ForegroundColor Cyan
-    & "$BuildDir\test_five_pose_ndi_capture.exe" --validate $inputCsv
+    & "$BuildDir\ndi_capture_and_validate.exe" --validate $inputCsv
     if ($LASTEXITCODE -ne 0) {
         Write-Host "validate run FAILED for I=$i -- stopping sweep." -ForegroundColor Red
         exit 1

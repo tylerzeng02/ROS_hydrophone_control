@@ -1,5 +1,5 @@
 """Kinematic calibration for the Cyton Gamma 1500 arm using NDI Polaris
-Spectra data collected by tests/test_five_pose_ndi_capture.cpp.
+Spectra data collected by calibration/collection/ndi_capture_and_validate.cpp.
 
 Solves for a minimal, identifiable parameter set (19 unknowns):
   - one zero-offset correction per joint (7 params, radians)
@@ -175,7 +175,7 @@ def build_base_transform(base_xyz: np.ndarray, base_rpy: np.ndarray) -> np.ndarr
 def predict_relative_pose(measured_angles_rad: np.ndarray, params: CalibParams) -> np.ndarray:
     """Predicted 4x4 pose of the moving marker's rigid-body frame as seen
     from the fixed marker's rigid-body frame -- directly comparable to the
-    "moving_relative_fixed" columns test_five_pose_ndi_capture.cpp writes,
+    "moving_relative_fixed" columns ndi_capture_and_validate.cpp writes,
     since that computation already removes the tracker's own arbitrary
     position/orientation from the measurement."""
     corrected_angles = measured_angles_rad + params.joint_offsets
@@ -316,7 +316,7 @@ def rms_orientation_error_deg(param_vector: np.ndarray, measured_angles, measure
 
 
 # ---------------------------------------------------------------------------
-# CSV loading (columns written by tests/test_five_pose_ndi_capture.cpp)
+# CSV loading (columns written by calibration/collection/ndi_capture_and_validate.cpp)
 # ---------------------------------------------------------------------------
 
 def load_poses_from_csv(csv_path: str):

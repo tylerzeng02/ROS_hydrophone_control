@@ -278,79 +278,17 @@ constexpr int SETTLING_DIAGNOSTIC_POSE_COUNT = 15;
 constexpr int SETTLING_DIAGNOSTIC_DURATION_MS = 4000;
 constexpr const char* SETTLING_DIAGNOSTIC_CSV = "settling_diagnostic.csv";
 
-// --quick-test mode: runs the SAME real capture pipeline (stability-based
-// settle via waitForPoseStability() + full 30-sample average per tool via
-// collectBothTools()) as the normal 291-pose run, but in one short sitting
-// -- to test whether collecting the dataset without the multi-hour
-// session-length drift found in the original (superseded) 200-pose data
-// gets the fitted calibration error down near the arm's ~0.5mm repeatability
-// floor. Writes to its own CSV so it never touches five_pose_ndi_capture.csv
-// or its resume state.
+// --quick-test mode: same real capture pipeline (waitForPoseStability() +
+// full 30-sample average via collectBothTools()) as the default run, in one
+// short sitting, writing to its own CSV so it never touches the default
+// resume state.
 //
-// QUICK_TEST_POSE_INDICES currently targets a 51-pose evenly-spaced subset
-// (every 6th index) of the ORIGINAL 0-303 calibration pose range -- NOT
-// the 304-307 backlash-test poses. Purpose (2026-07-29): validate the
-// dynamixel_motor.cpp backlash-compensation fix (see CLAUDE.md's
-// kinematic-calibration section) via a direct, apples-to-apples RMS
-// comparison against the existing calibration datasets -- same poses,
-// same fitting methodology, the only difference being that
-// moveJointsSafely() now compensates for backlash by default during this
-// recollection. If the fix is working, refitting the current best model
-// on this new data should show a real RMS drop versus the ~8.257mm
-// baseline on quick_calibration_test_combined_298.csv. Evenly spacing by
-// index (rather than taking a contiguous block) preserves the original
-// dataset's joint-range diversity in a smaller, faster-to-collect sample.
-// Real-world IK round-trip validation (2026-07-29): poses 316-318, see
-// the comment on those TARGET_POSES entries below. MOVING_SPEED reduced
-// to 15 for this run (see that constant). Change back to covering the
-// full TARGET_POSES range, the 51-pose backlash-fix validation subset, or
-// a single-joint backlash-test pose set for other purposes.
-// Restored 2026-07-30 to the 51-pose evenly-spaced subset (every 6th index
-// of the original 0-303 calibration pose range) for re-testing the
-// BACKLASH_OVERSHOOT_TICKS margin (20->35) against the same old-vs-new
-// comparison methodology used to validate the original fix -- this had been
-// overwritten to {316,317,318} for the separate IK round-trip experiment.
-// Restored 2026-07-31 (again) to target the realm-restricted calibration
-// poses (TARGET_POSES index 354-482, 129 hand-posed configurations within
-// the user's actual reduced operating envelope -- see CLAUDE.md's
-// kinematic-calibration section). Change back to the 51-pose evenly-spaced
-// subset (0,6,12,...,300) for the backlash-margin comparison, TARGET_POSES
-// index 319-346 for the multi-joint backlash NDI capture, 347-353 for the
-// displacement-from-home test, or {316,317,318} for the IK round-trip
-// experiment.
-// Repointed (2026-07-31) to test ONLY the new recorded_hand_poses (3).csv
-// batch (index 657-856), in isolation from every prior quick-test dataset.
-// QUICK_TEST_CSV below was also changed to a new filename so this run
-// cannot overwrite the existing 218-pose quick_calibration_test.csv.
-// Previous quick-test pose sets (realm-restricted 354-482, widened-range
-// 483-656) are preserved in TARGET_POSES above and can be restored here
-// if needed again later.
-// Repointed (2026-08-11) to test ONLY the genuinely new poses from the
-// ongoing recording session on recorded_hand_poses_fixed_elbow_yaw(3).csv
-// (index 1398-1618, 221 poses -- rows 34-254 of that file; extends the
-// earlier 141-pose version, 80 more poses added in a later sitting -- same
-// session, legitimately resumed this time). The file's OUTPUT_CSV path is
-// hardcoded in record_hand_poses_fixed_elbow_yaw.cpp, so rows 1-33 are a
-// genuinely unrelated 2026-08-07 session that got silently appended to by
-// the 2026-08-10 session via the tool's own resume-detection logic --
-// caught when the user correctly didn't recognize that data as what they'd
-// just recorded. Those old 33 rows remain excluded here. The standalone
-// old-33 entry is NOT separately preserved elsewhere in TARGET_POSES; it
-// would need to be re-added from that file's first 33 rows if ever wanted
-// again. Every prior quick-test pose set (realm-restricted 354-482,
-// widened-range 483-656, batch3 657-856, first elbow_yaw-fixed batch
-// 857-1238, second elbow_yaw-fixed batch 1239-1397) is preserved in
-// TARGET_POSES and can be restored here if needed again.
-// Repointed (2026-08-18) to recollect the ORIGINAL 382-pose elbow-yaw-fixed
-// batch (index 857-1238 -- see the comment on those TARGET_POSES entries)
-// fresh, under TODAY's session/physical setup, specifically because a
-// session-level NDI frame drift (~7deg rotation in the fixed marker,
-// confirmed via a rigid-transform fit) was found between the ORIGINAL
-// deployed_model_training_dataset_374pose.csv capture and this session --
-// see CLAUDE.md's I-gain/PID-tuning section. QUICK_TEST_CSV below writes to
-// a NEW filename so this run cannot overwrite the original, historical
-// dataset; the previous (2026-08-11) batch3-newonly pose set (index
-// 1398-1618) is preserved above and can be restored here if needed again.
+// QUICK_TEST_POSE_INDICES currently targets the 382-pose elbow-yaw-fixed
+// batch (TARGET_POSES index 857-1238), recollected after a suspected NDI
+// fixed-marker drift. See CLAUDE.md's kinematic-calibration and I-gain/
+// PID-tuning sections for the full repointing history and every other pose
+// set this constant has targeted -- all remain preserved in TARGET_POSES
+// above and can be restored here if needed again.
 constexpr std::array<int, 382> QUICK_TEST_POSE_INDICES = {
     857, 858, 859, 860, 861, 862, 863, 864, 865, 866, 867, 868, 869, 870,
     871, 872, 873, 874, 875, 876, 877, 878, 879, 880, 881, 882, 883, 884,
@@ -681,14 +619,8 @@ const std::array<std::array<uint16_t, JOINT_COUNT>, POSE_COUNT> TARGET_POSES = {
     {{835, 852, 1236, 3192, 1360, 2190, 3754}},
     {{430, 851, 1266, 3273, 1880, 2068, 348}},
     {{414, 1036, 1263, 3236, 1939, 1891, 481}},
-    // Poses 291-303 (0-based): 13 new hand-recorded poses specifically
-    // targeting ORIENTATION diversity (not just joint-range coverage) --
-    // varying wrist_pitch/wrist_roll in combination rather than each joint
-    // individually. Independently verified (calibration/
-    // diag_check_new13_orientation.py) to have nearest-neighbor orientation
-    // distance ~24.3 deg vs ~8.3 deg for the rest of this dataset, and
-    // pairwise mean ~103.5 deg, approaching the ~120 deg random-orientation
-    // benchmark.
+    // Poses 291-303: 13 poses targeting orientation diversity specifically
+    // (varying wrist_pitch/wrist_roll in combination) -- see CLAUDE.md.
     {{287, 852, 1265, 3034, 1920, 3345, 1710}},
     {{287, 852, 1266, 3088, 1765, 2502, 1493}},
     {{285, 852, 1265, 3087, 2263, 2477, 998}},
@@ -703,84 +635,37 @@ const std::array<std::array<uint16_t, JOINT_COUNT>, POSE_COUNT> TARGET_POSES = {
     {{354, 852, 1265, 3273, 2342, 2972, 1558}},
     {{351, 852, 1265, 3274, 2341, 3344, 1672}},
 
-    // Poses 304-307 (0-based): backlash test for wrist_pitch (motor 5),
-    // from recorded_hand_poses.csv rows 217-220. Other 6 joints locked
-    // (torqued) during recording via record_hand_poses.cpp so they
-    // couldn't drift across the four. ALL FOUR must be visited in this
-    // exact order in the automated re-run too -- not just the two target
-    // poses -- otherwise the arm (which ends this sequence sitting right
-    // next to both targets already) would never actually approach either
-    // target from the intended direction, defeating the whole test:
-    //   304 (row 217): wrist_pitch BELOW the target (staging pose, not compared)
-    //   305 (row 218): wrist_pitch AT the target, arriving from below (tick 2058) <- COMPARE
-    //   306 (row 219): wrist_pitch ABOVE the target (staging pose, not compared)
-    //   307 (row 220): wrist_pitch AT the target again, arriving from above
-    //                  (tick 2059, an automatic servo-driven move back to
-    //                  305's exact tick -- within the 15-tick settling
-    //                  tolerance, i.e. effectively the same commanded
-    //                  target) <- COMPARE
-    // Compare the NDI-measured position of poses 305 vs 307: a gap
-    // meaningfully larger than the ~0.5mm repeatability floor means real
-    // backlash in wrist_pitch; a gap within that noise means it isn't a
-    // meaningful contributor. See CLAUDE.md's kinematic-calibration
-    // section for full context.
+    // Poses 304-307: backlash test for wrist_pitch (motor 5), other 6
+    // joints locked during recording. Must be visited in order (below
+    // target, at target from below <- COMPARE, above target, at target
+    // from above <- COMPARE) so the arm actually approaches from each
+    // direction. Compare 305 vs 307's NDI position; gap beyond the ~0.5mm
+    // repeatability floor = real backlash. See CLAUDE.md.
     {{1024, 2072, 2096, 2112, 2049, 840, 3020}},
     {{1026, 2077, 2096, 2112, 2049, 2058, 3020}},
     {{1026, 2079, 2096, 2116, 2051, 3345, 3022}},
     {{1026, 2078, 2096, 2116, 2050, 2059, 3022}},
 
-    // Poses 308-311 (0-based): backlash test for elbow_pitch (motor 3),
-    // from recorded_hand_poses.csv rows 221-224. Same structure/rationale
-    // as poses 304-307 above -- all four must be visited in order:
-    //   308 (row 221): elbow_pitch BELOW the target (staging, not compared)
-    //   309 (row 222): elbow_pitch AT the target, arriving from below (tick 2079) <- COMPARE
-    //   310 (row 223): elbow_pitch ABOVE the target (staging, not compared)
-    //   311 (row 224): elbow_pitch AT the target again, arriving from above
-    //                  (tick 2090, auto-driven back toward 309's tick --
-    //                  landed 11 ticks off, within the 15-tick settling
-    //                  tolerance) <- COMPARE
-    // Compare NDI-measured position of poses 309 vs 311, same interpretation
-    // as the wrist_pitch test (gap beyond ~0.5mm = real backlash).
+    // Poses 308-311: same backlash test for elbow_pitch (motor 3). Compare
+    // 309 vs 311.
     {{1102, 2055, 2059, 829, 2095, 2055, 3108}},
     {{1103, 2061, 2057, 2079, 2095, 2060, 3108}},
     {{1104, 2068, 2057, 3275, 2097, 2070, 3110}},
     {{1105, 2063, 2058, 2090, 2095, 2061, 3110}},
 
-    // Poses 312-315 (0-based): REDO of the elbow_pitch backlash test above,
-    // from recorded_hand_poses.csv rows 225-228, after tightening
-    // record_hand_poses.cpp's AUTO_DRIVE_TOLERANCE_TICKS 15->4 -- the
-    // first attempt's two "target" poses landed 11 ticks apart (2079 vs
-    // 2090), too loose given elbow_pitch's longer lever arm to the
-    // marker. This time: 313 (row 226) targets tick 2077, 315 (row 228,
-    // auto-driven) landed at 2081 -- only 4 ticks apart.
-    //   312 (row 225): elbow_pitch BELOW the target (staging, not compared)
-    //   313 (row 226): elbow_pitch AT the target, arriving from below (tick 2077) <- COMPARE
-    //   314 (row 227): elbow_pitch ABOVE the target (staging, not compared)
-    //   315 (row 228): elbow_pitch AT the target again, arriving from above
-    //                  (tick 2081) <- COMPARE
+    // Poses 312-315: redo of the elbow_pitch backlash test with a tighter
+    // auto-drive tolerance (target poses only 4 ticks apart this time, vs.
+    // 11 before). Compare 313 vs 315.
     {{1102, 2055, 2056, 829, 2089, 2048, 3101}},
     {{1102, 2064, 2055, 2077, 2090, 2055, 3102}},
     {{1103, 2069, 2054, 3275, 2092, 2066, 3104}},
     {{1103, 2064, 2054, 2081, 2091, 2056, 3104}},
 
-    // Poses 316-318 (0-based): real-world IK round-trip validation
-    // (2026-07-29, calibration/diag_ik_validation_setup.py). Each pose's
-    // ticks were found by numerically inverting the FULLY corrected model
-    // (offset+scale+tilt+origin+shoulder_pitch Fourier term+tool+base
-    // frame, RMS 8.187mm on the 298-pose training set) to reach a chosen
-    // target position, starting the solve from a DIFFERENT initial guess
-    // than whatever generated the target (residual ~0.0000mm -- confirms
-    // the solve genuinely converged, not just returned its start point).
-    // Compare each pose's NDI-measured moving_relative_fixed position
-    // against its intended target (see the script's printed output) --
-    // this tests whether the offline-validated ~8mm accuracy figure
-    // actually holds when going the OTHER direction: position -> commanded
-    // joint angles -> real measured result, the practical direction any
-    // real IK/MoveIt usage would need. MOVING_SPEED reduced to 15 for
-    // this run (see that constant's comment) since these exact
-    // combinations were never hand-verified the way every other pose in
-    // this file was -- individually within jointCalibrations' safe range
-    // with margin, but not cross-checked for self-collision.
+    // Poses 316-318: real-world IK round-trip validation. Each pose's ticks
+    // came from numerically inverting the fitted model to reach a target
+    // position -- tests whether accuracy holds in the practical direction
+    // (position -> joint angles -> measured result). Never hand-verified
+    // for self-collision (numerically inverted, not physically posed).
     //   Target 1: [218.48, 265.65, -375.24] mm
     //   Target 2: [219.13, -556.65, -98.84] mm
     //   Target 3: [228.88, -427.39, -365.99] mm
@@ -788,14 +673,9 @@ const std::array<std::array<uint16_t, JOINT_COUNT>, POSE_COUNT> TARGET_POSES = {
     {{2289, 2058, 2512, 1858, 2246, 2023, 2215}},
     {{2209, 2225, 2191, 1959, 1985, 1670, 2227}},
 
-    // Multi-joint backlash test (2026-07-30, record_hand_poses.cpp,
-    // generalized version -- see CLAUDE.md's kinematic-calibration
-    // section). Each joint gets 4 poses in order: below target, at target
-    // (arriving from below), above target, at target again (auto-driven
-    // back to the exact tick recorded for pose 2, arriving from above).
-    // All 4 per joint must be visited in that order -- comparing only the
-    // 2 "at target" poses without also passing through "below"/"above"
-    // first wouldn't actually approach from the intended direction.
+    // Multi-joint backlash test: each joint gets 4 poses in order (below
+    // target, at target from below, above target, at target from above) --
+    // see CLAUDE.md.
     // motor 0 backlash test (index 319-322)
     {{1418, 2056, 2048, 2062, 2124, 2105, 2976}},
     {{1032, 2055, 2048, 2062, 2124, 2105, 2977}},
@@ -832,18 +712,11 @@ const std::array<std::array<uint16_t, JOINT_COUNT>, POSE_COUNT> TARGET_POSES = {
     {{946, 2069, 2043, 2023, 2053, 2103, 3403}},
     {{946, 2070, 2040, 2023, 2053, 2104, 3085}},
 
-    // Displacement-from-home test (2026-07-30): home position + increasing
-    // Cartesian offsets along +Y (0/5/10/15/20/25/30mm), numerically
-    // inverted via the current-best fitted FK model (calibrate_kinematics.py
-    // + gen_displacement_from_home_poses.py -- see CLAUDE.md's kinematic-
-    // calibration section). Checks whether position error grows roughly
-    // proportionally with commanded displacement, the signature of a
-    // residual joint gear-ratio scale error -- distinct from the Jacobian/
-    // manipulability and travel-distance hypotheses already ruled out on
-    // the existing calibration dataset. Individually within jointCalibrations'
-    // safe range, but like the earlier IK round-trip poses, NEVER hand-
-    // verified for self-collision (numerically inverted, not physically
-    // posed) -- MOVING_SPEED reduced for this run, same precaution as before.
+    // Displacement-from-home test: home + increasing +Y offsets
+    // (0-30mm), numerically inverted via the fitted FK model. Checks
+    // whether error grows proportionally with displacement (signature of a
+    // residual gear-ratio scale error). Never hand-verified for
+    // self-collision -- see CLAUDE.md.
     // index 347-353
     {{1545, 2044, 1625, 2101, 2049, 2120, 2090}},  // home + 0mm
     {{1541, 2052, 1620, 2102, 2006, 2092, 2318}},  // home + 5mm
@@ -853,17 +726,9 @@ const std::array<std::array<uint16_t, JOINT_COUNT>, POSE_COUNT> TARGET_POSES = {
     {{1568, 2084, 1615, 2075, 1974, 2045, 2297}},  // home + 25mm
     {{1569, 2085, 1614, 2071, 1967, 2035, 2292}},  // home + 30mm
 
-    // Realm-restricted calibration poses (2026-07-31): 129 hand-posed
-    // configurations within the user's actual reduced operating envelope
-    // ("bent arm grabbing something," never fully extended), recorded via
-    // record_hand_poses (1).csv (200 poses collected, 71 excluded here for
-    // falling outside jointCalibrations' safe range on joint 0 and/or joint
-    // 4 -- see CLAUDE.md's kinematic-calibration section). Purpose: test
-    // whether restricting both calibration data collection AND the fitted
-    // model to this narrower realm improves accuracy there, following the
-    // in-sample finding that excluding just the 37-pose extreme-config
-    // cluster from the existing dataset already dropped bulk RMS from
-    // 5.38mm to 4.74mm with no new data at all.
+    // Realm-restricted calibration poses: 129 hand-posed configurations
+    // within the user's actual reduced operating envelope ("bent arm
+    // grabbing something," never fully extended) -- see CLAUDE.md.
     // index 354-482
     {{488, 1862, 1323, 3274, 952, 2321, 3383}},
     {{561, 1861, 1322, 3274, 953, 2304, 3447}},
@@ -995,14 +860,10 @@ const std::array<std::array<uint16_t, JOINT_COUNT>, POSE_COUNT> TARGET_POSES = {
     {{550, 1860, 935, 3087, 953, 1842, 3582}},
     {{603, 1859, 943, 3087, 954, 1866, 3614}},
 
-    // Widened-range calibration poses (2026-07-31): hand-posed
-    // configurations previously excluded from the realm-restricted set
-    // above because they fell outside jointCalibrations' OLD safe range
-    // on joint 0, 3, 4, and/or 6 -- now included since those bounds were
-    // widened (robot_calibration.cpp) to cover the full extent of both
-    // recorded_hand_poses (1)/(2).csv batches. First 70 from batch 1
-    // (excluded there for joint 0/4), remaining 104 from batch 2
-    // (excluded for joint 0/3/4/6).
+    // Widened-range calibration poses: hand-posed configurations previously
+    // excluded from the realm-restricted set above for falling outside
+    // jointCalibrations' old bounds -- now included since those bounds
+    // were widened. See CLAUDE.md.
     // index 483-656
     {{276, 2036, 1392, 3275, 1236, 2395, 3051}},
     {{276, 2009, 1392, 3276, 1162, 2402, 3090}},
@@ -1938,16 +1799,10 @@ const std::array<std::array<uint16_t, JOINT_COUNT>, POSE_COUNT> TARGET_POSES = {
     {{3143, 1867, 2049, 828, 2075, 1515, 1260}},
     {{3039, 1868, 2155, 828, 2079, 1482, 1255}},
     {{3005, 1868, 2224, 828, 2083, 1420, 1206}},
-    // 221 poses (2026-08-11), index 1398-1618: recorded_hand_poses_fixed_
-    // elbow_yaw(3).csv -- ONLY the genuinely new poses from the ongoing
-    // recording session (rows 34-254 of that file; extends the earlier
-    // 141-pose version of this same range with 80 more poses added in a
-    // later sitting -- same session, legitimately resumed/appended this
-    // time, not the unrelated-session mixup documented in CLAUDE.md). The
-    // file's OUTPUT_CSV path is hardcoded, so rows 1-33 (a genuinely
-    // unrelated 2026-08-07 session) are still excluded here. Third batch
-    // of the reduced-DOF (elbow_yaw locked near 2095) hand-posing session --
-    // see CLAUDE.md's kinematic-calibration section.
+    // 221 poses, index 1398-1618: third batch of the reduced-DOF
+    // (elbow_yaw locked near 2095) hand-posing session -- rows 34-254 of
+    // recorded_hand_poses_fixed_elbow_yaw(3).csv; rows 1-33 are a genuinely
+    // unrelated earlier session and stay excluded. See CLAUDE.md.
     {{3122, 1886, 2117, 828, 2093, 1379, 1169}},
     {{3122, 1887, 2117, 828, 2094, 1285, 1167}},
     {{3111, 1884, 2220, 828, 2085, 1269, 1132}},
@@ -3267,13 +3122,11 @@ std::size_t findResumeStartIndex(const std::string& csvPath) {
 }
 
 // --settling-diagnostic mode: moves through the first
-// SETTLING_DIAGNOSTIC_POSE_COUNT poses of TARGET_POSES (already
-// hand-verified safe -- same array the real 200-pose capture uses) and,
-// instead of the normal SETTLING_TIME_MS sleep + 30-sample average, logs
-// every raw BX poll for SETTLING_DIAGNOSTIC_DURATION_MS right after each
-// move completes. Lets us see directly whether the tracked pose is still
-// moving/settling in the window the real capture loop would otherwise
-// silently average over.
+// SETTLING_DIAGNOSTIC_POSE_COUNT poses of TARGET_POSES and, instead of the
+// normal settle-then-average, logs every raw BX poll for
+// SETTLING_DIAGNOSTIC_DURATION_MS right after each move -- shows whether
+// the tracked pose is still settling in the window the real capture loop
+// would otherwise silently average over.
 int runSettlingDiagnostic() {
     const std::vector<int> motorIds = {0, 1, 2, 3, 4, 5, 6};
 
@@ -3405,18 +3258,12 @@ int runSettlingDiagnostic() {
     }
 }
 
-// Real (30-sample-averaged) capture, limited to the first
-// QUICK_TEST_POSE_COUNT poses, written to its own CSV. See the constant
-// comment above for why this exists.
+// Real (30-sample-averaged) capture over QUICK_TEST_POSE_INDICES, written
+// to QUICK_TEST_CSV.
 // resumeFromSequenceIndex: 0-based position in QUICK_TEST_POSE_INDICES to
-// start from. 0 (the default, fresh-start case) truncates and overwrites
-// QUICK_TEST_CSV as before. Any nonzero value means "resume" -- the CSV is
-// opened in append mode instead, so previously-captured poses from an
-// earlier run of this same pose sequence are preserved rather than wiped.
-// Deliberately manual (caller/user supplies the pose number to resume from)
-// rather than auto-detected from the CSV, since Ctrl+C gives no chance to
-// run any auto-detection logic anyway -- the user has to know and report
-// where they stopped regardless.
+// start from. 0 (default) truncates/overwrites QUICK_TEST_CSV; nonzero
+// opens it in append mode instead. Deliberately manual (not auto-detected)
+// since Ctrl+C gives no chance to run detection logic anyway.
 int runQuickCalibrationTest(std::size_t resumeFromSequenceIndex = 0) {
     const std::vector<int> motorIds = {0, 1, 2, 3, 4, 5, 6};
 
@@ -3426,14 +3273,10 @@ int runQuickCalibrationTest(std::size_t resumeFromSequenceIndex = 0) {
         CYTON_PROTOCOL_VERSION
     );
 
-    // Compliance slope / punch experiment (2026-07-29) was tried here and
-    // removed: it caused audible vibration on the real hardware (too
-    // aggressive a change to both parameters at once -- see CLAUDE.md's
-    // kinematic-calibration section) and was not worth the risk for a
-    // modest precision gain. Kept out of this function going forward;
-    // DynamixelMotor::readCompliance*/writeCompliance*/readPunch/
-    // writePunch() still exist if this is revisited later, more
-    // conservatively (one parameter at a time, smaller steps).
+    // A compliance slope/punch experiment was tried here and removed --
+    // caused audible vibration (too aggressive a change to both at once,
+    // see CLAUDE.md). DynamixelMotor's compliance/punch accessors still
+    // exist if revisited more conservatively.
 
     try {
         const bool resuming = resumeFromSequenceIndex > 0;
@@ -3608,18 +3451,14 @@ int runQuickCalibrationTest(std::size_t resumeFromSequenceIndex = 0) {
     }
 }
 
-// --validate mode (2026-08-04): moves the arm to a caller-supplied list of
-// joint-tick test points and reports, live, how far the NDI-measured actual
-// position deviates from a precomputed *predicted* position for each point.
-// Predictions are NOT computed here -- this program has no FK/calibration
-// model of its own. They must be precomputed offline (see
-// calibration/current/gen_validation_predictions.py, which fits the current
-// best-fit correction model against a chosen dataset and evaluates it at
-// each requested tick target) and supplied via VALIDATION_INPUT_CSV, format:
+// --validate mode: moves the arm to a caller-supplied list of joint-tick
+// test points and reports how far the NDI-measured actual position
+// deviates from a precomputed predicted position. Predictions must be
+// computed offline (see calibration/current/gen_validation_predictions.py)
+// and supplied via VALIDATION_INPUT_CSV, format:
 //   tick_0,tick_1,tick_2,tick_3,tick_4,tick_5,tick_6,predicted_x_mm,predicted_y_mm,predicted_z_mm
-// For a meaningful test, the tick targets should be points NOT already in
-// whatever dataset the model was fit on -- reusing fit poses here would
-// just measure fit quality on training data again, not real generalization.
+// For a meaningful test, ticks should be points NOT already in whatever
+// dataset the model was fit on.
 struct ValidationPoint {
     std::array<uint16_t, JOINT_COUNT> ticks{};
     double predictedXMm = 0.0;
@@ -3938,14 +3777,10 @@ int runValidationTest(const std::string& inputCsvPath) {
                 << "Saved data to " << VALIDATION_RESULTS_CSV << '\n';
         }
 
-        // Deliberately NOT disabling torque here -- torque-enable is a
-        // persistent state held by each servo's own firmware regardless of
-        // whether this process is running (see dynamixel_motor.h's note on
-        // this), so leaving it enabled across process exit is safe and lets
-        // an external caller (e.g. a sweep script running --validate
-        // repeatedly across many candidates) keep the arm supported for the
-        // whole sweep, only disabling once at the very end via a separate
-        // explicit step (see tests/disable_torque_prompt.cpp).
+        // Deliberately NOT disabling torque here -- torque-enable is
+        // persistent servo-firmware state, so leaving it on across process
+        // exit lets a sweep script keep the arm supported across many
+        // runs, disabled only once at the end via disable_torque_prompt.
         std::cout << "\nExiting with torque still enabled -- run "
                      "disable_torque_prompt when you're done to release it.\n";
         motor.disconnect();

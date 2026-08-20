@@ -19,21 +19,10 @@ int getMotorTolerance(int motorId)
     return 10; // main arm joints stay more accurate
 }
 
-// Per-joint backlash overshoot margin (2026-07-30), replacing the earlier
-// single uniform BACKLASH_OVERSHOOT_TICKS=20 applied to all 7 joints.
-// Measured directly via the full 7-joint hand-verified below/target/above/
-// target reversal test (record_hand_poses.cpp + test_five_pose_ndi_
-// capture.cpp --quick-test, TARGET_POSES index 319-346; see CLAUDE.md's
-// kinematic-calibration section for the full mm-domain results and the
-// FK-lever-arm back-calculation converting them to these tick values).
-// Each value is the joint's own implied true backlash gap (in ticks) with
-// a modest safety margin -- NOT a generous one, since a prior direct test
-// (20 vs 35 vs 40 ticks, uniform) confirmed overshooting past the true gap
-// only adds settling-noise cost with zero additional correction benefit.
-// shoulder_roll/shoulder_pitch measured negligible backlash (0.28mm/1.01mm,
-// implied 0.3/1.3 ticks) and get a small nominal value rather than zero, to
-// avoid a special-cased "no compensation" branch for what's already a
-// near-harmless minimum overshoot.
+// Per-joint backlash overshoot margin, from hand-verified reversal tests
+// (see CLAUDE.md). Each value is the joint's measured backlash gap plus a
+// modest safety margin -- kept modest since overshooting past the true gap
+// only adds settling noise, not correction benefit.
 int getBacklashOvershootTicks(int motorId)
 {
     static const int overshootPerJoint[7] = {
@@ -524,23 +513,8 @@ bool DynamixelMotor::setMovingSpeed(int motorId, uint16_t speed)
 
     if (compensateBacklash && targetPosition < startPosition)
     {
-        // This move would arrive by DECREASING the tick value. Overshoot
-        // below the target first so the real approach below always
-        // INCREASES instead -- see the header comment on this function
-        // for why (confirmed backlash finding, CLAUDE.md).
-        // Reduced from 40 (2026-07-29): the extra overshoot-and-return
-        // cycle this triggers has its own settling variance, which shows
-        // up as added noise in a joint's final landed position (observed
-        // directly: other-joint scatter went from 1-2 ticks to 3-8 ticks
-        // after this fix was introduced, likely from exactly this extra
-        // cycle, not from backlash itself getting worse). A uniform-margin
-        // sweep (20/35/40 ticks) confirmed overshooting past the true gap
-        // only adds settling-noise cost with zero additional correction
-        // benefit -- see CLAUDE.md's kinematic-calibration section. RESOLVED
-        // (2026-07-30): switched to a per-joint margin (getBacklashOvershoot
-        // Ticks()) once the true gap was measured directly for all 7 joints
-        // (0.28mm-7.68mm, a wide real range this single uniform value could
-        // never fit well for every joint at once).
+        // Would arrive by decreasing -- overshoot below the target first so
+        // the real approach always increases instead (see header comment).
         int overshoot = static_cast<int>(targetPosition) -
             getBacklashOvershootTicks(motorId);
 
@@ -563,14 +537,9 @@ bool DynamixelMotor::setMovingSpeed(int motorId, uint16_t speed)
                 /*compensateBacklash=*/false
             ))
         {
-            // Not fatal: the overshoot's purpose is just to get PAST the
-            // target in the right direction before the real approach --
-            // even landing short of the exact overshoot tick (e.g. due to
-            // friction/stall near a joint's range limit) almost certainly
-            // still served that purpose. Proceeding to the real move is
-            // far better than aborting it entirely, which would otherwise
-            // leave the joint sitting at an incomplete overshoot position
-            // instead of its actual intended target.
+            // Not fatal: even a partial overshoot almost certainly still
+            // got past the target in the right direction, so proceed to
+            // the real move rather than abort.
             std::cerr << "Warning: backlash-compensation overshoot for "
                        << "motor ID " << motorId
                        << " did not fully converge; proceeding to the "
@@ -700,25 +669,10 @@ bool DynamixelMotor::moveJointsSafely(
 
     if (compensateBacklash)
     {
-        // Per joint: if this move would arrive by DECREASING the tick
-        // value, overshoot below the target first so the real approach
-        // below always INCREASES instead -- see moveJointSafely()'s
-        // header comment for why (confirmed backlash finding, CLAUDE.md).
-        // Joints already approaching by increasing (or already at target)
-        // go straight to their real target here, unmodified.
-        // Reduced from 40 (2026-07-29): the extra overshoot-and-return
-        // cycle this triggers has its own settling variance, which shows
-        // up as added noise in a joint's final landed position (observed
-        // directly: other-joint scatter went from 1-2 ticks to 3-8 ticks
-        // after this fix was introduced, likely from exactly this extra
-        // cycle, not from backlash itself getting worse). A uniform-margin
-        // sweep (20/35/40 ticks) confirmed overshooting past the true gap
-        // only adds settling-noise cost with zero additional correction
-        // benefit -- see CLAUDE.md's kinematic-calibration section. RESOLVED
-        // (2026-07-30): switched to a per-joint margin (getBacklashOvershoot
-        // Ticks()) once the true gap was measured directly for all 7 joints
-        // (0.28mm-7.68mm, a wide real range this single uniform value could
-        // never fit well for every joint at once).
+        // Per joint: if this move would arrive by decreasing, overshoot
+        // below the target first so the real approach always increases
+        // instead (see moveJointSafely()'s header comment). Joints already
+        // approaching by increasing (or already at target) are unmodified.
 
         std::vector<uint16_t> overshootTargets;
         overshootTargets.reserve(motorIds.size());
@@ -794,12 +748,7 @@ bool DynamixelMotor::moveJointsSafely(
                     /*compensateBacklash=*/false
                 ))
             {
-                // Not fatal -- see the identical reasoning in
-                // moveJointSafely() above: even an incomplete overshoot
-                // almost certainly still served its purpose, and aborting
-                // here would otherwise skip the real move entirely,
-                // leaving joints at an incomplete intermediate position
-                // instead of their actual intended targets.
+                // Not fatal -- same reasoning as moveJointSafely() above.
                 std::cerr
                     << "Warning: backlash-compensation overshoot did not "
                     << "fully converge for all joints; proceeding to the "
@@ -954,14 +903,10 @@ bool DynamixelMotor::moveJointsSafely(
                           << "enabled rather than being released."
                           << std::endl;
 
-                // Command each motor's goal to wherever it already
-                // physically is, so it holds there instead of continuing
-                // toward the original (now-abandoned) target. Uses the
-                // raw writer, not setGoalPosition(), because the
-                // offending motor's OWN current position is by
-                // definition outside jointCalibrations here --
-                // setGoalPosition() would reject commanding it to hold
-                // exactly where it already is.
+                // Hold each motor at its current position (raw writer, not
+                // setGoalPosition(), since the offending motor's current
+                // position is by definition out of range and would be
+                // rejected).
                 for (int id : motorIds)
                 {
                     uint16_t freezePosition = 0;
@@ -1052,22 +997,12 @@ bool DynamixelMotor::moveJointsSafely(
         {
             std::cout << "All target positions reached." << std::endl;
 
-            // Fine-correction pass (2026-07-29): the +-tolerance check
-            // above accepts a move once "close enough" (default 10
-            // ticks), but a real IK round-trip test showed several ticks
-            // of leftover commanded-vs-achieved gap on multiple joints
-            // at once, compounding into several extra mm of real-world
-            // position error beyond the kinematic model's own validated
-            // accuracy (see CLAUDE.md's kinematic-calibration section).
-            // Re-writing the SAME goal position again (not a new value)
-            // often lets a servo's own position-control loop nudge
-            // closer, since a fresh goal write is handled differently
-            // than continuing to hold an old one -- this is a real,
-            // commonly-used trick for squeezing extra settling precision
-            // out of position-control servos. Only touches joints still
-            // outside the tighter FINE_CORRECTION_TOLERANCE_TICKS of
-            // their real final target; harmless no-op for joints already
-            // that close.
+            // Fine-correction pass: the +-tolerance check above accepts
+            // "close enough", but re-writing the SAME goal position again
+            // often lets a servo's position-control loop nudge closer
+            // (a fresh goal write behaves differently than continuing to
+            // hold an old one). No-op for joints already within
+            // FINE_CORRECTION_TOLERANCE_TICKS.
             constexpr int FINE_CORRECTION_TOLERANCE_TICKS = 3;
             constexpr int FINE_CORRECTION_ATTEMPTS = 5;
             constexpr int FINE_CORRECTION_WAIT_MS = 200;

@@ -13,6 +13,7 @@ cmake-build-*/
 build/archive/
 calibration/archive/
 ros/archive/
+tests/archive/
 trash/
 understanding/
 

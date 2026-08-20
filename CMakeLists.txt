@@ -187,19 +187,25 @@ target_link_libraries(record_hand_poses_multijoint_backlash_test
         dynamixel_sdk
 )
 
-add_executable(record_hand_poses_fixed_elbow_yaw
-    tests/record_hand_poses_fixed_elbow_yaw.cpp
+# Renamed from record_hand_poses_fixed_elbow_yaw 2026-08-20, moved out of
+# tests/ into calibration/collection/ -- this is the general-purpose hand-
+# pose recorder (locks elbow_yaw, records the other 6 joints on Enter) that
+# produced the deployed model's training data; not to be confused with
+# tests/record_hand_poses_multijoint_backlash_test.cpp, a different,
+# special-purpose tool despite the similar name.
+add_executable(record_hand_poses
+    calibration/collection/record_hand_poses.cpp
     src/dynamixel_motor.cpp
     src/robot_calibration.cpp
 )
 
-target_include_directories(record_hand_poses_fixed_elbow_yaw
+target_include_directories(record_hand_poses
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/external/DynamixelSDK/c++/include
 )
 
-target_link_libraries(record_hand_poses_fixed_elbow_yaw
+target_link_libraries(record_hand_poses
     PRIVATE
         dynamixel_sdk
 )
@@ -308,108 +314,15 @@ target_link_libraries(set_i_gain
 
 # ------------------------------------------------------------
 # TRAC-IK targets
-# Only enabled when TRAC-IK exists
+#
+# Archived 2026-08-20 (tests/archive/test_trac_ik.cpp, test_cyton_ik.cpp,
+# test_cyton_ik_move.cpp, test_cyton_ik_target.cpp,
+# test_cyton_ik_target_move.cpp) -- external/trac_ik was empty on this
+# checkout at the time and these 5 targets were silently skipped by the
+# existence-guard that used to live here. If TRAC-IK is populated again and
+# these are wanted back, restore this block from git history (see the
+# commit that removed it) alongside the archived .cpp files.
 # ------------------------------------------------------------
-
-if(EXISTS
-    "${CMAKE_CURRENT_SOURCE_DIR}/external/trac_ik/trac_ik_lib/CMakeLists.txt"
-)
-
-    add_subdirectory(
-        external/trac_ik/trac_ik_lib
-        external/trac_ik_build
-    )
-
-    add_executable(test_trac_ik
-        tests/test_trac_ik.cpp
-    )
-
-    target_link_libraries(test_trac_ik
-        PRIVATE
-            trac_ik
-    )
-
-    add_executable(test_cyton_ik
-        tests/test_cyton_ik.cpp
-        src/robot_calibration.cpp
-    )
-
-    target_include_directories(test_cyton_ik
-        PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/src
-            ${CMAKE_CURRENT_SOURCE_DIR}/external/trac_ik/trac_ik_lib/include
-    )
-
-    target_link_libraries(test_cyton_ik
-        PRIVATE
-            trac_ik
-            ${orocos_kdl_LIBRARIES}
-    )
-
-    add_executable(test_cyton_ik_move
-        tests/test_cyton_ik_move.cpp
-        src/dynamixel_motor.cpp
-        src/robot_calibration.cpp
-    )
-
-    target_include_directories(test_cyton_ik_move
-        PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/src
-            ${CMAKE_CURRENT_SOURCE_DIR}/external/DynamixelSDK/c++/include
-            ${CMAKE_CURRENT_SOURCE_DIR}/external/trac_ik/trac_ik_lib/include
-    )
-
-    target_link_libraries(test_cyton_ik_move
-        PRIVATE
-            trac_ik
-            ${orocos_kdl_LIBRARIES}
-            dynamixel_sdk
-    )
-
-    add_executable(test_cyton_ik_target
-        tests/test_cyton_ik_target.cpp
-        src/robot_calibration.cpp
-    )
-
-    target_include_directories(test_cyton_ik_target
-        PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/src
-            ${CMAKE_CURRENT_SOURCE_DIR}/external/trac_ik/trac_ik_lib/include
-    )
-
-    target_link_libraries(test_cyton_ik_target
-        PRIVATE
-            trac_ik
-            ${orocos_kdl_LIBRARIES}
-    )
-
-    add_executable(test_cyton_ik_target_move
-        tests/test_cyton_ik_target_move.cpp
-        src/dynamixel_motor.cpp
-        src/robot_calibration.cpp
-    )
-
-    target_include_directories(test_cyton_ik_target_move
-        PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/src
-            ${CMAKE_CURRENT_SOURCE_DIR}/external/DynamixelSDK/c++/include
-            ${CMAKE_CURRENT_SOURCE_DIR}/external/trac_ik/trac_ik_lib/include
-    )
-
-    target_link_libraries(test_cyton_ik_target_move
-        PRIVATE
-            trac_ik
-            ${orocos_kdl_LIBRARIES}
-            dynamixel_sdk
-    )
-
-else()
-
-    message(STATUS
-        "TRAC-IK not found; skipping IK targets"
-    )
-
-endif()
 
 # ------------------------------------------------------------
 # NDI API
@@ -427,8 +340,14 @@ if(EXISTS
         external/ndicapi_build
     )
 
-    add_executable(test_five_pose_ndi_capture
-        tests/test_five_pose_ndi_capture.cpp
+    # Renamed from test_five_pose_ndi_capture 2026-08-20, moved out of
+    # tests/ into calibration/collection/ -- the "five_pose" name was a
+    # historical artifact (it started as a 5-pose demo and grew into the
+    # project's main pose-list-driven NDI capture/validation tool, with
+    # --quick-test, --validate, and --settling-diagnostic modes). This is
+    # the tool behind every calibration dataset in this project.
+    add_executable(ndi_capture_and_validate
+        calibration/collection/ndi_capture_and_validate.cpp
         src/dynamixel_motor.cpp
         src/robot_calibration.cpp
     )
@@ -447,14 +366,14 @@ if(EXISTS
             ndicapi
     )
 
-    target_include_directories(test_five_pose_ndi_capture
+    target_include_directories(ndi_capture_and_validate
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src
             ${CMAKE_CURRENT_SOURCE_DIR}/external/DynamixelSDK/c++/include
             ${CMAKE_CURRENT_SOURCE_DIR}/external/ndicapi
     )
 
-    target_link_libraries(test_five_pose_ndi_capture
+    target_link_libraries(ndi_capture_and_validate
         PRIVATE
             dynamixel_sdk
             ndicapi

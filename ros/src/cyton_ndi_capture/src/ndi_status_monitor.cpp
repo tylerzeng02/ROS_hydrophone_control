@@ -28,7 +28,7 @@ constexpr const char* DEFAULT_FIXED_TOOL_ROM =
     "/home/temp/Downloads/8700449- Polaris Passive 4-Marker Rigid Body 3(1).rom";
 
 constexpr int POLL_INTERVAL_MS = 100;
-constexpr double MAX_NDI_ERROR = 0.50;  // same threshold as ndi_measure/test_five_pose_ndi_capture
+constexpr double MAX_NDI_ERROR = 0.50;  // same threshold as ndi_measure/ndi_capture_and_validate
 
 enum class NdiToolStatus { Detected, Missing, OutOfVolume, Disabled, LowQuality };
 

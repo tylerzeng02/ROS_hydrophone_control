@@ -36,7 +36,7 @@ constexpr std::size_t JOINT_COUNT = 7;
 //   4. test joint AT the exact same target again, but auto-driven back to
 //      pose 2's exact recorded tick, arriving from above
 // Comparing the NDI-measured position of pose 2 vs pose 4 (via
-// test_five_pose_ndi_capture.cpp, same as the original single-joint
+// ndi_capture_and_validate.cpp, same as the original single-joint
 // workflow) isolates that joint's own backlash: a gap larger than the
 // tracker's own repeatability floor means real backlash for that joint.
 // See CLAUDE.md's kinematic-calibration section for the wrist_pitch/

@@ -1,7 +1,7 @@
 // run_accuracy_check: single combined program that both commands the arm
 // via MoveIt and captures each pose's NDI measurement, in one synchronized
 // loop -- move, confirm success, settle, capture, log, repeat. Same shape
-// as the original tests/test_five_pose_ndi_capture.cpp, but MoveIt does the
+// as the original calibration/collection/ndi_capture_and_validate.cpp, but MoveIt does the
 // moving instead of raw Dynamixel ticks.
 //
 // Built to replace the separate cyton_pose_commander + cyton_ndi_capture
@@ -72,7 +72,7 @@ constexpr double RECOVERY_BUFFER_RAD = 0.01;
 // Pause after a confirmed-successful move, before starting the NDI
 // capture, to let any residual servo vibration settle -- matches this
 // project's established SETTLING_TIME_MS convention (originally 750ms in
-// test_five_pose_ndi_capture.cpp). MoveGroupInterface's move() already
+// ndi_capture_and_validate.cpp). MoveGroupInterface's move() already
 // blocks until the controller reports the trajectory finished, so the arm
 // is already at (or very near) the target by the time this runs; this is
 // just extra margin before trusting the measurement.

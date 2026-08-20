@@ -32,8 +32,8 @@ These build via the root `CMakeLists.txt` same as everything in `tests/` — jus
 
 Every file here starts with `i_gain_<value>_...` for a specific I-gain setting, or `i_gain_sweep_...`/`i_gain_final_sweep_...` for the pose sets the sweep scripts move the arm through.
 
-- `i_gain_final_sweep_45pose_hand_posed_dataset.csv` — the 45 hand-posed poses (elbow_yaw locked) behind the final, most complete sweep, recorded via `tests/record_hand_poses_fixed_elbow_yaw.cpp`.
-- `i_gain_final_sweep_45pose_validate_input.csv` — the same 45 poses, reformatted as an input file for `test_five_pose_ndi_capture.exe --validate`.
+- `i_gain_final_sweep_45pose_hand_posed_dataset.csv` — the 45 hand-posed poses (elbow_yaw locked) behind the final, most complete sweep, recorded via `calibration/collection/record_hand_poses.cpp`.
+- `i_gain_final_sweep_45pose_validate_input.csv` — the same 45 poses, reformatted as an input file for `ndi_capture_and_validate.exe --validate`.
 - `i_gain_{0,4,8,12,16,20,24,30}_final_sweep_accuracy_results.csv` — the final sweep's real NDI-measured accuracy results for each I-gain candidate, on the 45-pose set above. This is the data behind the "no candidate beats I=0" bottom-line finding.
 - `i_gain_sweep_12pose_spread_across_range_input.csv`, `i_gain_sweep_35pose_early_subset_input.csv`, `i_gain_sweep_37pose_early_subset_input.csv` — three earlier, smaller candidate pose sets, each the literal input to its matching `.ps1` script above. Superseded by the 45-pose final sweep but kept since the scripts still run against them as-is.
 - `i_gain_0_baseline_accuracy_results.csv`, `i_gain_8_regression_discovery_9pose_results.csv` — the original 9-point same-session A/B test (I=0 vs I=8) that first caught I=8 making real accuracy *worse* (10.25mm → 24.60mm mean deviation) — the finding that triggered this whole investigation.

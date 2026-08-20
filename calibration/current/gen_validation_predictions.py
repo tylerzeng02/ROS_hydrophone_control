@@ -3,7 +3,7 @@ points, using the current best-fit 60-param correction model (recovered in
 recovered_60param_fit.py -- see CLAUDE.md's kinematic-calibration section for
 where that model came from).
 
-Companion to tests/test_five_pose_ndi_capture.cpp's --validate mode: that
+Companion to calibration/collection/ndi_capture_and_validate.cpp's --validate mode: that
 program moves the real arm to each test point and measures the actual NDI
 position; this script supplies the "predicted" side of the comparison. The
 C++ program has no FK/calibration model of its own on purpose -- keeping the
@@ -311,7 +311,7 @@ def main():
                   f"({pred_mm[0]:.2f}, {pred_mm[1]:.2f}, {pred_mm[2]:.2f})")
 
     print(f"\nWrote {len(ticks_rows)} predicted test points to {args.out}")
-    print(f"Run on the arm with: test_five_pose_ndi_capture.exe --validate {args.out}")
+    print(f"Run on the arm with: ndi_capture_and_validate.exe --validate {args.out}")
 
 
 if __name__ == "__main__":

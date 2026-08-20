@@ -12,8 +12,8 @@ a home for real project data. See `calibration/data/README.md`.
 
 ## A quirk worth knowing: hardware tools still *write* here by default
 
-The native hardware tools (`test_five_pose_ndi_capture.exe`,
-`record_hand_poses_fixed_elbow_yaw.exe`, etc.) are built into this directory
+The native hardware tools (`ndi_capture_and_validate.exe`,
+`record_hand_poses.exe`, etc.) are built into this directory
 and, per this project's own build instructions, are meant to be run from
 inside it (`cd build`, then run the `.exe` directly) — so any output file
 they write with a bare relative filename (no directory prefix) lands here by

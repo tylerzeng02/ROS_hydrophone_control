@@ -1,60 +1,35 @@
 // move_between_points: given a sequence of real, NDI-measured target points
-// (collected by cyton_ndi_capture's ndi_measure, e.g. by jogging the arm
-// around in RViz and pressing Enter at each spot), commands the arm to
-// visit each one in turn via a RELATIVE Cartesian move computed from its
-// live current position, and measures the real error at each stop.
+// (collected via cyton_ndi_capture's ndi_measure), commands the arm to
+// visit each one via a RELATIVE Cartesian move from its live current
+// position, and measures the real error at each stop.
 //
-// Rationale (from the conversation that motivated this tool): a relative
-// "move by this much" command and an absolute "go to this point" command
-// are literally the same MoveIt request under the hood (setPoseTarget with
-// current_pose + delta vs. setPoseTarget with an absolute pose) -- the
-// difference in expected accuracy comes from where the delta being
-// commanded is ANCHORED, not from the command mechanism. Anchoring the
-// delta to the arm's own LIVE current position at each hop (as this tool
-// does) means each hop only has to be as good as the arm's own short-term
-// repeatability, not its full absolute calibration accuracy -- and it
-// self-corrects any drift from a prior hop instead of compounding it,
-// since every hop re-measures "where am I actually right now" before
-// computing the next move.
+// Rationale: a relative move and an absolute move are the same MoveIt
+// request under the hood -- what matters is where the delta is anchored.
+// Anchoring to the arm's live current position each hop means each hop
+// only needs the arm's short-term repeatability, not full absolute
+// calibration accuracy, and self-corrects prior drift instead of
+// compounding it.
 //
-// A real subtlety this tool has to handle: the target points are recorded
-// in the NDI tracker's own coordinate frame (moving marker relative to
-// fixed marker), but MoveIt needs a delta expressed in ITS frame
-// (base_link) to command a move. These two frames are rotated relative to
-// each other by a real, substantial amount (verified this session: two
-// independently-fit base-frame rotations, from different datasets, agreed
-// to within ~3 degrees of each other as actual rotation matrices, despite
-// their raw Euler-angle numbers looking wildly different -- Euler angles
-// are famously non-unique, so always compare rotations as matrices, not
-// raw angle triples). Only the ROTATION part of that frame relationship is
-// needed here (translation cancels out for a delta/direction vector), so
-// this tool is far less sensitive to the base-frame TRANSLATION
-// uncertainty that plagues absolute-position tests elsewhere in this
-// project.
+// Target points are recorded in the NDI tracker's frame, but MoveIt needs
+// the delta in its own (base_link) frame -- these frames differ by a real,
+// substantial rotation (R_MOVEIT_TO_NDI below). Only the rotation matters
+// here (translation cancels out for a delta vector), so this tool is far
+// less sensitive to base-frame translation uncertainty than absolute-
+// position tests elsewhere in this project.
 //
 // NdiTracker and its dependencies are copied verbatim from
-// cyton_accuracy_check/src/run_accuracy_check.cpp / move_x_test.cpp
-// (themselves copied from cyton_ndi_capture/src/ndi_measure.cpp) --
-// already hardware-validated NDI connect/BX-polling/averaging code, not
-// reimplemented here.
+// run_accuracy_check.cpp/move_x_test.cpp (originally from
+// cyton_ndi_capture/src/ndi_measure.cpp) -- already hardware-validated.
 //
-// Orientation-target fix (2026-08-13): before this, targetPose's
-// orientation was always copied from moveGroup.getCurrentPose() -- i.e.
-// "preserve whatever orientation the arm currently has," NOT "restore the
-// orientation recorded when the trajectory was built." With nothing ever
-// pulling orientation back toward what was actually intended, small
-// per-hop drift (IK convergence tolerance, execution error) accumulated
-// uncorrected over a long run -- confirmed on a real run where a
-// perpendicular-to-the-ground trajectory ended up visibly bent by the
-// last point. Fixed by reading the orientation that was ALREADY recorded
-// per-point in any ndi_measure/record_waypoints-format CSV: moveit_pose_
-// qw/qx/qy/qz (MoveIt/base_link frame -- used directly as the IK target's
-// orientation, no conversion needed) and moving_relative_fixed_q0/qx/qy/
-// qz (NDI frame -- used directly to measure orientation error against the
-// NDI-measured "after" pose, again no conversion needed, since each is
-// already expressed in the frame it's used in). Falls back to the old
-// current-orientation behavior (with a printed warning) if a CSV lacks
-// these columns.
+// Orientation-target fix: targetPose's orientation used to be copied from
+// getCurrentPose() every hop ("preserve current orientation") instead of
+// the originally-recorded target, so small per-hop drift accumulated
+// uncorrected (confirmed on a real run that ended up visibly bent). Fixed
+// by reading the orientation already recorded per-point in any
+// ndi_measure/record_waypoints CSV (moveit_pose_qw/qx/qy/qz for the IK
+// target, moving_relative_fixed_q0/qx/qy/qz for measuring error against
+// the NDI-measured result) -- falls back to the old behavior with a
+// warning if a CSV lacks these columns.
 
 #include <algorithm>
 #include <array>
@@ -90,13 +65,10 @@ constexpr const char* DEFAULT_FIXED_TOOL_ROM =
     "/home/temp/Downloads/8700449- Polaris Passive 4-Marker Rigid Body 3(1).rom";
 
 constexpr const char* PLANNING_GROUP = "arm";
-// Same values established (and verified via the real move_group log, see
-// CLAUDE.md/this session's history) for move_x_test's Cartesian-IK moves:
-// a single 5s attempt was NOT reliably enough for elbow_yaw's narrow
-// locked window to be found by random-seeded IK, and setNumPlanningAttempts
-// alone doesn't multiply the total search time the way it sounds like it
-// should (MoveIt runs a handful of threads IN PARALLEL sharing the same
-// time budget, not sequential fresh-budget retries).
+// Same values as move_x_test's Cartesian-IK moves: a single 5s attempt
+// isn't reliably enough for elbow_yaw's narrow locked window to be found
+// by random-seeded IK, and setNumPlanningAttempts's threads run in
+// PARALLEL sharing one time budget, not sequential fresh-budget retries.
 constexpr double PLANNING_TIME_SECONDS = 30.0;
 constexpr unsigned int NUM_PLANNING_ATTEMPTS = 15;
 
@@ -109,38 +81,20 @@ constexpr double MAX_NDI_ERROR = 0.50;
 
 // ---------------------------------------------------------------------
 // NDI-frame -> MoveIt-frame ROTATION (only the rotation, not the full
-// base-frame transform -- see the file header comment for why that's
-// sufficient here).
-//
-// REFIT 2026-08-10 (calibration/current/refit_moveit_ndi_rotation.py):
-// the previous batch2-derived rotation below was found to be stale --
-// calibration/current/check_fixed_marker_drift.py measured ~6.31deg of
-// drift in the fixed marker's own orientation since the batch2 session,
-// and this independently-derived Kabsch fit (12 fresh paired NDI/MoveIt
-// poses, collected via the 2026-08-10 ndi_measure change that logs
-// MoveGroupInterface::getCurrentPose() alongside each NDI capture) agrees
-// closely: 6.21deg between the old and new matrices, via a completely
-// different method (delta-vector Kabsch fit vs. raw quaternion comparison)
-// -- strong cross-validation that the drift is real, not a measurement
-// artifact. RMS delta-vector error on the 12-pose fit data dropped from
-// 6.03mm (old matrix) to 3.44mm (this one).
-// Old (batch2-derived, now stale) rotation, kept for reference:
-//     {-0.0352, 0.8862, 0.4619},
-//     {0.6846, 0.3581, -0.6349},
-//     {-0.7281, 0.2939, -0.6193},
+// base-frame transform -- see the file header for why that's sufficient).
+// Refit periodically (calibration/current/refit_moveit_ndi_rotation.py) as
+// the fixed marker's orientation can drift between sessions -- see
+// CLAUDE.md for the fit history.
 //
 // Convention (matches calibrate_kinematics.py's build_base_transform()):
-// this matrix R maps a vector expressed in MoveIt/base_link coordinates to
-// the same vector expressed in NDI/fixed-marker coordinates:
+// this matrix R maps a vector in MoveIt/base_link coordinates to the same
+// vector in NDI/fixed-marker coordinates:
 //     v_ndi = R * v_moveit
-// To go the other way (we have a delta in NDI coordinates, need it in
-// MoveIt coordinates to command a move), use the transpose (R is a proper
-// rotation matrix, so R^-1 == R^T):
+// To go the other way (NDI delta -> MoveIt delta), use the transpose
+// (R is a proper rotation matrix, so R^-1 == R^T):
 //     v_moveit = R^T * v_ndi
-// Refit 2026-08-13 from ndi_moveit_rotation_calibration_data.csv (13
-// valid paired poses, 1 getCurrentPose()-failed sentinel row auto-rejected).
-// Only 0.46deg from the prior fit -- effectively confirms no meaningful
-// marker drift, but deployed anyway per direct request.
+// Current fit: ndi_moveit_rotation_calibration_data.csv (13 valid paired
+// poses).
 constexpr double R_MOVEIT_TO_NDI[3][3] = {
     {0.0033, 0.8971, 0.4418},
     {0.6142, 0.3469, -0.7088},

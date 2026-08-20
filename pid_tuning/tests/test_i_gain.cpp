@@ -1,77 +1,36 @@
-// test_i_gain: single-joint, one-parameter-at-a-time PID I-Gain test --
-// the direct, correctly-targeted successor to test_compliance_punch.cpp
-// now that this arm's servos are confirmed MX-64/MX-28 (real PID control),
-// not AX-12A (compliance control) -- see tests/check_servo_model.cpp and
-// dynamixel_motor.h's corrected header comment on readComplianceMargins().
+// test_i_gain: single-joint, one-parameter-at-a-time PID I-Gain test.
+// Servos are MX-64/MX-28 (real PID), not AX-12A -- see check_servo_model.cpp.
 //
-// Why I Gain specifically: it's the PID term that eliminates STEADY-STATE
-// error under constant load -- exactly the "servo settles a few ticks
-// short of target and never closes the gap" symptom documented in
-// CLAUDE.md's kinematic-calibration section. Unlike P Gain (address 28),
-// which the 2026-07-29 vibration incident already touched (aggressively,
-// across presumably all joints, and had to be reverted), I Gain (address
-// 27) has never been touched by anything in this project's history --
-// it's a genuinely untested, well-targeted candidate, not a repeat of a
-// past mistake.
+// I Gain eliminates steady-state error under constant load, matching the
+// "settles a few ticks short and never closes the gap" symptom (see
+// CLAUDE.md). Unlike P Gain (already touched by a past vibration
+// incident), I Gain has never been touched before.
 //
 // Usage: test_i_gain [motorId] [testIGain] [startTick] [targetTick]
-//   motorId:     which joint to test (default 3 = elbow_pitch -- a real
-//                backlash/gravity hotspot with meaningful lever arm to
-//                the end-effector, so an improvement here is more likely
-//                to be visible in real NDI-measured accuracy).
-//   testIGain:   the I Gain value to try (default 8; factory/current
-//                value is read directly from the servo and printed, NOT
-//                assumed -- I Gain is commonly 0 by default on Dynamixel
-//                servos, meaning zero integral action, which is
-//                consistent with the steady-state-error symptom this
-//                test is chasing). Valid range is 0-254 (1 byte); this
-//                program does not clamp/validate beyond what
-//                writeGains()/the servo firmware itself enforces.
-//   startTick/targetTick: explicit move endpoints (both required together,
-//                or both omitted). If omitted, defaults to the joint's
-//                calibrated midpoint +/- 300 ticks. IMPORTANT (2026-08-13,
-//                found via a real first trial): a symmetric-around-
-//                midpoint default has no guarantee of landing anywhere
-//                near a gravity-loaded configuration -- a P-only
-//                controller's steady-state error scales with however much
-//                constant torque is fighting it, so testing at a spot
-//                with little load will show little-to-no baseline error
-//                for I Gain to fix (and can make I Gain look like it hurts
-//                via ordinary integral windup, when really there was
-//                nothing to correct). Pass explicit ticks nearer one end
-//                of the joint's range (more extended/horizontal
-//                configuration, more downstream mass, larger gravity
-//                moment arm about this joint's own axis) to actually
-//                exercise the failure mode this test is meant to probe.
+//   motorId:   default 3 (elbow_pitch), a real backlash/gravity hotspot.
+//   testIGain: default 8. Baseline is read from the servo, not assumed.
+//   startTick/targetTick: both required together, or both omitted
+//               (defaults to midpoint +/- 300). Pass explicit ticks near
+//               one end of the range to land somewhere gravity-loaded --
+//               a symmetric-midpoint default may show no baseline error
+//               for I Gain to fix (and can look like it hurts via
+//               ordinary integral windup instead).
 //
-// Methodology: read and print the CURRENT D/I/P gains (baseline -- NOT
-// assumed factory values). Move to START, settle. Move to TARGET at the
-// CURRENT (unmodified) gains via a single setGoalPosition() write (NOT
+// Methodology: read/print baseline D/I/P gains. Move to START, settle.
+// Move to TARGET at unmodified gains (single setGoalPosition() write, not
 // moveJointSafely(), to avoid its own backlash-overshoot logic
-// confounding what we're isolating), poll position every 100ms until it
-// stops changing or times out, record the BEFORE tick error. Move back to
-// START, settle. Write ONLY I Gain to the test value -- D Gain and P Gain
-// are read back and written back UNCHANGED, not reset to any assumed
-// default, so this test isolates exactly one parameter the same way
-// test_compliance_punch.cpp isolated Punch. Confirm via read-back. Move
-// to TARGET again the same way, poll the same way, record the AFTER tick
-// error. Move back to START, restore the ORIGINAL D/I/P gains read at the
-// very start, confirm via read-back regardless of what happened above.
-// Print both poll traces in full (watch for oscillation in the numbers --
-// a real vibration signature, not just a final-error number) plus a
-// before/after summary.
+// confounding the isolation), poll until settled, record BEFORE error.
+// Back to START. Write only I Gain to the test value (D/P unchanged),
+// confirm via read-back. Move to TARGET again, record AFTER error. Back
+// to START, restore original D/I/P, confirm via read-back regardless of
+// outcome. Print both poll traces plus a before/after summary.
 //
-// IMPORTANT: watch and LISTEN to the arm during the AFTER phase. Any
-// audible vibration or visible oscillation means abort (Ctrl+C is safe --
-// see CLAUDE.md's "Torque/Ctrl+C note": the servo just holds its last
-// commanded position with no ongoing host communication needed) and this
-// I Gain value is too aggressive for this joint -- try a smaller step.
+// WATCH AND LISTEN during AFTER. Any vibration/oscillation means abort
+// (Ctrl+C is safe -- torque holds the last commanded position) and this
+// I Gain value is too aggressive.
 //
-// This is a SINGLE-TRIAL diagnostic, not a validated fix. A real fix
-// needs this repeated a few times (settling behavior can vary run to
-// run), then confirmed with an actual NDI before/after comparison (the
-// same standard this project applies to every other change), before being
-// trusted or rolled out to other joints.
+// Single-trial diagnostic, not a validated fix -- repeat a few times, then
+// confirm with a real NDI before/after comparison before trusting it.
 
 #include <chrono>
 #include <cmath>
@@ -164,15 +123,8 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // startTick/targetTick: explicit overrides (args 3 and 4), letting the
-    // caller deliberately target a specific, potentially gravity-loaded
-    // configuration instead of an arbitrary midpoint-centered offset.
-    // Steady-state error under a P-only controller scales with however
-    // much constant torque (e.g. gravity) is fighting it -- a
-    // symmetric-around-midpoint test has no guarantee of landing anywhere
-    // near where that load, and hence the error I Gain is meant to fix,
-    // is actually significant. If omitted, falls back to the original
-    // midpoint +/- 300 default.
+    // startTick/targetTick: explicit overrides (args 3 and 4) -- see header
+    // comment. Falls back to midpoint +/- 300 if omitted.
     int startTickInt, targetTickInt;
     if (argc > 4) {
         startTickInt = std::stoi(argv[3]);
@@ -209,13 +161,8 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // Enable torque on ALL 7 joints, not just the one under test -- so the
-    // rest of the arm stays rigid/holding position while the test joint
-    // moves, instead of hanging loose under gravity. This also matches
-    // real production dynamics more closely (the whole arm's weight is
-    // normally supported by every joint at once), which matters here
-    // since gravity-dependent load is part of what this test is
-    // implicitly probing.
+    // Torque on ALL 7 joints, not just the one under test, so the rest of
+    // the arm stays rigid instead of hanging loose under gravity.
     std::cout << "Enabling torque on all 7 joints...\n";
     for (int otherMotorId = 0; otherMotorId < 7; ++otherMotorId) {
         if (!motor.pingMotor(otherMotorId)) {
@@ -243,12 +190,9 @@ int main(int argc, char** argv) {
     // --- BEFORE: current (unmodified) gains ---
     std::cout << "\n--- Moving to START (settle) ---\n";
     motor.moveJointSafely(motorId, startTick, MOVING_SPEED);
-    // moveJointSafely() unconditionally disables torque on this motor once
-    // it reaches its target (no parameter can prevent this, unlike the
-    // multi-joint moveJointsSafely()'s holdTorque) -- re-enable immediately
-    // so the joint doesn't hang unsupported under gravity for however long
-    // this program does anything next. See this file's own comment history
-    // (2026-08-13) for the real, observed drop this caused before the fix.
+    // moveJointSafely() unconditionally disables torque once it reaches
+    // target (no parameter can prevent this) -- re-enable immediately so
+    // the joint doesn't hang unsupported under gravity.
     motor.enableTorque(motorId);
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
@@ -260,13 +204,7 @@ int main(int argc, char** argv) {
 
     std::cout << "\n--- Moving back to START (settle) ---\n";
     motor.moveJointSafely(motorId, startTick, MOVING_SPEED);
-    // moveJointSafely() unconditionally disables torque on this motor once
-    // it reaches its target (no parameter can prevent this, unlike the
-    // multi-joint moveJointsSafely()'s holdTorque) -- re-enable immediately
-    // so the joint doesn't hang unsupported under gravity for however long
-    // this program does anything next. See this file's own comment history
-    // (2026-08-13) for the real, observed drop this caused before the fix.
-    motor.enableTorque(motorId);
+    motor.enableTorque(motorId);  // see the earlier comment on this pattern
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
     // --- Apply test I Gain (D and P left exactly as read, unchanged) ---
@@ -300,13 +238,7 @@ int main(int argc, char** argv) {
     // attempted, regardless of what happened above). ---
     std::cout << "\n--- Moving back to START, restoring original gains ---\n";
     motor.moveJointSafely(motorId, startTick, MOVING_SPEED);
-    // moveJointSafely() unconditionally disables torque on this motor once
-    // it reaches its target (no parameter can prevent this, unlike the
-    // multi-joint moveJointsSafely()'s holdTorque) -- re-enable immediately
-    // so the joint doesn't hang unsupported under gravity for however long
-    // this program does anything next. See this file's own comment history
-    // (2026-08-13) for the real, observed drop this caused before the fix.
-    motor.enableTorque(motorId);
+    motor.enableTorque(motorId);  // see the earlier comment on this pattern
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     if (!motor.writeGains(motorId, originalD, originalI, originalP)) {
         std::cerr << "WARNING: FAILED to restore original gains (D=" << static_cast<int>(originalD)
