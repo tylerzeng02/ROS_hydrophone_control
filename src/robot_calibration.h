@@ -10,8 +10,8 @@ struct JointCalibration
     int direction;
     int minTick;
     int maxTick;
-    // Gear-ratio scale correction from the kinematic calibration fit (see
-    // CLAUDE.md). 1.0 = uncorrected. See radiansToTicks()/ticksToRadians().
+    // Gear-ratio scale correction from the kinematic calibration fit.
+    // 1.0 = uncorrected. See radiansToTicks()/ticksToRadians().
     double scale = 1.0;
 };
 

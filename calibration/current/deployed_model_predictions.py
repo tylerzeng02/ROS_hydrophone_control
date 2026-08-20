@@ -17,8 +17,8 @@ The only thing fit is the base-frame/tool-frame transform (12 params)
 needed to translate a predicted end-effector pose into the NDI tracker's
 measurement frame (moving-marker-relative-to-fixed-marker) -- nothing in
 the deployed system relates base_link to that frame (deliberately: that
-transform is anchored to the calibration rig, not real deployment, see
-CLAUDE.md). This mirrors exactly how calibrate_kinematics.py treats
+transform is anchored to the calibration rig, not real deployment). This
+mirrors exactly how calibrate_kinematics.py treats
 base_xyz/base_rpy (unregularized, unknown rig geometry) and tool_xyz/
 tool_rpy (weakly regularized around nominal, since the marker mount is
 close to its designed position) -- just isolated here since joint offsets
@@ -49,24 +49,20 @@ from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
 import calibrate_kinematics as ck
 
-# ---------------------------------------------------------------------------
 # Deployed joint-level calibration (src/robot_calibration.cpp jointCalibrations,
 # as of 2026-08-06). direction is +1 for every joint on this arm.
 # radians = direction * scale * (tick - zeroTick) / TICKS_PER_RADIAN
 # -- exactly matches ticksToRadians() in src/robot_calibration.cpp.
-# ---------------------------------------------------------------------------
 DEPLOYED_ZERO_TICKS = [2048, 2047, 2060, 2102, 2078, 2042, 2048]
 DEPLOYED_DIRECTION = [1, 1, 1, 1, 1, 1, 1]
 DEPLOYED_SCALE = [0.988203, 1.001931, 0.964711, 1.014467, 1.0, 1.006796, 1.002933]
 
-# ---------------------------------------------------------------------------
 # Deployed geometry (references/cyton_gamma_1500_trac_ik.urdf, as of
 # 2026-08-06). Axis tilt applied to all 7 joints except elbow_yaw (index 4,
 # left at its nominal axis -- poorly identified fit, moot since the joint is
 # now permanently locked). Origin correction applied only to shoulder_yaw
 # (x,z), elbow_pitch (x,y,z), wrist_pitch (x,y,z); every other joint's
 # origin is unchanged from nominal.
-# ---------------------------------------------------------------------------
 DEPLOYED_AXES_RAW = np.array([
     [0.013792, 0.014877, 0.999794],
     [0.998997, -0.043573, -0.010357],
@@ -111,11 +107,9 @@ def forward_kinematics_deployed(joint_angles_rad):
     return T
 
 
-# ---------------------------------------------------------------------------
 # Frame-fit parameters (12): tool_xyz/rpy (3+3, weakly regularized around
 # nominal) + base_xyz/rpy (3+3, unregularized -- no small-value prior, same
 # reasoning as calibrate_kinematics.py).
-# ---------------------------------------------------------------------------
 
 def unpack(x):
     return dict(tool_xyz=x[0:3], tool_rpy=x[3:6], base_xyz=x[6:9], base_rpy=x[9:12])
@@ -147,14 +141,12 @@ def residual(x, angles, pos_mm, quat_xyzw):
         )
     # Regularize tool_xyz toward zero only (a mild small-value prior on the
     # marker-mount translation). tool_rpy/base_xyz/base_rpy are left
-    # unregularized, matching every "current best" script in this project
-    # (gen_validation_predictions.py etc.) -- the core calibrate_kinematics.py's
-    # tight ±10mm/±10deg/±180deg bounds+regularization on these caused
-    # bound-pinning (confirmed directly: even the known-good 374-pose dataset
-    # blows up to ~70mm RMS under those tight bounds), which is exactly the
-    # already-documented "tool-frame bounds disagree between scripts" issue
-    # in CLAUDE.md -- this script follows the wider, proven convention
-    # instead of the narrow core-script one.
+    # unregularized, matching every "current best" script in this project --
+    # the core calibrate_kinematics.py's tight ±10mm/±10deg/±180deg
+    # bounds+regularization on these caused bound-pinning (confirmed
+    # directly: even the known-good 374-pose dataset blows up to ~70mm RMS
+    # under those tight bounds), so this script follows the wider, proven
+    # convention instead.
     reg = p["tool_xyz"] * (ck.TOOL_REG_WEIGHT / TOOL_XYZ_BOUND_M)
     return np.concatenate([pos_res.ravel(), orient_res.ravel(), reg])
 

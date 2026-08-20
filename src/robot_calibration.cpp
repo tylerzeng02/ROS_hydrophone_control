@@ -3,8 +3,8 @@
 #include <cmath>
 
 // Offset/scale corrections come from the 60-param kinematic calibration fit
-// (blocked-CV RMS 0.78mm; see CLAUDE.md). Offset is folded into zeroTick;
-// scale is the fitted gear-ratio correction, applied in radiansToTicks()/
+// (blocked-CV RMS 0.78mm). Offset is folded into zeroTick; scale is the
+// fitted gear-ratio correction, applied in radiansToTicks()/
 // ticksToRadians() below.
 //
 // Joints 0 (shoulder_roll) and 6 (wrist_roll) don't get their fitted offset:
@@ -21,17 +21,17 @@ std::vector<JointCalibration> jointCalibrations = {
     // minTick/maxTick have a few ticks' margin beyond the hand-verified
     // extremes: MoveIt's CheckStartStateBounds has zero tolerance for being
     // outside the declared range, and ordinary servo settling/backlash
-    // noise is enough to occasionally land just past it -- see CLAUDE.md.
+    // noise is enough to occasionally land just past it.
     {3, 2102, +1, 799, 3307, 1.014467},                  // offset +0.5297deg
     // Joint 4 (elbow_yaw) is deliberately LOCKED near its midpoint -- it's
     // the single worst-measured backlash joint (7.68mm) and a confirmed
     // coupling/gravity-deflection hotspot; excluding it from motion
-    // planning measurably improved the other 6 joints' accuracy (see
-    // CLAUDE.md, "reduced-DOF breakthrough"). No offset/scale applied: it
-    // barely moved in the fit dataset (locked the whole time), so its own
-    // correction is poorly identified and moot anyway while locked. Range
-    // is a deliberately tiny ~4-degree window, with just enough slack to
-    // absorb settling noise without tripping MoveIt's bounds check.
+    // planning measurably improved the other 6 joints' accuracy. No
+    // offset/scale applied: it barely moved in the fit dataset (locked the
+    // whole time), so its own correction is poorly identified and moot
+    // anyway while locked. Range is a deliberately tiny ~4-degree window,
+    // with just enough slack to absorb settling noise without tripping
+    // MoveIt's bounds check.
     {4, 2078, +1, 2060, 2130, 1.0},
     {5, 2042, +1, 751, 3344, 1.006796},                  // offset +0.4909deg
     {6, 2048, +1, 335, 3761, 1.002933}                   // offset skipped (tool-frame degeneracy)

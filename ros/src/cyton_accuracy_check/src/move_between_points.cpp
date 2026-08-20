@@ -53,9 +53,7 @@
 
 namespace {
 
-// ---------------------------------------------------------------------
 // Configuration
-// ---------------------------------------------------------------------
 constexpr const char* DEFAULT_INPUT_CSV = "ndi_target_points.csv";
 constexpr const char* DEFAULT_OUTPUT_CSV = "move_between_points_results.csv";
 constexpr const char* DEFAULT_NDI_DEVICE = "/dev/ttyUSB1";
@@ -79,12 +77,10 @@ constexpr int NDI_SAMPLE_INTERVAL_MS = 20;
 constexpr int REQUIRED_VISIBLE_MARKERS = 4;
 constexpr double MAX_NDI_ERROR = 0.50;
 
-// ---------------------------------------------------------------------
 // NDI-frame -> MoveIt-frame ROTATION (only the rotation, not the full
 // base-frame transform -- see the file header for why that's sufficient).
 // Refit periodically (calibration/current/refit_moveit_ndi_rotation.py) as
-// the fixed marker's orientation can drift between sessions -- see
-// CLAUDE.md for the fit history.
+// the fixed marker's orientation can drift between sessions.
 //
 // Convention (matches calibrate_kinematics.py's build_base_transform()):
 // this matrix R maps a vector in MoveIt/base_link coordinates to the same
@@ -114,10 +110,8 @@ std::array<double, 3> rotateNdiDeltaToMoveIt(const std::array<double, 3>& deltaN
     return result;
 }
 
-// ---------------------------------------------------------------------
 // From cyton_ndi_capture/src/ndi_measure.cpp (NdiTracker and dependencies)
 // -- copied verbatim, same as move_x_test.cpp/run_accuracy_check.cpp.
-// ---------------------------------------------------------------------
 
 enum class NdiToolStatus { Detected, Missing, OutOfVolume, Disabled, LowQuality };
 
@@ -555,11 +549,9 @@ private:
     bool tracking_ = false;
 };
 
-// ---------------------------------------------------------------------
 // Target-point loading -- reads whatever CSV cyton_ndi_capture's
 // ndi_measure produced (or any CSV with the same moving_relative_fixed_tx_
 // mm/_ty_mm/_tz_mm columns), one target point per row, in order.
-// ---------------------------------------------------------------------
 
 struct TargetPoint {
     double txMm = 0.0, tyMm = 0.0, tzMm = 0.0;

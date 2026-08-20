@@ -8,12 +8,11 @@
 // moving-tool-relative-to-fixed-tool pose to CSV. Repeat for as many poses
 // as you want; Ctrl+C to quit.
 //
-// This is the NDI *measurement* half of calibration/collection/ndi_capture_and_validate.cpp
-// only -- the NdiTracker class and its direct dependencies (structs,
-// quaternion math, BX polling/averaging) are ported over close to verbatim,
-// since that code is already hardware-validated (see CLAUDE.md's
-// kinematic-calibration section for the full history). Real changes
-// from the original:
+// This is the NDI *measurement* half of
+// calibration/collection/ndi_capture_and_validate.cpp only -- the
+// NdiTracker class and its direct dependencies (structs, quaternion math,
+// BX polling/averaging) are ported over close to verbatim, since that code
+// is already hardware-validated. Real changes from the original:
 //   1. The Windows-only <conio.h> pause/skip/manual-mode hotkeys are
 //      stripped entirely (handleUserControls() is now a no-op) -- this tool
 //      doesn't drive the arm through a long unattended pose list the way
@@ -24,18 +23,16 @@
 //   2. Joint values come from live ROS /joint_states (whatever MoveIt/
 //      ros2_control last reported), not from directly reading Dynamixel
 //      ticks -- this tool has no DynamixelMotor dependency at all.
-//   3. Each capture also logs MoveGroupInterface::getCurrentPose() (added
-//      2026-08-10): pairing that MoveIt-frame pose with the same capture's
-//      NDI-frame pose is exactly the input a Kabsch/Procrustes fit needs to
-//      re-derive move_between_points.cpp's hardcoded NDI-to-MoveIt rotation
-//      -- e.g. after discovering (via calibration/current/
-//      check_fixed_marker_drift.py) that the fixed marker's orientation had
-//      drifted ~6.3deg from the batch2 calibration session that rotation
-//      was originally fit from. Using MoveIt's own live pose here, rather
-//      than recomputing FK offline in Python from the joint angles, means
-//      this is exactly what MoveIt itself believes the pose is -- no risk
-//      of a subtle mismatch between an offline reimplementation and
-//      whatever the real URDF/robot_state is doing internally.
+//   3. Each capture also logs MoveGroupInterface::getCurrentPose(): pairing
+//      that MoveIt-frame pose with the same capture's NDI-frame pose is
+//      exactly the input a Kabsch/Procrustes fit needs to re-derive
+//      move_between_points.cpp's hardcoded NDI-to-MoveIt rotation, since
+//      the fixed marker's orientation can drift between sessions. Using
+//      MoveIt's own live pose here, rather than recomputing FK offline in
+//      Python from the joint angles, means this is exactly what MoveIt
+//      itself believes the pose is -- no risk of a subtle mismatch between
+//      an offline reimplementation and whatever the real URDF/robot_state
+//      is doing internally.
 
 #include <algorithm>
 #include <array>
@@ -60,12 +57,8 @@
 
 namespace {
 
-// ---------------------------------------------------------------------
-// Configuration -- machine-specific, same spirit as the hardcoded values
-// in ndi_capture_and_validate.cpp (that file's own comment: "expect to
-// update them per machine"). Override via command-line args if needed;
-// see printUsage() below.
-// ---------------------------------------------------------------------
+// Configuration -- machine-specific, expect to update these per machine.
+// Override via command-line args if needed; see printUsage() below.
 constexpr const char* DEFAULT_NDI_DEVICE = "/dev/ttyUSB1";
 constexpr const char* DEFAULT_MOVING_TOOL_ROM =
     "/home/temp/Downloads/8700339- Polaris Passive 4-Marker Rigid Body 2(1).rom";
@@ -74,11 +67,6 @@ constexpr const char* DEFAULT_FIXED_TOOL_ROM =
 constexpr const char* DEFAULT_OUTPUT_CSV = "moveit_ndi_accuracy_check.csv";
 
 // Same planning group as move_between_points.cpp/run_accuracy_check.cpp.
-// Logging MoveGroupInterface's own live getCurrentPose() here (rather than
-// recomputing FK offline from the joint angles) means this tool's output
-// is exactly what MoveIt itself believes the pose is -- no risk of a
-// subtle mismatch between an offline Python FK reimplementation and
-// whatever the real URDF/robot_state is doing internally.
 constexpr const char* PLANNING_GROUP = "arm";
 
 constexpr int NDI_REQUIRED_VALID_SAMPLES = 30;
@@ -94,10 +82,8 @@ constexpr std::array<const char*, 7> JOINT_NAMES = {
     "wrist_roll_joint",
 };
 
-// ---------------------------------------------------------------------
 // Ported near-verbatim from ndi_capture_and_validate.cpp -- see that
 // file for the full derivation history of these types/functions.
-// ---------------------------------------------------------------------
 
 enum class NdiToolStatus { Detected, Missing, OutOfVolume, Disabled, LowQuality };
 
@@ -571,9 +557,7 @@ private:
     bool tracking_ = false;
 };
 
-// ---------------------------------------------------------------------
 // New code: live joint state + CSV logging + the capture loop.
-// ---------------------------------------------------------------------
 
 class JointStateCache : public rclcpp::Node {
 public:

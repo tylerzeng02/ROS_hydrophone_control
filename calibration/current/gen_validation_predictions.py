@@ -1,7 +1,6 @@
 """Generates predicted end-effector positions for a list of joint-tick test
 points, using the current best-fit 60-param correction model (recovered in
-recovered_60param_fit.py -- see CLAUDE.md's kinematic-calibration section for
-where that model came from).
+recovered_60param_fit.py).
 
 Companion to calibration/collection/ndi_capture_and_validate.cpp's --validate mode: that
 program moves the real arm to each test point and measures the actual NDI

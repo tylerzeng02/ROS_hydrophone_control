@@ -22,11 +22,8 @@ constexpr float CYTON_PROTOCOL_VERSION = 1.0F;
 
 constexpr std::size_t JOINT_COUNT = 7;
 
-// Multi-joint backlash test (2026-07-30): generalizes the original single-
-// joint version (which confirmed real backlash at wrist_pitch and
-// elbow_pitch individually) to walk through ALL joints in TEST_JOINT_IDS,
-// one after another, in a single sitting -- so a per-joint backlash gap
-// can be measured for every joint, not just the two already tested.
+// Multi-joint backlash test: walks through all joints in TEST_JOINT_IDS,
+// one after another, so a per-joint backlash gap can be measured for each.
 //
 // For each joint in turn, records exactly POSES_PER_JOINT (4) poses while
 // every OTHER joint stays locked (torqued) at a fixed position:
@@ -36,18 +33,14 @@ constexpr std::size_t JOINT_COUNT = 7;
 //   4. test joint AT the exact same target again, but auto-driven back to
 //      pose 2's exact recorded tick, arriving from above
 // Comparing the NDI-measured position of pose 2 vs pose 4 (via
-// ndi_capture_and_validate.cpp, same as the original single-joint
-// workflow) isolates that joint's own backlash: a gap larger than the
-// tracker's own repeatability floor means real backlash for that joint.
-// See CLAUDE.md's kinematic-calibration section for the wrist_pitch/
-// elbow_pitch results this generalizes.
+// ndi_capture_and_validate.cpp) isolates that joint's own backlash: a gap
+// larger than the tracker's own repeatability floor means real backlash.
 //
 // Only the joint currently under test is ever free (torque off); every
 // other joint -- including ones already tested earlier in this same
-// session -- is locked (torqued, held wherever it happens to be) so it
-// can't drift while a different joint is being hand-moved. Order matters
-// only in that TEST_JOINT_IDS is processed front-to-back; feel free to
-// reorder or trim this list to re-test a subset instead of all 7.
+// session -- is locked so it can't drift while a different joint is being
+// hand-moved. TEST_JOINT_IDS is processed front-to-back; reorder or trim
+// to re-test a subset instead of all 7.
 constexpr std::array<int, 7> TEST_JOINT_IDS = {0, 1, 2, 3, 4, 5, 6};
 constexpr int POSES_PER_JOINT = 4;
 
@@ -511,13 +504,9 @@ int main() {
                         );
                     }
 
-                    // Tightened from 15 (2026-07-29): the elbow_pitch
-                    // backlash test landed 11 ticks off pose 2's target
-                    // under the old 15-tick tolerance -- some joints'
-                    // longer lever arms to the marker make a loose tick-
-                    // match a much bigger confound than for a joint close
-                    // to the end effector, so keeping this tight matters
-                    // across the board now that every joint is tested.
+                    // Kept tight: joints with a long lever arm to the
+                    // marker make a loose tick-match a much bigger confound
+                    // than for a joint close to the end effector.
                     constexpr int AUTO_DRIVE_TOLERANCE_TICKS = 4;
                     constexpr int AUTO_DRIVE_TIMEOUT_MS = 8000;
                     constexpr int AUTO_DRIVE_POLL_MS = 100;

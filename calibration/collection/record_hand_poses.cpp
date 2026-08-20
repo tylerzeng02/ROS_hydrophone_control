@@ -17,11 +17,11 @@ constexpr float CYTON_PROTOCOL_VERSION = 1.0F;
 
 constexpr std::size_t JOINT_COUNT = 7;
 
-// Reduced-DOF data collection (2026-08-04): elbow_yaw (motor 4) is
-// commanded to its calibrated range's midpoint and held there (torqued)
-// for the whole session -- see CLAUDE.md's kinematic-calibration section
-// for why: it's the single largest measured backlash contributor (7.68mm)
-// of any joint, and a confirmed joint-coupling/gravity-deflection hotspot.
+// Reduced-DOF data collection: elbow_yaw (motor 4) is commanded to its
+// calibrated range's midpoint and held there (torqued) for the whole
+// session -- it's the single largest measured backlash contributor
+// (7.68mm) of any joint, and a confirmed joint-coupling/gravity-deflection
+// hotspot.
 // Fixing it removes both its own motion error and the IK redundancy it
 // otherwise contributes, at the cost of one fewer usable DOF. The other 6
 // joints are freely hand-posed (torque off) exactly like the original

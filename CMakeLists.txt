@@ -4,9 +4,7 @@ project(cyton_setup)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# ------------------------------------------------------------
 # Dynamixel SDK
-# ------------------------------------------------------------
 
 if(EXISTS
     "${CMAKE_CURRENT_SOURCE_DIR}/external/DynamixelSDK/c++/CMakeLists.txt"
@@ -21,18 +19,14 @@ else()
     )
 endif()
 
-# ------------------------------------------------------------
 # Common include directories
-# ------------------------------------------------------------
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/external/DynamixelSDK/c++/include
 )
 
-# ------------------------------------------------------------
 # Main program
-# ------------------------------------------------------------
 
 add_executable(cyton_setup
     src/main.cpp
@@ -45,9 +39,7 @@ target_link_libraries(cyton_setup
         dynamixel_sdk
 )
 
-# ------------------------------------------------------------
 # Basic Dynamixel tests
-# ------------------------------------------------------------
 
 add_executable(test_radians
     tests/test_radians.cpp
@@ -312,7 +304,6 @@ target_link_libraries(set_i_gain
         dynamixel_sdk
 )
 
-# ------------------------------------------------------------
 # TRAC-IK targets
 #
 # Archived 2026-08-20 (tests/archive/test_trac_ik.cpp, test_cyton_ik.cpp,
@@ -322,11 +313,8 @@ target_link_libraries(set_i_gain
 # existence-guard that used to live here. If TRAC-IK is populated again and
 # these are wanted back, restore this block from git history (see the
 # commit that removed it) alongside the archived .cpp files.
-# ------------------------------------------------------------
 
-# ------------------------------------------------------------
 # NDI API
-# ------------------------------------------------------------
 
 set(ndicapi_BUILD_APPLICATIONS OFF CACHE BOOL "" FORCE)
 set(BUILD_PYTHON OFF CACHE BOOL "" FORCE)

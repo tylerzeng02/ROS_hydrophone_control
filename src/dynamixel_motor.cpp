@@ -19,10 +19,10 @@ int getMotorTolerance(int motorId)
     return 10; // main arm joints stay more accurate
 }
 
-// Per-joint backlash overshoot margin, from hand-verified reversal tests
-// (see CLAUDE.md). Each value is the joint's measured backlash gap plus a
-// modest safety margin -- kept modest since overshooting past the true gap
-// only adds settling noise, not correction benefit.
+// Per-joint backlash overshoot margin, from hand-verified reversal tests.
+// Each value is the joint's measured backlash gap plus a modest safety
+// margin -- kept modest since overshooting past the true gap only adds
+// settling noise, not correction benefit.
 int getBacklashOvershootTicks(int motorId)
 {
     static const int overshootPerJoint[7] = {

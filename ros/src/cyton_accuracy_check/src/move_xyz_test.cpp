@@ -29,9 +29,7 @@
 
 namespace {
 
-// ---------------------------------------------------------------------
 // Configuration
-// ---------------------------------------------------------------------
 constexpr const char* DEFAULT_NDI_DEVICE = "/dev/ttyUSB1";
 constexpr const char* DEFAULT_MOVING_TOOL_ROM =
     "/home/temp/Downloads/8700339- Polaris Passive 4-Marker Rigid Body 2(1).rom";
@@ -60,10 +58,8 @@ constexpr int NDI_SAMPLE_INTERVAL_MS = 20;
 constexpr int REQUIRED_VISIBLE_MARKERS = 4;
 constexpr double MAX_NDI_ERROR = 0.50;
 
-// ---------------------------------------------------------------------
 // From move_x_test.cpp / cyton_ndi_capture/src/ndi_measure.cpp (NdiTracker
 // and dependencies) -- copied verbatim.
-// ---------------------------------------------------------------------
 
 enum class NdiToolStatus { Detected, Missing, OutOfVolume, Disabled, LowQuality };
 
@@ -644,8 +640,7 @@ int main(int argc, char** argv) {
                   << "  (note: NDI-measured displacement is in the NDI tracker's own frame, not "
                      "directly comparable axis-by-axis to the commanded MoveIt-frame delta -- only "
                      "the magnitude is directly comparable, since the two frames' axes aren't "
-                     "aligned. See CLAUDE.md's kinematic-calibration section for why NDI/MoveIt "
-                     "frames differ.)\n";
+                     "aligned.)\n";
     } catch (const std::exception& e) {
         std::cerr << "\nFatal error: " << e.what() << '\n';
         exitCode = 1;

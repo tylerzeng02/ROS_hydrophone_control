@@ -66,9 +66,7 @@ int main()
     std::cout << "\nMake sure the arm and surrounding area are clear."
               << std::endl;
 
-    // ------------------------------------------------------------
     // Phase 1: Enable torque at the arm's current pose
-    // ------------------------------------------------------------
 
     std::cout << "\nPress ENTER to enable torque for all motors "
               << "at their current positions...";
@@ -230,9 +228,7 @@ int main()
               << targetRadians << std::endl;
     std::cout << "Target tick: " << targetTick << std::endl;
 
-    // ------------------------------------------------------------
     // Phase 2: Move +0.05 rad from the captured starting position
-    // ------------------------------------------------------------
 
     std::cout << "\nPress ENTER to move motor "
               << testMotorId << " by +"
@@ -297,9 +293,7 @@ int main()
                   << "after the test movement." << std::endl;
     }
 
-    // ------------------------------------------------------------
     // Phase 3: Return only the tested joint to its captured position
-    // ------------------------------------------------------------
 
     std::cout << "\nPress ENTER to return motor "
               << testMotorId
@@ -329,9 +323,7 @@ int main()
     std::cout << "The selected joint returned to its captured "
               << "starting position." << std::endl;
 
-    // ------------------------------------------------------------
     // Phase 4: Disable torque for all motors
-    // ------------------------------------------------------------
 
     std::cout << "\nWarning: the arm may fall or move under gravity "
               << "when torque is disabled." << std::endl;

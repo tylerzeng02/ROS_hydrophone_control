@@ -4,23 +4,21 @@
 
 // Live, pose-dependent kinematic correction -- the joint-coupling,
 // gravity/elastostatic-deflection, and shoulder_pitch Fourier terms from
-// this project's offline 60-param calibration model (see CLAUDE.md for
-// derivation/validation history). robot_calibration.cpp/the deployed URDF
-// only carry the STATIC part of that model (offset/scale/tilt/origin);
-// these terms are functions of the current joint configuration, so they
-// can't be baked into a static geometry file and must be evaluated fresh
-// each control cycle -- hence their own module, with the full 7-joint FK
-// pass that requires.
+// this project's offline 60-param calibration model.
+// robot_calibration.cpp/the deployed URDF only carry the STATIC part of
+// that model (offset/scale/tilt/origin); these terms are functions of the
+// current joint configuration, so they can't be baked into a static
+// geometry file and must be evaluated fresh each control cycle -- hence
+// their own module, with the full 7-joint FK pass that requires.
 //
 // CONTROL DIRECTION: the offline model predicts true angle = f(commanded
 // angle). For control we need the inverse -- what to command so the true
 // angle lands where MoveIt wants. Approximated as one Newton step:
-// evaluate the deviation AT the desired angle and subtract it. Valid since
-// every correction here is a small perturbation relative to the joint
-// ranges involved (see CLAUDE.md for why this and one other small
-// approximation -- evaluating against the offset/scale-corrected angle
-// rather than the raw encoder angle the Python model was fit against --
-// are both negligible here).
+// evaluate the deviation AT the desired angle and subtract it. Valid
+// since every correction here is a small perturbation relative to the
+// joint ranges involved -- also true of evaluating against the offset/
+// scale-corrected angle rather than the raw encoder angle the Python
+// model was fit against, a second small approximation made here.
 //
 // elbow_yaw (index 4) is permanently locked to a ~4-degree window and gets
 // no correction here either, for the same reason as its offset/scale in

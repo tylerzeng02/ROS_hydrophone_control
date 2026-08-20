@@ -2,9 +2,9 @@
 // Servos are MX-64/MX-28 (real PID), not AX-12A -- see check_servo_model.cpp.
 //
 // I Gain eliminates steady-state error under constant load, matching the
-// "settles a few ticks short and never closes the gap" symptom (see
-// CLAUDE.md). Unlike P Gain (already touched by a past vibration
-// incident), I Gain has never been touched before.
+// "settles a few ticks short and never closes the gap" symptom. Unlike
+// P Gain (already touched by a past vibration incident), I Gain has
+// never been touched before.
 //
 // Usage: test_i_gain [motorId] [testIGain] [startTick] [targetTick]
 //   motorId:   default 3 (elbow_pitch), a real backlash/gravity hotspot.

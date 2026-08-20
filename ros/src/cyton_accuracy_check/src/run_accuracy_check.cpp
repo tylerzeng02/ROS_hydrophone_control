@@ -1,18 +1,15 @@
 // run_accuracy_check: single combined program that both commands the arm
 // via MoveIt and captures each pose's NDI measurement, in one synchronized
 // loop -- move, confirm success, settle, capture, log, repeat. Same shape
-// as the original calibration/collection/ndi_capture_and_validate.cpp, but MoveIt does the
-// moving instead of raw Dynamixel ticks.
+// as the original calibration/collection/ndi_capture_and_validate.cpp,
+// but MoveIt does the moving instead of raw Dynamixel ticks.
 //
 // Built to replace the separate cyton_pose_commander + cyton_ndi_capture
-// two-terminal workflow, which was found to have a real timing race: a
-// human manually alternating Enter between two terminals could (and did)
-// capture a pose before the move had actually finished, corrupting the
-// resulting dataset (see CLAUDE.md's kinematic-calibration section for the
-// specific incident -- two captures found to be the *same* physical pose
-// because a capture landed before the arm had moved). A single program
-// with a synchronous move-then-capture loop can't race with itself the
-// same way; there's no human-timed handoff to get wrong.
+// two-terminal workflow, which had a real timing race: a human manually
+// alternating Enter between two terminals could (and did) capture a pose
+// before the move had actually finished, corrupting the dataset (two
+// captures found to be the *same* physical pose). A single program with a
+// synchronous move-then-capture loop can't race with itself that way.
 //
 // This file merges, largely verbatim:
 //   - cyton_pose_commander/src/pose_commander.cpp's CSV loading,
@@ -20,11 +17,11 @@
 //     recovery logic.
 //   - cyton_ndi_capture/src/ndi_measure.cpp's NdiTracker class and its
 //     direct dependencies (already hardware-validated NDI connect/BX-
-//     polling/averaging code, see CLAUDE.md).
+//     polling/averaging code).
 //
 // Tick<->radian conversion goes through robot_calibration.cpp's
-// ticksToRadians()/radiansToTicks() (compiled directly into this binary,
-// see CMakeLists.txt) -- not reimplemented here.
+// ticksToRadians()/radiansToTicks() (compiled directly into this binary)
+// -- not reimplemented here.
 
 #include <algorithm>
 #include <array>
@@ -53,9 +50,7 @@
 
 namespace {
 
-// ---------------------------------------------------------------------
 // Configuration
-// ---------------------------------------------------------------------
 constexpr const char* DEFAULT_INPUT_CSV =
     "/home/temp/dev/cyton_setup/build/repeatability_test_8points_labeled.csv";
 constexpr const char* DEFAULT_OUTPUT_CSV = "accuracy_check_results.csv";
@@ -70,12 +65,9 @@ constexpr double PLANNING_TIME_SECONDS = 5.0;
 constexpr double RECOVERY_BUFFER_RAD = 0.01;
 
 // Pause after a confirmed-successful move, before starting the NDI
-// capture, to let any residual servo vibration settle -- matches this
-// project's established SETTLING_TIME_MS convention (originally 750ms in
-// ndi_capture_and_validate.cpp). MoveGroupInterface's move() already
-// blocks until the controller reports the trajectory finished, so the arm
-// is already at (or very near) the target by the time this runs; this is
-// just extra margin before trusting the measurement.
+// capture, to let any residual servo vibration settle. move() already
+// blocks until the trajectory finishes, so this is just extra margin
+// before trusting the measurement.
 constexpr int SETTLE_MS = 750;
 
 constexpr int NDI_REQUIRED_VALID_SAMPLES = 30;
@@ -89,9 +81,7 @@ constexpr std::array<const char*, 7> JOINT_NAMES = {
     "wrist_roll_joint",
 };
 
-// ---------------------------------------------------------------------
 // From cyton_pose_commander/src/pose_commander.cpp
-// ---------------------------------------------------------------------
 
 struct TestPoint {
     int pointId = 0;
@@ -197,9 +187,7 @@ bool sendCorrectiveTrajectory(const std::array<double, 7>& radians) {
     return content.find("SUCCEEDED") != std::string::npos;
 }
 
-// ---------------------------------------------------------------------
 // From cyton_ndi_capture/src/ndi_measure.cpp (NdiTracker and dependencies)
-// ---------------------------------------------------------------------
 
 enum class NdiToolStatus { Detected, Missing, OutOfVolume, Disabled, LowQuality };
 
@@ -664,9 +652,7 @@ private:
     bool tracking_ = false;
 };
 
-// ---------------------------------------------------------------------
 // CSV output for this combined tool
-// ---------------------------------------------------------------------
 
 void writePoseFields(std::ofstream& csv, const std::string& prefix) {
     csv << ',' << prefix << "_q0" << ',' << prefix << "_qx" << ',' << prefix << "_qy" << ','
@@ -682,10 +668,8 @@ void writeCsvHeader(std::ofstream& csv) {
     }
     // actual_rad_{i} (not a joint-name-based column) is a hard requirement,
     // not a style choice: calibrate_kinematics.py's load_poses_from_csv()
-    // reads this exact column name pattern to feed the fitting scripts --
-    // see CLAUDE.md's kinematic-calibration section for the established
-    // schema this matches (the same one every quick_calibration_test*.csv
-    // in this project has always used).
+    // reads this exact column name pattern, matching the schema every
+    // quick_calibration_test*.csv in this project has always used.
     for (std::size_t j = 0; j < 7; ++j) {
         csv << ",actual_rad_" << j;
     }

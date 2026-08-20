@@ -2,12 +2,11 @@
 // (address 0, identical location on every Protocol 1.0 Dynamixel) to
 // settle, from real hardware rather than assumption, exactly which servo
 // series this arm uses -- this project's code/comments long assumed
-// AX-12A, but that was corrected 2026-08-13 (the servos are actually
-// MX-64/MX-28), which matters a lot: on MX-series, register addresses
-// 26/27/28 are D Gain/I Gain/P Gain (real PID), not AX-style Compliance
-// Margin/Slope. See dynamixel_motor.h's updated header comment on
-// readComplianceMargins()/readComplianceSlopes() for why this distinction
-// matters for the compliance/punch investigation in CLAUDE.md.
+// AX-12A, but the servos are actually MX-64/MX-28, which matters a lot:
+// on MX-series, register addresses 26/27/28 are D Gain/I Gain/P Gain
+// (real PID), not AX-style Compliance Margin/Slope. See
+// dynamixel_motor.h's readComplianceMargins()/readComplianceSlopes() for
+// why this distinction matters.
 //
 // Read-only -- does not move the arm, does not write any register.
 //

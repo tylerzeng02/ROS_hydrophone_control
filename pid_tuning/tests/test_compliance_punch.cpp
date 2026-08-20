@@ -1,55 +1,33 @@
 // test_compliance_punch: single-joint, one-parameter-at-a-time compliance
-// test -- see CLAUDE.md's kinematic-calibration section ("Compliance-
-// margin/slope/punch investigated...") for the diagnosis this tests, and
-// the caution motivating this program's design. An earlier attempt
-// (2026-07-29) changed slope AND punch together, across presumably all
-// joints at once, and caused audible vibration -- it had to be reverted
-// (tests/reset_compliance.cpp exists because of that incident). This test
-// changes ONLY Punch, on ONLY one motor, and measures the actual
-// before/after tick-settling error at a real target -- not just "did it
-// run without erroring."
+// test. An earlier attempt changed slope AND punch together across all
+// joints and caused audible vibration (had to be reverted --
+// reset_compliance.cpp exists because of that). This test changes only
+// Punch, on only one motor, and measures actual before/after
+// tick-settling error, not just "did it run."
 //
 // Usage: test_compliance_punch [motorId] [testPunch] [offsetTicks]
-//   motorId:     which joint to test (default 3 = elbow_pitch -- a real
-//                backlash/gravity hotspot with meaningful lever arm to the
-//                end-effector, so an improvement here is more likely to be
-//                visible in real NDI-measured accuracy -- see CLAUDE.md).
-//   testPunch:   the punch value to try (default 60; factory default is
-//                32 -- see dynamixel_motor.h's own comment for what this
-//                register does. Valid range per the AX-12A spec is
-//                32-1023; this program does not clamp/validate beyond
-//                what writePunch()/the servo firmware itself enforces).
-//   offsetTicks: how far from the joint's calibrated midpoint to place
-//                START/TARGET (default 300 -- comfortably clears every
-//                joint's measured backlash gap from CLAUDE.md's per-joint
-//                backlash survey, so this isn't confounded by an
-//                incomplete reversal).
+//   motorId:     default 3 (elbow_pitch), a real backlash/gravity hotspot.
+//   testPunch:   default 60 (factory default is 32; range 32-1023 per the
+//                AX-12A spec, not clamped beyond what the firmware itself
+//                enforces).
+//   offsetTicks: default 300 -- comfortably clears every joint's measured
+//                backlash gap so this isn't confounded by an incomplete
+//                reversal.
 //
-// Methodology: move to START, settle. Move to TARGET at FACTORY punch
-// (32) via a single setGoalPosition() write (NOT moveJointSafely(), to
-// avoid its own backlash-overshoot logic confounding what we're
-// isolating), poll position every 100ms until it stops changing or times
-// out, record the BEFORE tick error. Move back to START, settle. Write
-// the TEST punch value to the one motor under test, confirm via
-// read-back. Move to TARGET again the same way, poll the same way, record
-// the AFTER tick error. Move back to START, restore FACTORY punch,
-// confirm via read-back regardless of what happened above. Print both
-// poll traces in full (watch for oscillation in the numbers -- a real
-// vibration signature, not just a final-error number) plus a before/after
-// summary.
+// Methodology: move to START, settle. Move to TARGET at factory punch
+// (single setGoalPosition() write, not moveJointSafely(), to avoid its
+// backlash-overshoot logic confounding the isolation), poll until
+// settled, record BEFORE error. Back to START. Write test punch, confirm
+// via read-back. Move to TARGET again, record AFTER error. Back to
+// START, restore factory punch, confirm via read-back regardless of
+// outcome. Print both poll traces plus a before/after summary.
 //
-// IMPORTANT: watch and LISTEN to the arm during the AFTER phase. Any
-// audible vibration or visible oscillation means abort (Ctrl+C is safe --
-// see CLAUDE.md's "Torque/Ctrl+C note": the servo just holds its last
-// commanded position with no ongoing host communication needed) and this
-// punch value is too aggressive for this joint -- try a smaller testPunch
-// step instead of a bigger one.
+// WATCH AND LISTEN during AFTER. Any vibration/oscillation means abort
+// (Ctrl+C is safe -- torque holds the last commanded position) and this
+// punch value is too aggressive.
 //
-// This is a SINGLE-TRIAL diagnostic, not a validated fix. A real fix
-// needs this repeated a few times (settling behavior can vary run to
-// run), then confirmed with an actual NDI before/after comparison (the
-// same standard this project applies to every other change), before being
-// trusted or rolled out to other joints.
+// Single-trial diagnostic, not a validated fix -- repeat a few times, then
+// confirm with a real NDI before/after comparison before trusting it.
 
 #include <chrono>
 #include <cmath>
@@ -197,11 +175,9 @@ int main(int argc, char** argv) {
     // --- BEFORE: factory punch ---
     std::cout << "\n--- Moving to START (settle) ---\n";
     motor.moveJointSafely(motorId, startTick, MOVING_SPEED);
-    // moveJointSafely() unconditionally disables torque on this motor once
-    // it reaches its target (no parameter can prevent this, unlike the
-    // multi-joint moveJointsSafely()'s holdTorque) -- re-enable immediately
-    // so the joint doesn't hang unsupported under gravity for however long
-    // this program does anything next.
+    // moveJointSafely() unconditionally disables torque once it reaches
+    // target -- re-enable immediately so the joint doesn't hang
+    // unsupported under gravity.
     motor.enableTorque(motorId);
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
@@ -212,11 +188,9 @@ int main(int argc, char** argv) {
 
     std::cout << "\n--- Moving back to START (settle) ---\n";
     motor.moveJointSafely(motorId, startTick, MOVING_SPEED);
-    // moveJointSafely() unconditionally disables torque on this motor once
-    // it reaches its target (no parameter can prevent this, unlike the
-    // multi-joint moveJointsSafely()'s holdTorque) -- re-enable immediately
-    // so the joint doesn't hang unsupported under gravity for however long
-    // this program does anything next.
+    // moveJointSafely() unconditionally disables torque once it reaches
+    // target -- re-enable immediately so the joint doesn't hang
+    // unsupported under gravity.
     motor.enableTorque(motorId);
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
@@ -247,11 +221,9 @@ int main(int argc, char** argv) {
     // regardless of what happened above). ---
     std::cout << "\n--- Moving back to START, restoring factory punch ---\n";
     motor.moveJointSafely(motorId, startTick, MOVING_SPEED);
-    // moveJointSafely() unconditionally disables torque on this motor once
-    // it reaches its target (no parameter can prevent this, unlike the
-    // multi-joint moveJointsSafely()'s holdTorque) -- re-enable immediately
-    // so the joint doesn't hang unsupported under gravity for however long
-    // this program does anything next.
+    // moveJointSafely() unconditionally disables torque once it reaches
+    // target -- re-enable immediately so the joint doesn't hang
+    // unsupported under gravity.
     motor.enableTorque(motorId);
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     if (!motor.writePunch(motorId, FACTORY_PUNCH)) {

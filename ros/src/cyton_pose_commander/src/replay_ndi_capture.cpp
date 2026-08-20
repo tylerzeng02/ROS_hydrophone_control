@@ -1,28 +1,18 @@
 // replay_ndi_capture: drives the arm through the poses recorded in a
-// cyton_ndi_capture/ndi_measure output CSV (moveit_ndi_accuracy_check*.csv --
-// capture_id,timestamp_ms,shoulder_roll_joint_rad,...,wrist_roll_joint_rad,
-// moveit_pose_x_mm,... and the NDI-frame columns) via MoveIt, so you can
-// re-visit exactly the poses that were captured earlier (e.g. to redo NDI
-// measurements, or just sanity-check the recorded set) instead of jogging
-// back to each one by hand.
+// cyton_ndi_capture/ndi_measure output CSV via MoveIt, so you can re-visit
+// exactly the poses captured earlier instead of jogging back by hand.
 //
-// Unlike pose_commander.cpp (which reads TICK targets and converts them via
-// robot_calibration.cpp's ticksToRadians()), this file's input already has
-// the 7 joint angles in RADIANS as named columns -- no tick conversion
-// needed, just direct setJointValueTarget() per joint by name. Columns are
-// resolved by HEADER NAME (not fixed position), same pattern
-// move_between_points.cpp already uses for its own input CSV, so this
-// works against any file sharing that column-naming convention regardless
-// of what other columns it does or doesn't have.
+// Unlike pose_commander.cpp (which reads tick targets and converts them
+// via ticksToRadians()), this file's input already has the 7 joint angles
+// in radians as named columns -- no conversion needed, just direct
+// setJointValueTarget() per joint by name. Columns are resolved by header
+// name (not fixed position), same pattern move_between_points.cpp uses.
 //
 // Everything else (plan-preview-then-confirm workflow, the
 // ensureCurrentStateWithinBounds()/sendCorrectiveTrajectory() out-of-bounds
-// recovery logic for elbow_pitch/elbow_yaw's razor-thin locked windows) is
+// recovery for elbow_pitch/elbow_yaw's razor-thin locked windows) is
 // carried over from pose_commander.cpp verbatim -- already hardware-
-// validated there, not reimplemented differently here. Recovery still uses
-// jointCalibrations directly (from robot_calibration.h, compiled into this
-// binary same as pose_commander), which is independent of how the target
-// points themselves were loaded.
+// validated there, not reimplemented differently here.
 
 #include <algorithm>
 #include <array>

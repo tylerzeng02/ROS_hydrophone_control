@@ -215,10 +215,8 @@ std::chrono::milliseconds handleUserControls(bool& manualModeEnabled) {
 constexpr std::size_t JOINT_COUNT = 7;
 constexpr std::size_t POSE_COUNT = 1619;
 
-// Reverted to Windows 2026-08-14 -- this machine is Windows again (was
-// ported to Linux 2026-08-07, see CLAUDE.md, for the ROS/MoveIt machine).
-// Original Windows values restored from git history (commit that made the
-// Linux port).
+// Windows device paths -- ported to Linux at one point for the ROS/MoveIt
+// machine, reverted here for the Windows dev machine.
 constexpr const char* CYTON_DEVICE = "COM4";
 constexpr int CYTON_BAUD_RATE = 1000000;
 constexpr float CYTON_PROTOCOL_VERSION = 1.0F;
@@ -285,10 +283,9 @@ constexpr const char* SETTLING_DIAGNOSTIC_CSV = "settling_diagnostic.csv";
 //
 // QUICK_TEST_POSE_INDICES currently targets the 382-pose elbow-yaw-fixed
 // batch (TARGET_POSES index 857-1238), recollected after a suspected NDI
-// fixed-marker drift. See CLAUDE.md's kinematic-calibration and I-gain/
-// PID-tuning sections for the full repointing history and every other pose
-// set this constant has targeted -- all remain preserved in TARGET_POSES
-// above and can be restored here if needed again.
+// fixed-marker drift. Every other pose set this constant has targeted
+// remains preserved in TARGET_POSES above and can be restored here if
+// needed again.
 constexpr std::array<int, 382> QUICK_TEST_POSE_INDICES = {
     857, 858, 859, 860, 861, 862, 863, 864, 865, 866, 867, 868, 869, 870,
     871, 872, 873, 874, 875, 876, 877, 878, 879, 880, 881, 882, 883, 884,
@@ -620,7 +617,7 @@ const std::array<std::array<uint16_t, JOINT_COUNT>, POSE_COUNT> TARGET_POSES = {
     {{430, 851, 1266, 3273, 1880, 2068, 348}},
     {{414, 1036, 1263, 3236, 1939, 1891, 481}},
     // Poses 291-303: 13 poses targeting orientation diversity specifically
-    // (varying wrist_pitch/wrist_roll in combination) -- see CLAUDE.md.
+    // (varying wrist_pitch/wrist_roll in combination).
     {{287, 852, 1265, 3034, 1920, 3345, 1710}},
     {{287, 852, 1266, 3088, 1765, 2502, 1493}},
     {{285, 852, 1265, 3087, 2263, 2477, 998}},
@@ -640,7 +637,7 @@ const std::array<std::array<uint16_t, JOINT_COUNT>, POSE_COUNT> TARGET_POSES = {
     // target, at target from below <- COMPARE, above target, at target
     // from above <- COMPARE) so the arm actually approaches from each
     // direction. Compare 305 vs 307's NDI position; gap beyond the ~0.5mm
-    // repeatability floor = real backlash. See CLAUDE.md.
+    // repeatability floor = real backlash.
     {{1024, 2072, 2096, 2112, 2049, 840, 3020}},
     {{1026, 2077, 2096, 2112, 2049, 2058, 3020}},
     {{1026, 2079, 2096, 2116, 2051, 3345, 3022}},
@@ -674,8 +671,7 @@ const std::array<std::array<uint16_t, JOINT_COUNT>, POSE_COUNT> TARGET_POSES = {
     {{2209, 2225, 2191, 1959, 1985, 1670, 2227}},
 
     // Multi-joint backlash test: each joint gets 4 poses in order (below
-    // target, at target from below, above target, at target from above) --
-    // see CLAUDE.md.
+    // target, at target from below, above target, at target from above).
     // motor 0 backlash test (index 319-322)
     {{1418, 2056, 2048, 2062, 2124, 2105, 2976}},
     {{1032, 2055, 2048, 2062, 2124, 2105, 2977}},
@@ -716,7 +712,7 @@ const std::array<std::array<uint16_t, JOINT_COUNT>, POSE_COUNT> TARGET_POSES = {
     // (0-30mm), numerically inverted via the fitted FK model. Checks
     // whether error grows proportionally with displacement (signature of a
     // residual gear-ratio scale error). Never hand-verified for
-    // self-collision -- see CLAUDE.md.
+    // self-collision.
     // index 347-353
     {{1545, 2044, 1625, 2101, 2049, 2120, 2090}},  // home + 0mm
     {{1541, 2052, 1620, 2102, 2006, 2092, 2318}},  // home + 5mm
@@ -728,7 +724,7 @@ const std::array<std::array<uint16_t, JOINT_COUNT>, POSE_COUNT> TARGET_POSES = {
 
     // Realm-restricted calibration poses: 129 hand-posed configurations
     // within the user's actual reduced operating envelope ("bent arm
-    // grabbing something," never fully extended) -- see CLAUDE.md.
+    // grabbing something," never fully extended).
     // index 354-482
     {{488, 1862, 1323, 3274, 952, 2321, 3383}},
     {{561, 1861, 1322, 3274, 953, 2304, 3447}},
@@ -863,7 +859,7 @@ const std::array<std::array<uint16_t, JOINT_COUNT>, POSE_COUNT> TARGET_POSES = {
     // Widened-range calibration poses: hand-posed configurations previously
     // excluded from the realm-restricted set above for falling outside
     // jointCalibrations' old bounds -- now included since those bounds
-    // were widened. See CLAUDE.md.
+    // were widened.
     // index 483-656
     {{276, 2036, 1392, 3275, 1236, 2395, 3051}},
     {{276, 2009, 1392, 3276, 1162, 2402, 3090}},
@@ -1247,10 +1243,9 @@ const std::array<std::array<uint16_t, JOINT_COUNT>, POSE_COUNT> TARGET_POSES = {
     {{318, 3224, 932, 2414, 2582, 2765, 2936}},
     {{372, 3223, 928, 2383, 2581, 2792, 2999}},
 
-    // Reduced-DOF collection (2026-08-04): elbow_yaw (motor 4) held
-    // fixed at its calibrated midpoint (2095) for every pose in this
-    // batch, only the other 6 joints hand-posed -- see CLAUDE.md's
-    // kinematic-calibration section. From recorded_hand_poses_fixed_
+    // Reduced-DOF collection: elbow_yaw (motor 4) held fixed at its
+    // calibrated midpoint (2095) for every pose in this batch, only the
+    // other 6 joints hand-posed. From recorded_hand_poses_fixed_
     // elbow_yaw.csv.
     // index 857-1238
     {{740, 2009, 2012, 3276, 2093, 2870, 2775}},
@@ -1802,7 +1797,7 @@ const std::array<std::array<uint16_t, JOINT_COUNT>, POSE_COUNT> TARGET_POSES = {
     // 221 poses, index 1398-1618: third batch of the reduced-DOF
     // (elbow_yaw locked near 2095) hand-posing session -- rows 34-254 of
     // recorded_hand_poses_fixed_elbow_yaw(3).csv; rows 1-33 are a genuinely
-    // unrelated earlier session and stay excluded. See CLAUDE.md.
+    // unrelated earlier session and stay excluded.
     {{3122, 1886, 2117, 828, 2093, 1379, 1169}},
     {{3122, 1887, 2117, 828, 2094, 1285, 1167}},
     {{3111, 1884, 2220, 828, 2085, 1269, 1132}},
@@ -3274,9 +3269,9 @@ int runQuickCalibrationTest(std::size_t resumeFromSequenceIndex = 0) {
     );
 
     // A compliance slope/punch experiment was tried here and removed --
-    // caused audible vibration (too aggressive a change to both at once,
-    // see CLAUDE.md). DynamixelMotor's compliance/punch accessors still
-    // exist if revisited more conservatively.
+    // caused audible vibration (too aggressive a change to both at once).
+    // DynamixelMotor's compliance/punch accessors still exist if revisited
+    // more conservatively.
 
     try {
         const bool resuming = resumeFromSequenceIndex > 0;

@@ -33,14 +33,12 @@ from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
 
 
-# ---------------------------------------------------------------------------
 # URDF-derived kinematic chain
 # (references/cyton_gamma_1500_trac_ik.urdf, base_link -> virtual_endeffector)
 #
 # Every joint <origin> in that URDF has rpy="0 0 0" -- rotation only ever
 # comes from each revolute joint's own axis rotation, so each joint's
 # transform is just Translate(origin_xyz) then Rotate(axis, angle).
-# ---------------------------------------------------------------------------
 
 JOINT_NAMES = [
     "shoulder_roll_joint",
@@ -91,9 +89,7 @@ JOINT_TICK_RANGES = [
 TICKS_PER_RADIAN = 4096.0 / (2.0 * np.pi)
 
 
-# ---------------------------------------------------------------------------
 # Parameter vector layout (19 total)
-# ---------------------------------------------------------------------------
 
 N_PARAMS = 19
 
@@ -131,9 +127,7 @@ def pack_params(
     return np.concatenate([joint_offsets, tool_xyz, tool_rpy, base_xyz, base_rpy])
 
 
-# ---------------------------------------------------------------------------
 # Forward kinematics
-# ---------------------------------------------------------------------------
 
 def homogeneous_transform(rotation_matrix: np.ndarray, translation: np.ndarray) -> np.ndarray:
     T = np.eye(4)
@@ -185,14 +179,12 @@ def predict_relative_pose(measured_angles_rad: np.ndarray, params: CalibParams) 
     return T_base @ T_fk @ T_tool
 
 
-# ---------------------------------------------------------------------------
 # Bounds -- physically-motivated, not arbitrary. See the "how do you prevent
 # an unrealistic parameter" discussion this script came out of: joint
 # offsets and tool-frame corrections are small perturbations from a known
 # nominal (so tightly bounded and regularized toward zero); the base
 # transform has no such prior (we don't know where the fixed tool sits
 # relative to base_link) so it gets a generous bound and NO regularization.
-# ---------------------------------------------------------------------------
 
 JOINT_OFFSET_BOUND_RAD = np.radians(8.0)
 TOOL_XYZ_BOUND_M = 0.01
@@ -236,9 +228,7 @@ def initial_base_guess(
     return base_xyz_guess, base_rpy_guess
 
 
-# ---------------------------------------------------------------------------
 # Residuals
-# ---------------------------------------------------------------------------
 
 ORIENTATION_WEIGHT = 0.3      # de-emphasized: the real target is position accuracy
 ORIENTATION_SCALE_MM = 100.0  # brings radians into a comparable numeric scale to mm
@@ -315,9 +305,7 @@ def rms_orientation_error_deg(param_vector: np.ndarray, measured_angles, measure
     return float(np.sqrt(np.mean(errors ** 2))), errors
 
 
-# ---------------------------------------------------------------------------
 # CSV loading (columns written by calibration/collection/ndi_capture_and_validate.cpp)
-# ---------------------------------------------------------------------------
 
 def load_poses_from_csv(csv_path: str):
     measured_angles = []
@@ -354,9 +342,7 @@ def load_poses_from_csv(csv_path: str):
     )
 
 
-# ---------------------------------------------------------------------------
 # Calibration driver
-# ---------------------------------------------------------------------------
 
 def run_calibration(measured_angles, measured_pos_mm, measured_quat_xyzw, verbose=True):
     base_xyz_guess, base_rpy_guess = initial_base_guess(
@@ -480,9 +466,7 @@ def calibrate_from_csv(csv_path: str, test_fraction: float = 0.2, seed: int = 0)
     return result
 
 
-# ---------------------------------------------------------------------------
 # Self-test: synthetic data with known ground truth, no hardware required.
-# ---------------------------------------------------------------------------
 
 def selftest():
     rng = np.random.default_rng(1234)

@@ -1,26 +1,20 @@
 // replay_ndi_capture_sim: automatic-animation version of
 // replay_ndi_capture.cpp -- visits every pose in a cyton_ndi_capture/
-// ndi_measure output CSV (moveit_ndi_accuracy_check*.csv) in order via
-// MoveIt, pausing PAUSE_AFTER_POSE_MS between each, with NO per-pose Enter
-// confirmation. Built for demo/simulation purposes: showing the arm sweep
-// through a real recorded set of points (e.g. the skull-probing target
-// set) as a hands-off animation, same intent as waypoint_sequence_demo.cpp
-// but consuming the joint-radian CSV format ndi_measure writes instead of
-// a plain x,y,z,roll,pitch,yaw waypoint file.
+// ndi_measure output CSV in order via MoveIt, pausing
+// PAUSE_AFTER_POSE_MS between each, with no per-pose Enter confirmation.
+// Built for demo/simulation: showing the arm sweep through a real
+// recorded set of points as a hands-off animation.
 //
 // Safety note: unlike replay_ndi_capture.cpp (which pauses for Enter
-// before every single execute -- deliberately, so you can sanity-check
-// each move first), this tool moves through the WHOLE list automatically
-// once started. Fine and intended for hardware_type:=mock_components (a
-// simulated demo, nothing physically moves). If pointed at a real-hardware
-// launch, this WILL physically drive the arm through every recorded pose
-// unsupervised -- only do that deliberately, with the same care as any
-// other unattended real-hardware sequence in this project.
+// before every execute, so you can sanity-check each move first), this
+// tool moves through the WHOLE list automatically once started. Fine for
+// hardware_type:=mock_components (nothing physically moves). If pointed
+// at a real-hardware launch, this WILL physically drive the arm through
+// every recorded pose unsupervised -- only do that deliberately.
 //
 // CSV parsing, JOINT_NAMES, safeBoundsRadians()/sendCorrectiveTrajectory()/
 // ensureCurrentStateWithinBounds() are carried over from
-// replay_ndi_capture.cpp verbatim -- same already-validated recovery logic
-// for elbow_pitch/elbow_yaw's razor-thin locked windows.
+// replay_ndi_capture.cpp verbatim -- already-validated recovery logic.
 
 #include <algorithm>
 #include <array>

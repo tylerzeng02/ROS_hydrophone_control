@@ -15,13 +15,10 @@ rclcpp::Logger logger()
   return rclcpp::get_logger("cyton_hardware");
 }
 
-// Same lesson already documented in cyton_gamma_1500.ros2_control.xacro for
-// hardware_type: xacro args always arrive as strings, and xacro's ${...}
-// property substitution runs values through YAML-style type coercion
-// before re-stringifying, so a lowercase "true" typed on the command line
-// can arrive here as "True" or "TRUE" by the time it reaches this plugin.
-// Accept all the case variants rather than trusting exact case to survive
-// that pipeline.
+// xacro args always arrive as strings, and xacro's ${...} property
+// substitution runs values through YAML-style type coercion before
+// re-stringifying, so a lowercase "true" can arrive here as "True" or
+// "TRUE" -- accept all case variants rather than trusting exact case.
 bool parseBoolParam(const std::string & value)
 {
   return value == "true" || value == "True" || value == "TRUE" || value == "1";
@@ -261,11 +258,9 @@ hardware_interface::return_type CytonSystemHardware::write(
   {
     const JointCalibration & calibration = jointCalibrations[static_cast<size_t>(i)];
     // Subtract the predicted pose-dependent deviation before the static
-    // tick conversion -- see pose_dependent_correction.h's header comment
-    // for the control-direction derivation (this is a feedforward
-    // correction: command less than the desired angle by however much the
-    // coupling/gravity/Fourier effects are predicted to add back once
-    // physically realized).
+    // tick conversion (feedforward: command less than the desired angle
+    // by however much coupling/gravity/Fourier effects are predicted to
+    // add back once physically realized -- see pose_dependent_correction.h).
     const double correctedCommand =
       hw_commands_[static_cast<size_t>(i)] - poseDependentCorrection[static_cast<size_t>(i)];
     int tick = radiansToTicks(calibration, correctedCommand);
@@ -284,11 +279,8 @@ hardware_interface::return_type CytonSystemHardware::write(
     }
 
     // setGoalPosition() re-checks jointCalibrations' min/maxTick itself
-    // (isPositionWithinLimit) before writing -- this is the same safety
-    // gate every other motor-facing program in this repo goes through, not
-    // a weaker one specific to this interface. Also the final backstop
-    // against applyBacklashCompensation() ever proposing an out-of-range
-    // hold point, on top of that function's own internal clamp.
+    // before writing -- same safety gate as every other motor-facing
+    // program here, and a backstop against an out-of-range hold point.
     if (!motor_->setGoalPosition(calibration.id, static_cast<uint16_t>(tick)))
     {
       RCLCPP_ERROR(
@@ -300,31 +292,22 @@ hardware_interface::return_type CytonSystemHardware::write(
   return hardware_interface::return_type::OK;
 }
 
-// Reversal-triggered hold-point backlash compensator. See this class's own
-// header comment for the design rationale (why not a per-cycle port of
-// dynamixel_motor.cpp's blocking-move overshoot fix). Algorithm, per
-// joint, per write() cycle:
+// Reversal-triggered hold-point backlash compensator (see this class's
+// header for why not a per-cycle port of dynamixel_motor.cpp's
+// blocking-move overshoot fix). Per joint, per write() cycle:
+//   1. Compare this cycle's raw tick against last cycle's to determine
+//      the raw target's direction (+1/-1), ignoring moves smaller than
+//      kDirectionDeadbandTicks (ordinary trajectory-interpolation jitter).
+//   2. On a genuine reversal (an established direction flips), pin a hold
+//      point at raw_tick +/- getBacklashOvershootTicks(jointIndex) in the
+//      new direction, clamped to this joint's safety range.
+//   3. While a hold is active, clamp the tick sent to the servo to be at
+//      least as far along as the hold point (max()/min() depending on
+//      direction) until the raw trajectory naturally reaches/passes it,
+//      at which point the hold releases and 1:1 tracking resumes.
 //
-//   1. Compare this cycle's raw commanded tick against last cycle's to
-//      determine the RAW target's own direction of travel (+1/-1),
-//      ignoring moves smaller than kDirectionDeadbandTicks (ordinary
-//      trajectory-interpolation jitter near a momentary hold).
-//   2. A genuine reversal is: we already had an established direction
-//      (not the very first movement since activation), and this cycle's
-//      direction is established too, and it's the opposite of the last
-//      established one. On a reversal, pin a hold point at
-//      raw_tick +/- getBacklashOvershootTicks(jointIndex) in the NEW
-//      direction (clamped to this joint's safety range).
-//   3. While a hold is active, clamp the tick actually sent to the servo
-//      to be at least as far along as the hold point, in the hold
-//      direction (max() for +1, min() for -1) -- so the servo is always
-//      commanded at or beyond the hold point until the raw trajectory
-//      itself naturally reaches/passes it, at which point the hold
-//      releases and plain 1:1 tracking resumes automatically.
-//
-// This only engages once per genuine reversal (not every cycle of a
-// monotonic trajectory segment), unlike a naive per-cycle port -- see the
-// header comment for why that distinction is the whole point.
+// Engages once per genuine reversal, not every cycle of a monotonic
+// segment, unlike a naive per-cycle port.
 int CytonSystemHardware::applyBacklashCompensation(int jointIndex, int rawTick)
 {
   const size_t idx = static_cast<size_t>(jointIndex);

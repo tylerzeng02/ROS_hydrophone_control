@@ -1,31 +1,21 @@
-// constrained_pose_ik_test: deliberately replicates the ORIGINAL,
-// harder-than-necessary IK scenario that move_between_points.cpp used
-// BEFORE its 2026-08-11 seeded-IK fix -- setPoseTarget() with the current
-// orientation held fixed (not just position), which hands a full 6-DOF
-// Cartesian constraint to OMPL's own random-seeded goal-region sampling.
-// That's exactly what produced the real, logged 30-second RRTConnect
-// timeouts against elbow_yaw's razor-thin locked window ("Unable to sample
-// any valid states for goal tree").
+// constrained_pose_ik_test: deliberately replicates the harder-than-
+// necessary IK scenario move_between_points.cpp used before switching to
+// seeded setJointValueTarget() -- setPoseTarget() with orientation held
+// fixed, handing a full 6-DOF Cartesian constraint to OMPL's random-seeded
+// goal sampling. That's what produced real 30-second RRTConnect timeouts
+// against elbow_yaw's razor-thin locked window.
 //
-// Purpose: this project fixed that specific problem by switching to seeded
-// setJointValueTarget() instead -- which sidesteps the question of whether
-// a different IK PLUGIN (TRAC-IK vs. KDL) would have handled the harder,
-// random-seeded version any better. This tool exists purely to answer that
-// now-separate question: run it once against ik_solver:=kdl and once
-// against ik_solver:=trac_ik (same launch, same target list) and compare
-// success rate / timing directly.
+// Purpose: isolate whether a different IK plugin (TRAC-IK vs. KDL) would
+// handle this harder, random-seeded case any better -- run once against
+// ik_solver:=kdl and once against ik_solver:=trac_ik and compare success
+// rate/timing directly.
 //
-// Deliberately has NO NDI dependency at all -- pure MoveIt planning/
-// execution stress test, so it's usable regardless of tracker availability
-// and isolates the IK question from any measurement concerns. Reads a
-// small Cartesian offset (meters, position-only) per line from a CSV, and
-// for each one: reads the arm's LIVE current pose via getCurrentPose(),
-// builds an absolute target = current position + offset (orientation held
-// at whatever it currently is -- this is the part that makes it "harder"
-// than the seeded approach), calls setPoseTarget() + move(), and reports
-// success/failure and wall-clock time taken for that point. Continues to
-// the next point on failure rather than aborting the run, same "skip and
-// continue" convention as move_between_points.cpp/waypoint_sequence_demo.
+// No NDI dependency -- pure MoveIt planning/execution stress test. Reads
+// a small Cartesian offset (meters, position-only) per CSV line; for each,
+// reads the arm's live current pose, builds an absolute target = current
+// position + offset (orientation held at whatever it currently is), calls
+// setPoseTarget() + move(), and reports success/failure and timing.
+// Continues on failure rather than aborting the run.
 
 #include <array>
 #include <chrono>

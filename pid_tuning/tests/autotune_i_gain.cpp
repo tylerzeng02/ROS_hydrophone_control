@@ -1,67 +1,36 @@
 // autotune_i_gain: automatic I-Gain sweep for one joint, evaluated across
 // a small set of REAL, previously-measured target points instead of one
-// hand-picked spot -- the direct successor to test_i_gain.cpp, built
-// after that single-trial test picked an unrepresentative low-load
-// position on elbow_pitch. Points are selected from an existing results
-// CSV (default build/validation_results.csv) by picking the N rows where
-// the tuned joint's ACHIEVED tick was already furthest from its
-// COMMANDED tick -- i.e. the real, already-documented worst cases for
-// this joint, not arbitrary ones.
+// hand-picked spot -- picks the N rows where the tuned joint's achieved
+// tick was already furthest from commanded (the documented worst cases),
+// not arbitrary ones.
 //
-// Default joint is motor 1 (shoulder_pitch), found (2026-08-13) by
-// scanning build/validation_results.csv's per-joint achieved-vs-commanded
-// tick differences directly: it showed a consistent 7-9 tick shortfall
-// across every one of that file's 9 rows, far more than any other joint
-// (elbow_pitch, tested first, showed ~0-1 ticks -- an unrepresentative
-// pick). shoulder_pitch is an MX-64 sitting at the base with the ENTIRE
-// rest of the arm hanging off it downstream, so it carries real gravity
-// load almost everywhere in its range, unlike a joint such as elbow_pitch
-// whose downstream load (and hence how much a fixed P-gain alone falls
-// short) varies a lot with position.
+// Default joint is motor 1 (shoulder_pitch): an MX-64 at the base carrying
+// the entire rest of the arm downstream, so it's under real gravity load
+// almost everywhere in its range, unlike e.g. elbow_pitch whose load
+// varies a lot with position.
 //
-// SAFETY DESIGN (this runs a multi-point, multi-candidate loop
-// unattended between each step, so extra automated guardrails replace
-// what a human would otherwise catch step by step):
-//   - Fixed, capped candidate list (0, 4, 8, 12, 16, 20, 24, 30) -- I=0
-//     (baseline, current value) is always evaluated first as the
-//     reference every other candidate is compared against. 30 is a
-//     conservative ceiling, nowhere near the register's real 0-254 range.
-//   - A point that fails to settle within the poll timeout (the same
-//     stability-based settle-detection as test_i_gain.cpp) is treated as
-//     an oscillation/instability signal -- the sweep stops immediately at
-//     that candidate (does not try anything larger) and does not count
-//     that candidate as usable.
-//   - Simple early stopping: once a candidate scores worse than the best
-//     candidate found so far, for 2 candidates in a row, the sweep stops
-//     rather than continuing to escalate past what looks like the optimum.
-//   - Original D/I/P gains are read once at the very start and restored
-//     at the very end, REGARDLESS of outcome (including on an unsafe
-//     abort) -- this tool never leaves the servo in a modified state.
-//     "Automatically tunes and reports the best value" means exactly
-//     that: it finds and REPORTS the best I Gain, it does not leave it
-//     permanently applied -- adopting it anywhere is a separate, manual
-//     decision after further validation.
+// SAFETY DESIGN (runs an unattended multi-point, multi-candidate loop):
+//   - Fixed candidate list (0, 4, 8, 12, 16, 20, 24, 30), I=0 evaluated
+//     first as the reference.
+//   - A point that fails to settle is treated as an instability signal --
+//     the sweep stops immediately, that candidate is not counted usable.
+//   - Early stopping: 2 candidates in a row worse than the best-so-far
+//     stops the sweep rather than escalating past the optimum.
+//   - Original D/I/P gains are restored at the end regardless of outcome
+//     -- "tunes and reports" means exactly that, nothing is left applied.
 //
-// You should still watch and listen while this runs -- the settle-timeout
-// check is a reasonable automated proxy for instability, not a
-// replacement for a human noticing something wrong. Ctrl+C is always safe
-// (see CLAUDE.md's "Torque/Ctrl+C note").
+// Still watch and listen while this runs -- settle-timeout is a backup,
+// not a substitute for noticing something wrong. Ctrl+C is always safe.
 //
-// This is still a SMALL-N (5 point, one joint) diagnostic sweep, not a
-// full validation. Confirm any winning value against the full point set
-// this project already uses for real accuracy validation, and ideally an
-// actual NDI before/after, before treating it as adopted anywhere.
+// Small-N diagnostic, not a full validation -- confirm any winning value
+// against the full validation point set and a real NDI before/after.
 //
 // Usage: autotune_i_gain [motorId] [pointsCsv] [numPoints]
-//   motorId:   which joint's I Gain to tune (default 1 = shoulder_pitch).
-//   pointsCsv: a CSV with tick_0..tick_6 and achieved_tick_0..tick_6
-//              columns (the format build/validation_results.csv already
-//              has) -- used only to SELECT which points are most
-//              informative to sweep against; the actual per-candidate
-//              errors are always freshly measured live. Default:
-//              build/validation_results.csv.
-//   numPoints: how many of the worst-for-this-joint points to use
-//              (default 5).
+//   motorId:   default 1 (shoulder_pitch).
+//   pointsCsv: a CSV with tick_0..tick_6/achieved_tick_0..tick_6 columns,
+//              used only to select which points to sweep against (the
+//              per-candidate errors are always freshly measured live).
+//   numPoints: how many worst-for-this-joint points to use (default 5).
 
 #include <algorithm>
 #include <chrono>
@@ -313,16 +282,11 @@ int main(int argc, char** argv) {
             std::vector<int> motorIds = {0, 1, 2, 3, 4, 5, 6};
             std::vector<uint16_t> targets(points[p].ticks, points[p].ticks + 7);
 
-            // holdTorque=true is REQUIRED here, not optional -- the default
-            // (false) makes moveJointsSafely() disable torque on ALL 7
-            // joints immediately after every successful move (see its
-            // implementation: "if (!holdTorque) { disableTorque all
-            // motors }"), which would drop the whole arm unsupported
-            // between every single point in this loop, not just at the
-            // end. tolerance/timeoutSeconds are passed explicitly here
-            // (matching moveJointsSafely()'s own defaults) only because
-            // C++ has no named parameters -- holdTorque can't be reached
-            // positionally without them.
+            // holdTorque=true is REQUIRED -- the default (false) disables
+            // torque on all 7 joints after every move, which would drop
+            // the whole arm between every point in this loop.
+            // tolerance/timeoutSeconds are passed explicitly only to reach
+            // holdTorque positionally (no named parameters in C++).
             motor.moveJointsSafely(motorIds, targets, MOVING_SPEED, 15, 10, /*holdTorque=*/true);
             std::this_thread::sleep_for(std::chrono::milliseconds(300));
 

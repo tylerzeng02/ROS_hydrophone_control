@@ -1,10 +1,9 @@
-// One-off utility (2026-07-29): explicitly verify and reset every motor's
-// compliance slope and punch back to factory defaults (32, 32), rather
-// than trusting that ndi_capture_and_validate's automatic restore ran
-// (it should have, on a normal exit, but this confirms it directly after
-// the compliance/punch experiment that caused audible vibration -- see
-// CLAUDE.md's kinematic-calibration section). Read-only on margin/torque
-// enable; does not move the arm.
+// One-off utility: explicitly verify and reset every motor's compliance
+// slope and punch back to factory defaults (32, 32), rather than trusting
+// that ndi_capture_and_validate's automatic restore ran (it should have,
+// on a normal exit, but this confirms it directly after the compliance/
+// punch experiment that caused audible vibration). Read-only on margin/
+// torque enable; does not move the arm.
 #include <iostream>
 #include "dynamixel_motor.h"
 

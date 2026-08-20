@@ -20,46 +20,32 @@ namespace cyton_hardware
 {
 
 // ros2_control SystemInterface plugin wrapping this repo's own
-// DynamixelMotor/robot_calibration (../../../src -- see this package's
-// CMakeLists.txt, which compiles those files directly rather than
-// duplicating them). Exposes the 7 arm joints (motor IDs 0-6; motor 7,
-// the gripper, is intentionally excluded, matching the URDF's IK chain)
-// as position command/state interfaces.
+// DynamixelMotor/robot_calibration (../../../src, compiled directly by
+// this package's CMakeLists.txt rather than duplicated). Exposes the 7
+// arm joints (motor IDs 0-6; motor 7, the gripper, is intentionally
+// excluded, matching the URDF's IK chain) as position command/state
+// interfaces.
 //
-// Backlash compensation (2026-08-13, opt-in via the "compensate_backlash"
-// hardware param, default "false"): the existing, hardware-validated fix
-// in dynamixel_motor.cpp (moveJointSafely/moveJointsSafely's overshoot-
-// then-approach dance) is designed around a single blocking move to one
-// known target -- it doesn't have a well-defined meaning for a streaming
-// position command that changes every control cycle while a trajectory is
-// executing, where "the target" a reversal should overshoot below isn't
-// known in advance. A naive per-cycle port (inject an overshoot whenever
-// this cycle's target is below last cycle's) would fire on nearly every
-// cycle of any decreasing trajectory segment, fighting the trajectory
-// controller's own interpolation rather than correcting backlash.
-//
+// Backlash compensation (opt-in via "compensate_backlash", default
+// "false"): the existing, hardware-validated fix in dynamixel_motor.cpp
+// is designed around a single blocking move to one known target -- it has
+// no well-defined meaning for a streaming position command where "the
+// target" a reversal should overshoot below isn't known in advance. A
+// naive per-cycle port would fire on nearly every cycle of a decreasing
+// segment, fighting the trajectory controller's own interpolation.
 // Implemented instead: a reversal-triggered hold-point compensator (see
-// applyBacklashCompensation() in the .cpp for the exact algorithm) that
-// only engages once per genuine direction reversal, not every cycle. This
-// has NEVER been validated against real hardware -- it's a real, thought-
-// through design (not a guess), but the old blocking-move fix went
-// through extensive real A/B testing (uniform vs. per-joint overshoot
-// margins, several datasets) before being trusted, and this streaming
-// version hasn't had any of that yet. Enable deliberately and watch
-// closely, not as a default. See CLAUDE.md's kinematic-calibration
-// section for the full backlash history.
+// applyBacklashCompensation() in the .cpp) that only engages once per
+// genuine reversal. Never validated against real hardware -- enable
+// deliberately and watch closely, not as a default.
 //
-// Pose-dependent correction (2026-08-13, opt-in via the
-// "compensate_pose_dependent" hardware param, default "false"): applies
-// pose_dependent_correction::computeCorrection() (joint coupling, lumped
-// gravity/elastostatic deflection, shoulder_pitch Fourier term -- see that
-// module's own header comment for the exact math and the control-direction
-// derivation) to every joint's commanded angle, every write() cycle,
-// before the existing static tick/radian conversion and backlash
-// compensation. Same standing as compensate_backlash when it was first
-// written: the underlying math is checked against the Python model it
-// ports, but this has never been validated as LIVE CONTROL against real
-// hardware. Enable deliberately and watch closely, not as a default.
+// Pose-dependent correction (opt-in via "compensate_pose_dependent",
+// default "false"): applies pose_dependent_correction::computeCorrection()
+// (joint coupling, lumped gravity/elastostatic deflection, shoulder_pitch
+// Fourier term) to every joint's commanded angle each write() cycle,
+// before the static tick/radian conversion and backlash compensation.
+// Same standing as compensate_backlash: math is checked against the
+// Python model it ports, but never validated as live control on real
+// hardware.
 class CytonSystemHardware : public hardware_interface::SystemInterface
 {
 public:

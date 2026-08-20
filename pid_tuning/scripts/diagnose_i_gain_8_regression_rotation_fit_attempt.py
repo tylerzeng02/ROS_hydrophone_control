@@ -45,11 +45,9 @@ import calibrate_kinematics as ck
 
 SHOULDER_PITCH = 1
 
-# ---------------------------------------------------------------------
 # FK, copied from verify_pose_dependent_port.py (already independently
 # verified against pose_dependent_correction.cpp's C++ port to 8 decimal
 # places -- see that script's own header comment).
-# ---------------------------------------------------------------------
 JOINT_ORIGIN = np.array([
     [0.0, 0.0, 0.05315],
     [0.0205, 0.0, 0.12435],
@@ -109,9 +107,7 @@ def shoulder_pitch_jacobian_column(joint_angles):
     return np.cross(al[SHOULDER_PITCH], lever)  # meters, per radian
 
 
-# ---------------------------------------------------------------------
 # Load both already-collected real measurement sets, matched by test_id.
-# ---------------------------------------------------------------------
 with open("../data/i_gain_0_baseline_accuracy_results.csv") as f:
     base_rows = {r["test_id"]: r for r in csv.DictReader(f)}
 with open("../data/i_gain_8_regression_discovery_9pose_results.csv") as f:

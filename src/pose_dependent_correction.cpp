@@ -122,8 +122,7 @@ FkFrames computeFkFrames(const std::array<double, N>& jointAnglesRad) {
 }
 
 // Gravity moment-arm term for joint i: torque about joint i's axis from
-// gravity acting at the lumped downstream mass position (see CLAUDE.md,
-// "lumped gravity/elastostatic deflection model").
+// gravity acting at the lumped downstream mass position.
 std::array<double, N> gravityMomentArms(const FkFrames& frames) {
     constexpr Vec3 kGravityDir{0.0, 0.0, -1.0};
     std::array<double, N> g{};
@@ -135,12 +134,10 @@ std::array<double, N> gravityMomentArms(const FkFrames& frames) {
     return g;
 }
 
-// ---------------------------------------------------------------------
 // Fitted coefficients: calibration/current/final_deployment_fit.py on
 // calibration/data/deployed_model_training_dataset_374pose.csv -- the same
 // dataset the deployed static corrections were fit on, so these are
-// consistent with production (see CLAUDE.md for derivation history).
-// ---------------------------------------------------------------------
+// consistent with production.
 
 struct CoupleTerm { int i, j, target; double coeff; };
 
@@ -157,10 +154,7 @@ constexpr double kFourierA = -0.002404;
 constexpr double kFourierB = 0.012840;
 
 // Lumped gravity-deflection coefficient per joint (rad/m), indexed
-// shoulder_roll..wrist_roll. elbow_yaw's is fit but never applied. Smaller
-// than earlier-history figures quoted in CLAUDE.md for an older dataset --
-// not a contradiction, just less residual left to explain on this cleaner
-// dataset (see CLAUDE.md).
+// shoulder_roll..wrist_roll. elbow_yaw's is fit but never applied.
 constexpr double kGravityCoeff[N] = {
     0.001381, 0.002937, 0.000380, 0.011437, -0.001249, 0.000190, 0.000000,
 };

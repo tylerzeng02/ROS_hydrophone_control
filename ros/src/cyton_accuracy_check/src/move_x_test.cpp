@@ -12,9 +12,8 @@
 // already in the same (NDI) frame.
 //
 // This DOES exercise real IK (via MoveGroupInterface::setPoseTarget(),
-// unlike every joint-space-driven MoveIt tool built earlier this project --
-// see CLAUDE.md's kinematic-calibration section for why that distinction
-// matters) and the real ros2_control execution path.
+// unlike every joint-space-driven MoveIt tool built earlier this project)
+// and the real ros2_control execution path.
 //
 // NdiTracker and its dependencies are copied verbatim from
 // cyton_accuracy_check/src/run_accuracy_check.cpp (itself copied verbatim
@@ -40,9 +39,7 @@
 
 namespace {
 
-// ---------------------------------------------------------------------
 // Configuration
-// ---------------------------------------------------------------------
 constexpr const char* DEFAULT_NDI_DEVICE = "/dev/ttyUSB1";
 constexpr const char* DEFAULT_MOVING_TOOL_ROM =
     "/home/temp/Downloads/8700339- Polaris Passive 4-Marker Rigid Body 2(1).rom";
@@ -50,16 +47,11 @@ constexpr const char* DEFAULT_FIXED_TOOL_ROM =
     "/home/temp/Downloads/8700449- Polaris Passive 4-Marker Rigid Body 3(1).rom";
 
 constexpr const char* PLANNING_GROUP = "arm";
-// Bumped 5.0 -> 30.0 (2026-08-07) after directly observing in move_group's
-// log that setNumPlanningAttempts() alone did NOT reliably fix the
-// elbow_yaw-narrow-window IK problem: MoveIt's ParallelPlan runs a handful
-// of threads (4 observed, not num_planning_attempts=15) CONCURRENTLY,
-// sharing the SAME planning-time budget rather than each getting a fresh
-// one -- so raising num_planning_attempts alone doesn't multiply the total
-// search time the way a sequential retry would. Successful runs found a
-// valid goal state in well under a second, so the bottleneck is purely
-// "did a random seed land inside elbow_yaw's narrow window in time," which
-// a larger shared time budget addresses more directly than more threads.
+// setNumPlanningAttempts() alone doesn't reliably fix elbow_yaw's narrow-
+// window IK problem: MoveIt's ParallelPlan runs a handful of threads
+// concurrently sharing the SAME planning-time budget, not each getting a
+// fresh one -- so a larger shared time budget matters more than more
+// attempts for "did a random seed land inside the narrow window in time."
 constexpr double PLANNING_TIME_SECONDS = 30.0;
 
 // Default commanded displacement: 5cm along +Z, in the MoveGroup's own
@@ -77,10 +69,8 @@ constexpr int NDI_SAMPLE_INTERVAL_MS = 20;
 constexpr int REQUIRED_VISIBLE_MARKERS = 4;
 constexpr double MAX_NDI_ERROR = 0.50;
 
-// ---------------------------------------------------------------------
 // From cyton_ndi_capture/src/ndi_measure.cpp (NdiTracker and dependencies)
 // -- copied verbatim, same as run_accuracy_check.cpp already does.
-// ---------------------------------------------------------------------
 
 enum class NdiToolStatus { Detected, Missing, OutOfVolume, Disabled, LowQuality };
 
@@ -573,8 +563,7 @@ int main(int argc, char** argv) {
 
     // MoveGroupInterface's getCurrentPose()/getCurrentState() need this
     // node's own subscriptions actively spinning (same requirement, same
-    // fix, as cyton_pose_commander's START_STATE_INVALID recovery path --
-    // see CLAUDE.md's kinematic-calibration section).
+    // fix, as cyton_pose_commander's START_STATE_INVALID recovery path).
     rclcpp::executors::SingleThreadedExecutor executor;
     executor.add_node(node);
     std::thread spinThread([&executor]() { executor.spin(); });
@@ -584,19 +573,14 @@ int main(int argc, char** argv) {
         moveit::planning_interface::MoveGroupInterface moveGroup(node, PLANNING_GROUP);
         moveGroup.setPlanningTime(PLANNING_TIME_SECONDS);
         // elbow_yaw (motor 4) is permanently locked to a ~4-degree-wide tick
-        // range. Marking it <passive_joint> in the SRDF did NOT stop KDL's
-        // kinematics plugin from still treating it as a free IK variable
-        // (confirmed directly: "Joint weights for group 'arm': 1 1 1 1 1 1 1"
-        // in move_group's log, identical before/after that SRDF change --
-        // KDL builds its solve chain straight from the URDF tree and doesn't
-        // consult the passive-joint flag). A single planning attempt's
-        // random-seeded IK search can fail to land inside that narrow window
-        // and report GOAL_STATE_INVALID even though a solution exists --
-        // directly observed in the same log, where an identical subsequent
-        // request succeeded. setNumPlanningAttempts() reruns the whole
-        // planning attempt (fresh random seeds each time) rather than
-        // extending one attempt's internal timeout, which more directly
-        // matches that observed failure pattern.
+        // range. Marking it <passive_joint> in the SRDF does NOT stop KDL's
+        // kinematics plugin from still treating it as a free IK variable --
+        // KDL builds its solve chain straight from the URDF tree and ignores
+        // the flag. A single planning attempt's random-seeded IK search can
+        // fail to land inside that narrow window and report
+        // GOAL_STATE_INVALID even though a solution exists.
+        // setNumPlanningAttempts() reruns the whole attempt with fresh
+        // random seeds each time, matching that failure pattern.
         constexpr unsigned int NUM_PLANNING_ATTEMPTS = 15;
         moveGroup.setNumPlanningAttempts(NUM_PLANNING_ATTEMPTS);
 
@@ -662,13 +646,9 @@ int main(int argc, char** argv) {
         auto achievedState = moveGroup.getCurrentState(2.0);
         geometry_msgs::msg::PoseStamped achievedPose = moveGroup.getCurrentPose();
 
-        // MoveIt-frame before/after/delta, in mm -- this is the direct
-        // answer to "did the OTHER two axes (not the commanded one) stay
-        // put, or did they drift too" -- unlike the NDI numbers above,
-        // this stays in one consistent frame throughout (MoveIt's own), so
-        // a clean single-axis commanded move SHOULD show ~0 delta on the
-        // other two axes here, if IK/execution tracked the Cartesian
-        // target precisely.
+        // MoveIt-frame before/after/delta, in mm -- unlike the NDI numbers
+        // above, this stays in one consistent frame throughout, so a clean
+        // single-axis move should show ~0 delta on the other two axes here.
         const double moveitDxMm = (achievedPose.pose.position.x - currentPose.pose.position.x) * 1000.0;
         const double moveitDyMm = (achievedPose.pose.position.y - currentPose.pose.position.y) * 1000.0;
         const double moveitDzMm = (achievedPose.pose.position.z - currentPose.pose.position.z) * 1000.0;
@@ -700,8 +680,7 @@ int main(int argc, char** argv) {
                      "directly comparable axis-by-axis to the commanded MoveIt-frame delta -- only "
                      "the magnitude is directly comparable, since the two frames' axes aren't "
                      "aligned. The MoveIt-frame delta above, by contrast, IS directly comparable "
-                     "axis-by-axis to the command, since both are in the same frame. See CLAUDE.md's "
-                     "kinematic-calibration section for why NDI/MoveIt frames differ.)\n";
+                     "axis-by-axis to the command, since both are in the same frame.)\n";
 
         (void)achievedState;
     } catch (const std::exception& e) {

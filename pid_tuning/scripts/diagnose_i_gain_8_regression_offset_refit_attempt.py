@@ -77,11 +77,9 @@ e = np.array([
 ])
 print(f"Fit in-sample RMS: {np.sqrt(np.mean(e ** 2)):.2f}mm (sanity check only)\n")
 
-# ---------------------------------------------------------------------
 # Cross-check against the file's own recorded predictions BEFORE trusting
 # anything further -- this is exactly the check that caught the wrong-
 # dataset mistake last time; do not skip it again.
-# ---------------------------------------------------------------------
 DATA_PATH = "../data/i_gain_8_regression_discovery_9pose_results.csv"
 with open(DATA_PATH) as f:
     rows = list(csv.DictReader(f))
@@ -105,10 +103,8 @@ if max_diff > 1.0:
     sys.exit(1)
 print("Confirmed matching (<1mm) -- safe to proceed.\n")
 
-# ---------------------------------------------------------------------
 # Now the actual 1-parameter refit: extra shoulder_pitch offset, against
 # the 9 already-collected I=8 points (achieved ticks + real NDI position).
-# ---------------------------------------------------------------------
 ar_list, actual_list = [], []
 for r in rows:
     achieved_ticks = np.array([float(r[f"achieved_tick_{i}"]) for i in range(7)])

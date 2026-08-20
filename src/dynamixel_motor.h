@@ -7,8 +7,8 @@
 #include "dynamixel_sdk/dynamixel_sdk.h"
 
 // Per-joint backlash overshoot margin (ticks), tuned from hand-verified
-// reversal tests (see CLAUDE.md). Defined in dynamixel_motor.cpp; declared
-// here so other translation units (e.g. ros/src/cyton_hardware) can reuse it.
+// reversal tests. Defined in dynamixel_motor.cpp; declared here so other
+// translation units (e.g. ros/src/cyton_hardware) can reuse it.
 int getBacklashOvershootTicks(int motorId);
 
 class DynamixelMotor
@@ -32,7 +32,7 @@ public:
     // targetPosition by decreasing, first overshoot below it and approach
     // a second time while increasing, so every move finishes from the same
     // direction. Backlash is direction-dependent and otherwise invisible to
-    // static corrections (offset/scale/tilt/origin) -- see CLAUDE.md.
+    // static corrections (offset/scale/tilt/origin).
     bool moveJointSafely(
         int motorId,
         uint16_t targetPosition,
@@ -45,7 +45,7 @@ public:
     // compensateBacklash: see moveJointSafely() -- applied per-joint here.
     // compensateOnlyJointIds: empty (default) compensates every joint in
     // motorIds; non-empty restricts compensation to just those joint IDs
-    // (used to isolate one joint's backlash experimentally -- see CLAUDE.md).
+    // (used to isolate one joint's backlash contribution experimentally).
     bool moveJointsSafely(
         const std::vector<int>& motorIds,
         const std::vector<uint16_t>& targetPositions,
