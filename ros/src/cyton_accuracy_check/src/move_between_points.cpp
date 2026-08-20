@@ -563,14 +563,10 @@ private:
 
 struct TargetPoint {
     double txMm = 0.0, tyMm = 0.0, tzMm = 0.0;
-    // Target ORIENTATION, present only if the input CSV carries the
-    // ndi_measure/record_waypoints columns (see the file header comment).
-    // moveitQ* is the recorded MoveGroupInterface::getCurrentPose()
-    // orientation (MoveIt/base_link frame) -- used directly as the IK
-    // target's orientation. ndiQ* is the recorded moving_relative_fixed
-    // orientation (NDI frame) -- used directly to measure orientation
-    // error against the NDI-measured "after" pose. No frame conversion
-    // needed for either: each is already stored in the frame it's used in.
+    // Target orientation, present only if the CSV carries ndi_measure/
+    // record_waypoints columns. moveitQ* (MoveIt frame) is used directly
+    // as the IK target; ndiQ* (NDI frame) is used directly to measure
+    // orientation error -- no conversion needed for either.
     double moveitQw = 1.0, moveitQx = 0.0, moveitQy = 0.0, moveitQz = 0.0;
     double ndiQ0 = 1.0, ndiQx = 0.0, ndiQy = 0.0, ndiQz = 0.0;
     bool hasOrientation = false;
@@ -721,19 +717,11 @@ int main(int argc, char** argv) {
     rclcpp::init(argc, argv);
     auto node = std::make_shared<rclcpp::Node>("move_between_points");
 
-    // setJointValueTarget(pose) (added 2026-08-11, see its call site below)
-    // computes IK LOCALLY inside this process via MoveGroupInterface's own
-    // private RobotModel/RobotState, unlike setPoseTarget()/
-    // computeCartesianPath(), which just hand a constraint downstream to
-    // move_group (which already has its own kinematics.yaml loaded). A bare
-    // `ros2 run` node has no robot_description_kinematics parameter at all,
-    // so that local RobotModel has no IK plugin configured for group "arm"
-    // -- "No kinematics solver instantiated for group 'arm'". Rather than
-    // requiring every future launch of this tool to remember an extra
-    // --ros-args --params-file flag, declare the same solver config
-    // cyton_moveit_config/config/kinematics.yaml already uses for "arm"
-    // directly on this node, before MoveGroupInterface is constructed
-    // (it reads these at construction time).
+    // setJointValueTarget(pose) computes IK locally via MoveGroupInterface's
+    // own private RobotModel, which has no IK plugin configured unless
+    // robot_description_kinematics is declared on this node -- so declare
+    // the same solver config cyton_moveit_config uses, before
+    // MoveGroupInterface is constructed (it reads these at construction).
     node->declare_parameter<std::string>(
         "robot_description_kinematics.arm.kinematics_solver",
         "kdl_kinematics_plugin/KDLKinematicsPlugin"
@@ -817,34 +805,21 @@ int main(int argc, char** argv) {
             targetPose.pose.position.z += deltaMoveItM[2];
 
             if (target.hasOrientation) {
-                // Pin orientation to the ORIGINALLY-RECORDED target for this
-                // point instead of copying whatever orientation the arm
-                // currently happens to have -- see the file header comment
-                // for why the old behavior let orientation drift uncorrected
-                // over a long run.
+                // Pin to the originally-recorded target instead of copying
+                // the arm's current orientation -- see file header.
                 targetPose.pose.orientation.w = target.moveitQw;
                 targetPose.pose.orientation.x = target.moveitQx;
                 targetPose.pose.orientation.y = target.moveitQy;
                 targetPose.pose.orientation.z = target.moveitQz;
             }
 
-            // Orientation must stay constrained here (unlike the earlier
-            // position-only attempt) -- an unconstrained orientation can
-            // rotate the moving marker away from the NDI tracker's line of
-            // sight, breaking the very measurement this tool exists to take.
-            //
-            // Instead of setPoseTarget() (which hands a live Cartesian
-            // constraint to OMPL and makes it randomly sample goal states --
-            // the thing that was timing out against elbow_yaw's ~4-degree
-            // locked window), use setJointValueTarget(pose): this computes
-            // ONE IK solution up front, seeded from the arm's CURRENT joint
-            // state (already elbow_yaw-compliant, and each hop is only a
-            // small move), then hands the planner a single known joint-space
-            // goal to connect to -- a much easier problem than searching for
-            // *any* valid goal state from scratch, and it fails fast (no IK
-            // solution found) instead of burning the full 30s planning
-            // budget. See setJointValueTarget's own doc comment in
-            // move_group_interface.hpp for this exact behavior.
+            // Orientation must stay constrained -- an unconstrained one can
+            // rotate the moving marker away from the tracker's line of
+            // sight. setJointValueTarget(pose), not setPoseTarget() (which
+            // hands OMPL a live constraint to randomly sample against --
+            // timed out on elbow_yaw's ~4-degree locked window), computes
+            // one IK solution seeded from the current joint state and hands
+            // the planner a single known goal, failing fast if none exists.
             const bool ikFound = moveGroup.setJointValueTarget(targetPose);
             if (!ikFound) {
                 std::cout << "  IK FAILED to find a joint solution for this target "
