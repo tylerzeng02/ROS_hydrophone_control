@@ -47,7 +47,7 @@ constexpr int LOCK_MOVE_TIMEOUT_SECONDS = 10;
 constexpr uint16_t FULL_RANGE_CW_LIMIT = 0;
 constexpr uint16_t FULL_RANGE_CCW_LIMIT = 4095;
 
-constexpr const char* OUTPUT_CSV = "pid_tuning_data.csv";
+constexpr const char* OUTPUT_CSV = "i_gain_final_sweep_45pose_hand_posed_dataset.csv";
 
 void waitForEnter(const std::string& message) {
     std::cout << message << std::flush;

@@ -28,7 +28,7 @@ import sys
 import numpy as np
 
 # The rotation currently deployed in move_between_points.cpp (refit
-# 2026-08-13 from moveit_ndi_accuracy_check_new13_replay_clean.csv, 13 valid
+# 2026-08-13 from ndi_moveit_rotation_calibration_data.csv, 13 valid
 # pairs) -- printed alongside any new fit for comparison / drift-since-then
 # check.
 CURRENT_R_MOVEIT_TO_NDI = np.array([

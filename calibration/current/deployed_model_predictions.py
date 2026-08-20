@@ -28,8 +28,8 @@ IMPORTANT: angles are recomputed from each CSV row's actual_tick_* columns
 via this script's own ticks_to_deployed_radians(), NOT read from the CSV's
 actual_rad_* columns. Those columns are written by whatever version of
 ticksToRadians() was compiled into test_five_pose_ndi_capture.cpp at
-capture time -- the 374-pose quick_calibration_test_fixed_elbow_yaw.csv was
-captured BEFORE the 2026-08-06 deployment (pre-correction angles), while
+capture time -- the 374-pose deployed_model_training_dataset_374pose.csv (this
+dataset) was captured BEFORE the 2026-08-06 deployment (pre-correction angles), while
 the new batch2 data was captured with the current, already-corrected
 binary (post-correction angles). Recomputing from raw ticks with a single,
 explicit deployed formula sidesteps that inconsistency entirely.

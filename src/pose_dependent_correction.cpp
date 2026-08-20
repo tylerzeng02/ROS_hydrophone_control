@@ -146,7 +146,7 @@ std::array<double, N> gravityMomentArms(const FkFrames& frames) {
 
 // ---------------------------------------------------------------------
 // Fitted coefficients: calibration/current/final_deployment_fit.py on
-// build/quick_calibration_test_fixed_elbow_yaw.csv (374 poses, the same
+// calibration/data/deployed_model_training_dataset_374pose.csv (374 poses, the same
 // elbow_yaw-locked dataset the deployed static corrections in
 // robot_calibration.cpp/the URDF were fit on). Refit 2026-08-13 to get
 // values consistent with the currently-deployed dataset/base-frame

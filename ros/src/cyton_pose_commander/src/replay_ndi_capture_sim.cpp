@@ -46,7 +46,7 @@
 namespace {
 
 constexpr const char* DEFAULT_INPUT_CSV =
-    "/home/temp/dev/cyton_setup/ros/moveit_ndi_accuracy_check_easypoints.csv";
+    "/home/temp/dev/cyton_setup/ros/skull_probe_accuracy_test_target_points.csv";
 constexpr const char* PLANNING_GROUP = "arm";
 constexpr double PLANNING_TIME_SECONDS = 5.0;
 constexpr int PAUSE_AFTER_POSE_MS = 1000;  // "pausing for a second" per pose

@@ -170,19 +170,19 @@ target_link_libraries(test_home_pose
         dynamixel_sdk
 )
 
-add_executable(record_hand_poses
-    tests/record_hand_poses.cpp
+add_executable(record_hand_poses_multijoint_backlash_test
+    tests/record_hand_poses_multijoint_backlash_test.cpp
     src/dynamixel_motor.cpp
     src/robot_calibration.cpp
 )
 
-target_include_directories(record_hand_poses
+target_include_directories(record_hand_poses_multijoint_backlash_test
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/external/DynamixelSDK/c++/include
 )
 
-target_link_libraries(record_hand_poses
+target_link_libraries(record_hand_poses_multijoint_backlash_test
     PRIVATE
         dynamixel_sdk
 )
@@ -205,7 +205,7 @@ target_link_libraries(record_hand_poses_fixed_elbow_yaw
 )
 
 add_executable(reset_compliance
-    tests/reset_compliance.cpp
+    pid_tuning/tests/reset_compliance.cpp
     src/dynamixel_motor.cpp
     src/robot_calibration.cpp
 )
@@ -222,7 +222,7 @@ target_link_libraries(reset_compliance
 )
 
 add_executable(test_compliance_punch
-    tests/test_compliance_punch.cpp
+    pid_tuning/tests/test_compliance_punch.cpp
     src/dynamixel_motor.cpp
     src/robot_calibration.cpp
 )
@@ -239,7 +239,7 @@ target_link_libraries(test_compliance_punch
 )
 
 add_executable(check_servo_model
-    tests/check_servo_model.cpp
+    pid_tuning/tests/check_servo_model.cpp
     src/dynamixel_motor.cpp
     src/robot_calibration.cpp
 )
@@ -256,7 +256,7 @@ target_link_libraries(check_servo_model
 )
 
 add_executable(test_i_gain
-    tests/test_i_gain.cpp
+    pid_tuning/tests/test_i_gain.cpp
     src/dynamixel_motor.cpp
     src/robot_calibration.cpp
 )
@@ -273,7 +273,7 @@ target_link_libraries(test_i_gain
 )
 
 add_executable(autotune_i_gain
-    tests/autotune_i_gain.cpp
+    pid_tuning/tests/autotune_i_gain.cpp
     src/dynamixel_motor.cpp
     src/robot_calibration.cpp
 )
@@ -290,7 +290,7 @@ target_link_libraries(autotune_i_gain
 )
 
 add_executable(set_i_gain
-    tests/set_i_gain.cpp
+    pid_tuning/tests/set_i_gain.cpp
     src/dynamixel_motor.cpp
     src/robot_calibration.cpp
 )

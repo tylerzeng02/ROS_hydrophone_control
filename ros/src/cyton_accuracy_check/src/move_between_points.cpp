@@ -137,7 +137,7 @@ constexpr double MAX_NDI_ERROR = 0.50;
 // MoveIt coordinates to command a move), use the transpose (R is a proper
 // rotation matrix, so R^-1 == R^T):
 //     v_moveit = R^T * v_ndi
-// Refit 2026-08-13 from moveit_ndi_accuracy_check_new13_replay_clean.csv (13
+// Refit 2026-08-13 from ndi_moveit_rotation_calibration_data.csv (13
 // valid paired poses, 1 getCurrentPose()-failed sentinel row auto-rejected).
 // Only 0.46deg from the prior fit -- effectively confirms no meaningful
 // marker drift, but deployed anyway per direct request.

@@ -4,8 +4,17 @@
 build/*
 !build/*.csv
 !build/*.md
-!build/archive/
 cmake-build-*/
+
+# Archive/trash/reference folders -- historical or reference material kept
+# on disk for whoever's working locally, deliberately not tracked in git
+# (2026-08-19: previously build/archive/ was the one exception that WAS
+# tracked; now every archive/trash folder is treated the same way).
+build/archive/
+calibration/archive/
+ros/archive/
+trash/
+understanding/
 
 # Compiled files
 *.o
@@ -24,6 +33,17 @@ ros2_ws/log/
 ros/build/
 ros/install/
 ros/log/
+
+# Colcon build output accidentally left at repo root or inside
+# calibration/current/ from running colcon from the wrong directory --
+# these are pure regenerable artifacts, never meant to be tracked (one
+# instance found and removed 2026-08-19 still had a hardcoded path from a
+# different machine baked into it).
+/install/
+/log/
+calibration/current/build/
+calibration/current/install/
+calibration/current/log/
 
 # Editor and OS files
 .vscode/

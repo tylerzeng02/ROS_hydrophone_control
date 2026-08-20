@@ -1,3 +1,0 @@
-point_index,target_tx_mm,target_ty_mm,target_tz_mm,before_tx_mm,before_ty_mm,before_tz_mm,after_tx_mm,after_ty_mm,after_tz_mm,commanded_delta_ndi_mm_x,commanded_delta_ndi_mm_y,commanded_delta_ndi_mm_z,achieved_delta_ndi_mm_x,achieved_delta_ndi_mm_y,achieved_delta_ndi_mm_z,error_mm,orientation_error_deg
-0,-6.7301,-270.554,63.4994,-19.5091,-255.577,73.8786,-4.54851,-260.062,61.061,12.779,-14.9773,-10.3792,14.9606,-4.48579,-12.8176,10.9899,2.37989
-1,-6.01199,-269.509,66.0533,-4.60653,-260.084,61.0327,-8.09697,-260.671,65.3403,-1.40546,-9.42491,5.0206,-3.49044,-0.587084,4.30756,9.10839,2.25673

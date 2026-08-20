@@ -346,7 +346,7 @@ constexpr const char* SETTLING_DIAGNOSTIC_CSV = "settling_diagnostic.csv";
 // fresh, under TODAY's session/physical setup, specifically because a
 // session-level NDI frame drift (~7deg rotation in the fixed marker,
 // confirmed via a rigid-transform fit) was found between the ORIGINAL
-// quick_calibration_test_fixed_elbow_yaw.csv capture and this session --
+// deployed_model_training_dataset_374pose.csv capture and this session --
 // see CLAUDE.md's I-gain/PID-tuning section. QUICK_TEST_CSV below writes to
 // a NEW filename so this run cannot overwrite the original, historical
 // dataset; the previous (2026-08-11) batch3-newonly pose set (index
@@ -381,7 +381,7 @@ constexpr std::array<int, 382> QUICK_TEST_POSE_INDICES = {
     1221, 1222, 1223, 1224, 1225, 1226, 1227, 1228, 1229, 1230, 1231, 1232, 1233, 1234,
     1235, 1236, 1237, 1238,
 };
-constexpr const char* QUICK_TEST_CSV = "quick_calibration_test_fixed_elbow_yaw_fresh.csv";
+constexpr const char* QUICK_TEST_CSV = "marker_drift_recheck_dataset_377pose.csv";
 
 // Hand-recorded via tests/record_hand_poses.cpp: the arm was physically
 // moved by hand (torque off) into each pose and the resulting joint ticks

@@ -3,9 +3,7 @@ from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
 import calibrate_kinematics as ck
 
-CSV_PATHS = [
-    'C:/Users/ConformalUser/Desktop/cyton_setup/calibration/data/deployed_model_training_dataset_374pose.csv',
-]
+CSV_PATHS = ['/home/temp/dev/cyton_setup/build/calibration_dataset_374pose_deployed_model_source.csv']
 angles_list, pos_list, quat_list = [], [], []
 for p in CSV_PATHS:
     a, pos, q = ck.load_poses_from_csv(p)
