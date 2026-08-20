@@ -19,7 +19,8 @@ FONT_DIR = os.path.join(os.path.dirname(font_roboto.__file__), "files")
 for fname in ["Roboto-Regular.ttf", "Roboto-Bold.ttf"]:
     fm.fontManager.addfont(os.path.join(FONT_DIR, fname))
 
-OUT_DIR = "C:/Users/ConformalUser/Desktop/cyton_setup/build/presentation_figures/"
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+OUT_DIR = os.path.join(REPO_ROOT, "build", "presentation_figures") + "/"
 
 theme = load_theme("arctic_light")
 theme.apply()
@@ -32,7 +33,7 @@ plt.rcParams["axes.labelcolor"] = "black"
 
 point_idx = []
 errors = []
-with open("C:/Users/ConformalUser/Desktop/cyton_setup/ros/move_between_points_results_easypoints_rerun.csv", newline="") as f:
+with open(os.path.join(REPO_ROOT, "ros", "move_between_points_results_easypoints_rerun.csv"), newline="") as f:
     for row in csv.DictReader(f):
         point_idx.append(int(row["point_index"]))
         errors.append(float(row["error_mm"]))
