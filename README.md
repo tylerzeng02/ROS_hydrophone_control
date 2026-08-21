@@ -57,8 +57,7 @@ install with `colcon`.
   - `current/`: the active Python fitting/validation scripts for the
     deployed 48-parameter model (`calibrate_kinematics.py`,
     `final_deployment_fit.py`, `deployed_model_predictions.py`, and a few
-    others). This is what you touch to refit or re-validate the
-    calibration.
+    others). 
   - `data/`: the dataset the deployed model was fit on
     (`deployed_model_training_dataset_374pose.csv`). See
     `calibration/data/README.md`.
@@ -196,27 +195,3 @@ See `ros/src/fus_targeting_gui/README.md` for the app's architecture and
 `ros/src/fus_targeting_gui/config/default_config.yaml` for the one file
 that would need editing to point this at a different, already-calibrated
 robot arm.
-
-## Typical workflow, in order
-
-1. **Read-only sanity check.** `read_motor_positions` connects, prints
-   every motor's current position, and disconnects. Safe to run at any
-   time, including while the arm is being hand-posed.
-2. **Home pose.** `test_home_pose` enables torque and holds the arm at
-   its current pose, a basic check that the arm responds at all.
-3. **NDI connectivity.** `test_ndi_single_tool` confirms the tracker can
-   see one marker before attempting a capture session.
-4. **Calibration capture.** `ndi_capture_and_validate` (built from
-   `calibration/collection/`) drives the arm through a pose list and
-   captures paired NDI measurements. This is the tool behind every
-   calibration dataset in this project. `--quick-test` and `--validate`
-   are its other modes; see its own header comment for the full CLI.
-5. **Refit or validate the calibration** using the scripts in
-   `calibration/current/`, against the data `ndi_capture_and_validate`
-   collected.
-6. **Bring up ROS 2 / MoveIt** (`cyton_bringup`), with `hardware_type`
-   left at its safe `mock_components` default until you are ready to move
-   the real arm.
-7. **Drive the arm through MoveIt**, via RViz directly, `cyton_pose_commander`
-   for a CSV of joint targets, or `fus_targeting_gui` for the
-   click-a-point-on-the-skull workflow.
