@@ -1,4 +1,4 @@
-# cyton_setup
+# Cyton Gamma 1500 ROS and tFUS Acoustic Characterization Applications
 
 Control and integration codebase for a **Cyton Gamma 1500** 7-DOF
 Dynamixel-servo robot arm, kinematically calibrated against an **NDI
