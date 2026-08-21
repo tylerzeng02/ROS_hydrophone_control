@@ -84,7 +84,7 @@ install with `colcon`.
     (`bringup.launch.py`), a thin wrapper around `cyton_moveit_config`'s
     launch file.
   - `cyton_trac_ik_kinematics_plugin`: an alternative TRAC-IK-based IK
-    solver. KDL is the default; this is newer and less validated.
+    solver to the default KDL.
   - `cyton_ndi_capture`: `ndi_measure`, a standalone NDI measurement tool
     for checking MoveIt-commanded poses against independent tracker
     ground truth.
@@ -105,9 +105,6 @@ install with `colcon`.
   not populate it (see [Software prerequisites](#software-prerequisites)).
 - **`references/`**: the robot's URDF (`cyton_gamma_1500_trac_ik.urdf`)
   and the moving-marker mounting bracket CAD (`marker_mount.stl`).
-- **`pid_tuning/`, `notes/`, `trash/`, `understanding/`**: local-only
-  material, gitignored and not part of the tracked repo. Never needed to
-  build or run anything here.
 
 ## Software prerequisites
 
@@ -238,9 +235,4 @@ robot arm.
    for a CSV of joint targets, or `fus_targeting_gui` for the real
    click-a-point-on-the-skull workflow.
 
-## Full project history
 
-**`CLAUDE.md`** is this project's detailed, continuously-updated decision
-log: every real bug found, every calibration result, every dead end ruled
-out, and why. It is long, but it is the authoritative source for "why is
-this the way it is" on anything not obvious from the code itself.
