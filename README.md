@@ -5,7 +5,7 @@ Dynamixel-servo robot arm, kinematically calibrated against an **NDI
 Polaris Spectra** optical tracker, and driven through **ROS 2 + MoveIt 2**
 for real motion planning and execution.
 
-Currently developing operating-facing applications for tFUS acoustic characterization using this robotic system via `ros/src/fus_targeting_gui/`
+`ros/src/fus_targeting_gui/` is the operator-facing application for tFUS acoustic characterization with this arm.
 
 The native C++ hardware tools (`src/`, `tests/`, `calibration/collection/`)
 build with plain CMake and can run on the machine connected to the arm and
@@ -22,7 +22,6 @@ install with `colcon`.
 - [Getting started: Python calibration tooling](#getting-started-python-calibration-tooling)
 - [Getting started: fus_targeting_gui](#getting-started-fus_targeting_gui)
 - [Typical workflow, in order](#typical-workflow-in-order)
-- [Full project history](#full-project-history)
 
 ## Hardware
 
@@ -44,31 +43,26 @@ install with `colcon`.
 - **`src/`**: core motor control (`dynamixel_motor.{h,cpp}`) and the
   per-joint calibration table (`robot_calibration.{h,cpp}`) that every
   motor-facing program in this repo goes through for safety clamping and
-  tick/radian conversion. `src/archive/` holds retired modules kept
-  locally for reference (not tracked in git).
+  tick/radian conversion.
 - **`tests/`**: one standalone hardware-in-the-loop program per file
   (tick/radian checks, home-pose move, NDI single-tool diagnostic,
   multi-joint backlash test). Not a unit test suite; each is built and run
-  individually against the physical robot and/or tracker. `tests/archive/`
-  holds retired tools.
+  individually against the physical robot and/or tracker.
 - **`calibration/`**: the kinematic-calibration pipeline.
   - `collection/`: the C++ tools that talk to the hardware and collect
     data. `ndi_capture_and_validate.cpp` is the main NDI capture and
-    `--validate` tool, and the source of every calibration dataset in this
-    project. `record_hand_poses.cpp` records hand-posed joint
-    configurations for later NDI capture.
+    `--validate` tool, used for every calibration dataset in this project.
+    `record_hand_poses.cpp` records hand-posed joint configurations for
+    later NDI capture.
   - `current/`: the active Python fitting/validation scripts for the
     deployed 48-parameter model (`calibrate_kinematics.py`,
     `final_deployment_fit.py`, `deployed_model_predictions.py`, and a few
     others). This is what you touch to refit or re-validate the
     calibration.
-  - `data/`: the real, tracked dataset the deployed model was fit on
+  - `data/`: the dataset the deployed model was fit on
     (`deployed_model_training_dataset_374pose.csv`). See
     `calibration/data/README.md`.
-  - `archive/`: superseded diagnostic scripts and the earlier 60-param
-    research model, kept locally for reference (not tracked in git).
-- **`ros/`**: the ROS 2 + MoveIt 2 workspace. `src/` holds the real
-  packages.
+- **`ros/`**: the ROS 2 + MoveIt 2 workspace. `src/` holds the packages.
   - `cyton_description`: URDF/xacro and meshes for the arm.
   - `cyton_hardware`: the `ros2_control` hardware interface plugin
     bridging the Dynamixel servos to ROS 2/MoveIt.
@@ -90,8 +84,7 @@ install with `colcon`.
   - `fus_targeting_gui`: the skull-mesh point-picking targeting
     application. See its own `README.md` for setup and usage.
 
-  Loose files at the top level of `ros/` are real collected accuracy
-  data. See `ros/archive/README.md` for the superseded ones.
+  Loose files at the top level of `ros/` are collected accuracy data.
 - **`external/`**: vendored dependencies as git submodules.
   `DynamixelSDK` and `ndicapi` are populated; `trac_ik` is only needed if
   you plan to build `cyton_trac_ik_kinematics_plugin` and is empty in many
@@ -121,10 +114,9 @@ will not populate them on a fresh clone. If either is missing, populate it
 manually by cloning `ROBOTIS-GIT/DynamixelSDK` or `traclabs/trac_ik` into
 the corresponding `external/` directory at the commit this repo's git
 tree references. The root `CMakeLists.txt` and `ros/src/cyton_hardware`'s
-`CMakeLists.txt` both guard on `external/DynamixelSDK` existing, with a
-`FATAL_ERROR` if it is missing. NDI and TRAC-IK targets are guarded more
-gently and are simply skipped if their corresponding `external/`
-directory is not populated.
+`CMakeLists.txt` both stop with a `FATAL_ERROR` if `external/DynamixelSDK`
+is missing. NDI and TRAC-IK targets are optional and are skipped if their
+`external/` directory is not populated.
 
 ## Getting started: native C++ build
 
@@ -213,7 +205,7 @@ robot arm.
 2. **Home pose.** `test_home_pose` enables torque and holds the arm at
    its current pose, a basic check that the arm responds at all.
 3. **NDI connectivity.** `test_ndi_single_tool` confirms the tracker can
-   see one marker before attempting a real capture session.
+   see one marker before attempting a capture session.
 4. **Calibration capture.** `ndi_capture_and_validate` (built from
    `calibration/collection/`) drives the arm through a pose list and
    captures paired NDI measurements. This is the tool behind every
@@ -226,7 +218,5 @@ robot arm.
    left at its safe `mock_components` default until you are ready to move
    the real arm.
 7. **Drive the arm through MoveIt**, via RViz directly, `cyton_pose_commander`
-   for a CSV of joint targets, or `fus_targeting_gui` for the real
+   for a CSV of joint targets, or `fus_targeting_gui` for the
    click-a-point-on-the-skull workflow.
-
-
