@@ -290,10 +290,3 @@ robot arm.
 - **Only run `git commit`/`git push` yourself.** This is a standing
   project convention — changes get staged and handed back for you to
   commit, never committed automatically.
-
-## Full project history
-
-**`CLAUDE.md`** is this project's detailed, continuously-updated decision
-log — every real bug found, every calibration result, every dead end
-ruled out, and why. It is long, but it is the authoritative source for
-"why is this the way it is" on anything not obvious from the code itself.
