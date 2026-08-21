@@ -84,7 +84,6 @@ def launch_setup(context, *args, **kwargs):
                 "serial_port": LaunchConfiguration("serial_port"),
                 "baud_rate": LaunchConfiguration("baud_rate"),
                 "compensate_backlash": LaunchConfiguration("compensate_backlash"),
-                "compensate_pose_dependent": LaunchConfiguration("compensate_pose_dependent"),
             },
         )
         .robot_description_semantic(file_path="config/cyton_gamma_1500.srdf")
@@ -195,32 +194,23 @@ def generate_launch_description():
         "urdf_variant",
         default_value="calibrated",
         description="Which top-level URDF xacro MoveIt plans against: 'calibrated' (real, "
-        "deployed kinematic corrections -- default) or 'uncalibrated' (original, uncorrected "
-        "joint geometry -- see cyton_gamma_1500_robot_uncalibrated.xacro's header). Does not "
+        "deployed kinematic corrections, the default) or 'uncalibrated' (original, uncorrected "
+        "joint geometry, see cyton_gamma_1500_robot_uncalibrated.xacro's header). Does not "
         "affect robot_calibration.cpp's real-servo calibration either way.",
     )
     compensate_backlash_arg = DeclareLaunchArgument(
         "compensate_backlash",
         default_value="false",
         description="Enable cyton_hardware's streaming backlash compensator (only meaningful "
-        "with hardware_type:=real). Default false. Not yet validated against real hardware -- "
-        "see CytonSystemHardware's own header comment.",
-    )
-    compensate_pose_dependent_arg = DeclareLaunchArgument(
-        "compensate_pose_dependent",
-        default_value="false",
-        description="Enable the ported joint-coupling/gravity-deflection/shoulder_pitch-Fourier "
-        "correction (src/pose_dependent_correction.cpp, only meaningful with hardware_type:="
-        "real). Default false. Numerically verified against the Python model it ports, but "
-        "never validated as live control against real hardware -- see CytonSystemHardware's own "
-        "header comment.",
+        "with hardware_type:=real). Default false. Not yet validated against real hardware. "
+        "See CytonSystemHardware's own header comment.",
     )
     ik_solver_arg = DeclareLaunchArgument(
         "ik_solver",
         default_value="kdl",
         description="'kdl' (default, production-proven) or 'trac_ik' (cyton_trac_ik_kinematics_"
-        "plugin, 2026-08-13, brand new and not yet hardware-validated -- see that plugin's own "
-        "header comment). Selects config/kinematics.yaml vs. config/kinematics_trac_ik.yaml.",
+        "plugin, new and not yet hardware-validated, see that plugin's own header comment). "
+        "Selects config/kinematics.yaml versus config/kinematics_trac_ik.yaml.",
     )
 
     return LaunchDescription(
@@ -231,7 +221,6 @@ def generate_launch_description():
             rviz_config_arg,
             urdf_variant_arg,
             compensate_backlash_arg,
-            compensate_pose_dependent_arg,
             ik_solver_arg,
             OpaqueFunction(function=launch_setup),
         ]

@@ -2,47 +2,42 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
   <!--
-    ros2_control hardware block for the 7 arm joints (motor IDs 0-6;
-    motor 7, the gripper, is intentionally excluded  -  same as the base
-    URDF's IK chain, see cyton_gamma_1500_robot.xacro).
+    ros2_control hardware block for the 7 arm joints, motor IDs 0-6.
+    Motor 7, the gripper, is intentionally excluded, the same as the base
+    URDF's IK chain. See cyton_gamma_1500_robot.xacro.
 
-    hardware_type="mock_components" (the default) uses ros2_control's
+    hardware_type="mock_components", the default, uses ros2_control's
     built-in mock_components/GenericSystem plugin, which just echoes
-    commands back as state with no real servo involved  -  safe for
+    commands back as state with no real servo involved. This is safe for
     exercising the whole MoveIt pipeline (RViz, planning, execution) with
     zero hardware risk. Set it to "real" to load
     cyton_hardware/CytonSystemHardware instead, which talks to the real
-    Dynamixel servos via DynamixelMotor  -  only do this with the physical
+    Dynamixel servos via DynamixelMotor. Only do this with the physical
     arm connected, powered, and clear to move.
-    (hardware_type is compared as a string, not a xacro/Python boolean  - 
-    xacro args always arrive as strings, and "false" is truthy to Python's
-    bare eval(), so a boolean-looking parameter here would silently always
-    take the "true" branch. String equality avoids that trap.)
+    hardware_type is compared as a string, not a xacro or Python boolean.
+    xacro args always arrive as strings, and "false" is truthy to
+    Python's bare eval(), so a boolean-looking parameter here would
+    silently always take the "true" branch. String equality avoids that
+    trap.
 
     position is the only command/state interface exposed. velocity is
-    exposed as state-only (always reported 0.0 by cyton_hardware, since
-    DynamixelMotor's read path only reads present position here) so that
-    joint_trajectory_controller's default state_interfaces list (position
-    + velocity) is satisfied without a real velocity feedback source.
+    exposed as state-only, always reported 0.0 by cyton_hardware since
+    DynamixelMotor's read path only reads present position here, so that
+    joint_trajectory_controller's default state_interfaces list of
+    position plus velocity is satisfied without a real velocity feedback
+    source.
 
-    compensate_backlash (2026-08-13, default "false", string not boolean -
-    same xacro-arg-stringification trap as hardware_type above) enables
-    cyton_hardware's streaming-compatible backlash compensator. Only
-    meaningful on the "real" branch; harmless (and unused) if passed under
-    mock_components. See CytonSystemHardware's own header comment for what
-    this does and its validation status - NOT the same, already-validated
-    fix as dynamixel_motor.cpp's blocking moves.
-
-    compensate_pose_dependent (2026-08-13, default "false", same string-
-    not-boolean convention as above) enables the ported joint-coupling/
-    gravity-deflection/shoulder_pitch-Fourier correction
-    (src/pose_dependent_correction.cpp). Only meaningful on the "real"
-    branch. Numerically verified against the Python model it ports, but
-    NEVER validated as live control against real hardware - see
-    CytonSystemHardware's header comment.
+    compensate_backlash, default "false", is a string rather than a
+    boolean, the same xacro-arg-stringification trap as hardware_type
+    above. It enables cyton_hardware's streaming-compatible backlash
+    compensator. This is only meaningful on the "real" branch, and is
+    harmless and unused if passed under mock_components. See
+    CytonSystemHardware's own header comment for what this does and its
+    validation status. It is not the same, already-validated fix as
+    dynamixel_motor.cpp's blocking moves.
   -->
   <xacro:macro name="cyton_gamma_1500_ros2_control"
-               params="name hardware_type serial_port baud_rate protocol_version initial_positions_file compensate_backlash:='false' compensate_pose_dependent:='false'">
+               params="name hardware_type serial_port baud_rate protocol_version initial_positions_file compensate_backlash:='false'">
     <xacro:property name="initial_positions"
                      value="${xacro.load_yaml(initial_positions_file)['initial_positions']}"/>
 
@@ -57,7 +52,6 @@
           <param name="baud_rate">${baud_rate}</param>
           <param name="protocol_version">${protocol_version}</param>
           <param name="compensate_backlash">${compensate_backlash}</param>
-          <param name="compensate_pose_dependent">${compensate_pose_dependent}</param>
         </xacro:if>
       </hardware>
 
@@ -89,11 +83,12 @@
         </state_interface>
         <state_interface name="velocity"/>
       </joint>
-      <!-- elbow_yaw_joint: locked in production (see robot_calibration.cpp
-           and this file's own header comment)  -  still exposed as a normal
-           command/state interface since the URDF's own <limit> already
-           restricts it to a ~2 degree window, so MoveIt/ros2_control can't
-           command it anywhere meaningful even if a planner tries. -->
+      <!-- elbow_yaw_joint is locked in production. See robot_calibration.cpp
+           and this file's own header comment. It is still exposed as a
+           normal command/state interface since the URDF's own limit
+           already restricts it to a 2 degree window, so MoveIt and
+           ros2_control cannot command it anywhere meaningful even if a
+           planner tries. -->
       <joint name="elbow_yaw_joint">
         <command_interface name="position"/>
         <state_interface name="position">

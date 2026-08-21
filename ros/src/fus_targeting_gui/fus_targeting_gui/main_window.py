@@ -17,9 +17,10 @@ from .moveit_bridge import MoveItBridge
 
 
 class _CallThread(QThread):
-    """Runs one blocking callable off the GUI thread, emits `result` when
-    done. Used for both plan_to_pose() and execute() -- both block on
-    ROS service/action calls and would otherwise freeze the GUI."""
+    """Runs one blocking callable off the GUI thread and emits `result`
+    when done. Used for both plan_to_pose() and execute(), since both
+    block on ROS service or action calls and would otherwise freeze the
+    GUI."""
 
     result = Signal(object)
 

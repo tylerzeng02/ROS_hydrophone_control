@@ -1,5 +1,5 @@
-"""Mesh loading + rendering + surface point-picking. No ROS dependency at
-all -- runnable and testable standalone:
+"""Mesh loading, rendering, and surface point-picking. This module has no
+ROS dependency and is runnable and testable standalone:
 
     python3 -m fus_targeting_gui.mesh_view /path/to/mesh.stl
 """
@@ -14,9 +14,9 @@ from PySide6.QtWidgets import QApplication, QVBoxLayout, QWidget
 
 
 class MeshView(QWidget):
-    """Emits point_picked(point_xyz: tuple, normal_xyz: tuple) -- both in
-    the mesh's own local (pre-registration) coordinate frame -- every time
-    the user clicks a point on the mesh surface."""
+    """Emits point_picked(point_xyz: tuple, normal_xyz: tuple) every time
+    the user clicks a point on the mesh surface. Both values are in the
+    mesh's own local, pre-registration coordinate frame."""
 
     point_picked = Signal(tuple, tuple)
 
@@ -61,11 +61,11 @@ class MeshView(QWidget):
             return
         point = np.asarray(picked_point, dtype=float)
 
-        # Nearest-vertex normal rather than trusting a specific pyvista
-        # picker callback signature to hand back a normal directly --
-        # robust across pyvista versions, close enough for a surface pick
-        # (mesh is fine enough that adjacent-vertex normal differences are
-        # negligible for targeting purposes).
+        # Uses the nearest vertex's normal instead of trusting a specific
+        # pyvista picker callback signature to hand back a normal directly.
+        # This is robust across pyvista versions. The mesh is fine enough
+        # that adjacent-vertex normal differences are negligible for
+        # targeting purposes.
         closest_idx = self._mesh.find_closest_point(point)
         normal = np.asarray(self._mesh.point_normals[closest_idx], dtype=float)
         norm = np.linalg.norm(normal)
@@ -89,7 +89,7 @@ def _standalone_main():
     )
     view.load_mesh(path, scale=scale)
     view.resize(1000, 800)
-    view.setWindowTitle(f"MeshView standalone -- {path}")
+    view.setWindowTitle(f"MeshView standalone: {path}")
     view.show()
     sys.exit(app.exec())
 

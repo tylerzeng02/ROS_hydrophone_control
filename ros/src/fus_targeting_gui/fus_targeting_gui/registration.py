@@ -1,11 +1,11 @@
-"""Converts a picked mesh-local surface point (+ normal) into a target
+"""Converts a picked mesh-local surface point and normal into a target
 geometry_msgs/Pose in the robot's planning frame.
 
-Deliberately isolated behind the Registration base class so a future
-NDI-fiducial-based (or any other) registration scheme can replace
-FixedPoseRegistration without touching mesh_view.py or moveit_bridge.py --
-neither of those imports anything from this module except a Registration
-instance.
+This is deliberately isolated behind the Registration base class so a
+future NDI-fiducial-based, or any other, registration scheme can replace
+FixedPoseRegistration without touching mesh_view.py or moveit_bridge.py.
+Neither of those files imports anything from this module except a
+Registration instance.
 """
 
 from abc import ABC, abstractmethod
@@ -29,18 +29,20 @@ def _euler_to_matrix(rpy_rad):
 
 
 def quaternion_looking_along(direction, up_hint=(0.0, 0.0, 1.0)):
-    """Rotation that maps the end effector's local +Z axis onto `direction`
-    (both in the same frame), with the remaining rotation-about-the-approach
-    -axis degree of freedom resolved via `up_hint` (a "look-at" style
-    construction, not a claim about the physically-correct tool roll).
+    """Computes the rotation that maps the end effector's local +Z axis
+    onto `direction`, with both vectors expressed in the same frame. The
+    remaining rotation about the approach axis is resolved using `up_hint`,
+    a look-at style construction. This does not claim to be the physically
+    correct tool roll.
 
-    IMPORTANT: which local axis of `end_effector_frame` should point along
+    Important: which local axis of `end_effector_frame` should point along
     the approach direction is a property of how the probe is physically
-    mounted, and could not be verified from this repo alone (only the
-    arm's own virtual_endeffector frame is defined here, not the probe
-    tool's own frame convention). +Z is the assumption below -- confirm
-    against the real mount before trusting a computed orientation (e.g. by
-    checking a planned/executed pose in RViz against the physical probe).
+    mounted, and this could not be verified from the repository alone.
+    Only the arm's own virtual_endeffector frame is defined here, not the
+    probe tool's own frame convention. The +Z assumption below should be
+    confirmed against the real mount before trusting a computed
+    orientation, for example by checking a planned or executed pose in
+    RViz against the physical probe.
     """
     z = np.array(direction, dtype=float)
     norm = np.linalg.norm(z)
@@ -50,8 +52,8 @@ def quaternion_looking_along(direction, up_hint=(0.0, 0.0, 1.0)):
 
     up = np.array(up_hint, dtype=float)
     if abs(np.dot(z, up)) > 0.999:
-        # direction is (anti)parallel to the up hint -- pick a different
-        # reference so cross() below doesn't degenerate.
+        # The direction is parallel or antiparallel to the up hint.
+        # Pick a different reference so cross() below does not degenerate.
         up = np.array([1.0, 0.0, 0.0])
 
     x = np.cross(up, z)
@@ -68,19 +70,20 @@ def quaternion_looking_along(direction, up_hint=(0.0, 0.0, 1.0)):
 class Registration(ABC):
     @abstractmethod
     def mesh_point_to_target_pose(self, point_local, normal_local, standoff_mm):
-        """point_local/normal_local: (x, y, z) in the mesh's own (local,
-        pre-registration) coordinate frame, as returned by mesh_view's
-        picker. Returns a geometry_msgs/Pose in the robot's base_frame,
-        offset `standoff_mm` back along the (transformed) outward normal
-        from the picked surface point."""
+        """point_local and normal_local are (x, y, z) tuples in the mesh's
+        own local, pre-registration coordinate frame, as returned by
+        mesh_view's picker. Returns a geometry_msgs/Pose in the robot's
+        base_frame, offset standoff_mm back along the transformed outward
+        normal from the picked surface point."""
         raise NotImplementedError
 
 
 class FixedPoseRegistration(Registration):
-    """Registers the mesh to base_frame via one fixed, hand-specified pose
-    -- exactly the transform publish_skull_marker.py already uses to place
-    this same mesh in RViz. Keep this and that script's --xyz/--rpy in
-    sync if the mesh is ever re-registered against the real setup.
+    """Registers the mesh to base_frame using one fixed, hand-specified
+    pose. This is exactly the transform publish_skull_marker.py already
+    uses to place this same mesh in RViz. Keep this and that script's
+    xyz and rpy arguments in sync if the mesh is ever re-registered
+    against the real setup.
     """
 
     def __init__(self, xyz_m, rpy_rad):

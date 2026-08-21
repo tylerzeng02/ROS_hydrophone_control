@@ -5,14 +5,15 @@
   <version>0.1.0</version>
   <description>
     Standalone GUI for transcranial focused ultrasound (tFUS) acoustic
-    characterization: load a skull mesh, click a point on its surface, and
-    send the robot's end effector there via MoveIt. Deliberately contains
-    no robot-specific logic -- every robot-facing detail (planning group,
-    base/tip frame, mesh registration pose) comes from config.yaml, so a
-    future different (already-calibrated) arm is a config change, not a
-    code change. This is the first ament_python package in this workspace
-    (everything else is C++/ament_cmake); talks to MoveIt via pymoveit2
-    rather than moveit_py, which isn't installed here.
+    characterization. Loads a skull mesh, click a point on its surface,
+    and send the robot's end effector there via MoveIt. Contains no
+    robot-specific logic. Every robot-facing detail (planning group,
+    base and tip frame, mesh registration pose) comes from config.yaml,
+    so pointing this at a different, already-calibrated arm is a config
+    change, not a code change. This is the first ament_python package in
+    this workspace, since everything else is C++ and ament_cmake. It
+    talks to MoveIt via pymoveit2 rather than moveit_py, which is not
+    installed here.
   </description>
   <maintainer email="tonizengedu@gmail.com">tyler zeng</maintainer>
   <license>BSD</license>

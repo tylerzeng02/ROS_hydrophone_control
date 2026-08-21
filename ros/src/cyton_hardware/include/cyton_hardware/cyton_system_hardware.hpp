@@ -14,7 +14,6 @@
 
 #include "dynamixel_motor.h"
 #include "robot_calibration.h"
-#include "pose_dependent_correction.h"
 
 namespace cyton_hardware
 {
@@ -35,17 +34,8 @@ namespace cyton_hardware
 // segment, fighting the trajectory controller's own interpolation.
 // Implemented instead: a reversal-triggered hold-point compensator (see
 // applyBacklashCompensation() in the .cpp) that only engages once per
-// genuine reversal. Never validated against real hardware -- enable
+// genuine reversal. Never validated against real hardware. Enable
 // deliberately and watch closely, not as a default.
-//
-// Pose-dependent correction (opt-in via "compensate_pose_dependent",
-// default "false"): applies pose_dependent_correction::computeCorrection()
-// (joint coupling, lumped gravity/elastostatic deflection, shoulder_pitch
-// Fourier term) to every joint's commanded angle each write() cycle,
-// before the static tick/radian conversion and backlash compensation.
-// Same standing as compensate_backlash: math is checked against the
-// Python model it ports, but never validated as live control on real
-// hardware.
 class CytonSystemHardware : public hardware_interface::SystemInterface
 {
 public:
@@ -95,7 +85,6 @@ private:
   int baud_rate_ = 1000000;
   float protocol_version_ = 1.0f;
   uint16_t moving_speed_ = 40;  // matches this project's established MOVING_SPEED convention
-  bool compensate_pose_dependent_ = false;
 
   // ros2_control state/command storage. hw_velocities_ is always reported
   // 0.0 -- DynamixelMotor::readPosition() only reads present position, not

@@ -4,32 +4,32 @@
 // position, and measures the real error at each stop.
 //
 // Rationale: a relative move and an absolute move are the same MoveIt
-// request under the hood -- what matters is where the delta is anchored.
+// request under the hood. What matters is where the delta is anchored.
 // Anchoring to the arm's live current position each hop means each hop
 // only needs the arm's short-term repeatability, not full absolute
 // calibration accuracy, and self-corrects prior drift instead of
 // compounding it.
 //
 // Target points are recorded in the NDI tracker's frame, but MoveIt needs
-// the delta in its own (base_link) frame -- these frames differ by a real,
+// the delta in its own base_link frame. These frames differ by a real,
 // substantial rotation (R_MOVEIT_TO_NDI below). Only the rotation matters
-// here (translation cancels out for a delta vector), so this tool is far
-// less sensitive to base-frame translation uncertainty than absolute-
-// position tests elsewhere in this project.
+// here, since translation cancels out for a delta vector, so this tool is
+// far less sensitive to base-frame translation uncertainty than
+// absolute-position tests elsewhere in this project.
 //
 // NdiTracker and its dependencies are copied verbatim from
-// run_accuracy_check.cpp/move_x_test.cpp (originally from
-// cyton_ndi_capture/src/ndi_measure.cpp) -- already hardware-validated.
+// run_accuracy_check.cpp and move_x_test.cpp, originally from
+// cyton_ndi_capture/src/ndi_measure.cpp, and are already hardware-validated.
 //
 // Orientation-target fix: targetPose's orientation used to be copied from
-// getCurrentPose() every hop ("preserve current orientation") instead of
-// the originally-recorded target, so small per-hop drift accumulated
-// uncorrected (confirmed on a real run that ended up visibly bent). Fixed
-// by reading the orientation already recorded per-point in any
-// ndi_measure/record_waypoints CSV (moveit_pose_qw/qx/qy/qz for the IK
-// target, moving_relative_fixed_q0/qx/qy/qz for measuring error against
-// the NDI-measured result) -- falls back to the old behavior with a
-// warning if a CSV lacks these columns.
+// getCurrentPose() every hop, preserving the current orientation instead
+// of the originally-recorded target, so small per-hop drift accumulated
+// uncorrected. This was confirmed on a real run that ended up visibly
+// bent. The fix reads the orientation already recorded per point in any
+// ndi_measure or record_waypoints CSV: moveit_pose_qw/qx/qy/qz for the IK
+// target, and moving_relative_fixed_q0/qx/qy/qz for measuring error
+// against the NDI-measured result. It falls back to the old behavior
+// with a warning if a CSV lacks these columns.
 
 #include <algorithm>
 #include <array>
@@ -77,20 +77,21 @@ constexpr int NDI_SAMPLE_INTERVAL_MS = 20;
 constexpr int REQUIRED_VISIBLE_MARKERS = 4;
 constexpr double MAX_NDI_ERROR = 0.50;
 
-// NDI-frame -> MoveIt-frame ROTATION (only the rotation, not the full
-// base-frame transform -- see the file header for why that's sufficient).
-// Refit periodically (calibration/current/refit_moveit_ndi_rotation.py) as
-// the fixed marker's orientation can drift between sessions.
+// NDI-frame to MoveIt-frame rotation. This is only the rotation, not the
+// full base-frame transform. See the file header for why that is
+// sufficient. Refit periodically with
+// calibration/current/refit_moveit_ndi_rotation.py, since the fixed
+// marker's orientation can drift between sessions.
 //
-// Convention (matches calibrate_kinematics.py's build_base_transform()):
+// Convention, matching calibrate_kinematics.py's build_base_transform():
 // this matrix R maps a vector in MoveIt/base_link coordinates to the same
 // vector in NDI/fixed-marker coordinates:
 //     v_ndi = R * v_moveit
-// To go the other way (NDI delta -> MoveIt delta), use the transpose
-// (R is a proper rotation matrix, so R^-1 == R^T):
+// To go the other way, from an NDI delta to a MoveIt delta, use the
+// transpose. R is a proper rotation matrix, so R^-1 equals R^T:
 //     v_moveit = R^T * v_ndi
-// Current fit: ndi_moveit_rotation_calibration_data.csv (13 valid paired
-// poses).
+// Current fit: ndi_moveit_rotation_calibration_data.csv, 13 valid paired
+// poses.
 constexpr double R_MOVEIT_TO_NDI[3][3] = {
     {0.0033, 0.8971, 0.4418},
     {0.6142, 0.3469, -0.7088},
@@ -98,7 +99,7 @@ constexpr double R_MOVEIT_TO_NDI[3][3] = {
 };
 
 std::array<double, 3> rotateNdiDeltaToMoveIt(const std::array<double, 3>& deltaNdi) {
-    // v_moveit = R^T * v_ndi -- i.e. dot deltaNdi with each COLUMN of R.
+    // v_moveit = R^T * v_ndi. This dots deltaNdi with each column of R.
     std::array<double, 3> result{};
     for (int col = 0; col < 3; ++col) {
         double sum = 0.0;
@@ -110,8 +111,9 @@ std::array<double, 3> rotateNdiDeltaToMoveIt(const std::array<double, 3>& deltaN
     return result;
 }
 
-// From cyton_ndi_capture/src/ndi_measure.cpp (NdiTracker and dependencies)
-// -- copied verbatim, same as move_x_test.cpp/run_accuracy_check.cpp.
+// From cyton_ndi_capture/src/ndi_measure.cpp, the NdiTracker class and its
+// dependencies, copied verbatim, the same as move_x_test.cpp and
+// run_accuracy_check.cpp.
 
 enum class NdiToolStatus { Detected, Missing, OutOfVolume, Disabled, LowQuality };
 
@@ -549,16 +551,16 @@ private:
     bool tracking_ = false;
 };
 
-// Target-point loading -- reads whatever CSV cyton_ndi_capture's
-// ndi_measure produced (or any CSV with the same moving_relative_fixed_tx_
-// mm/_ty_mm/_tz_mm columns), one target point per row, in order.
+// Target-point loading. Reads whatever CSV cyton_ndi_capture's
+// ndi_measure produced, or any CSV with the same moving_relative_fixed_tx_
+// mm/_ty_mm/_tz_mm columns, one target point per row, in order.
 
 struct TargetPoint {
     double txMm = 0.0, tyMm = 0.0, tzMm = 0.0;
-    // Target orientation, present only if the CSV carries ndi_measure/
+    // Target orientation, present only if the CSV carries ndi_measure or
     // record_waypoints columns. moveitQ* (MoveIt frame) is used directly
-    // as the IK target; ndiQ* (NDI frame) is used directly to measure
-    // orientation error -- no conversion needed for either.
+    // as the IK target. ndiQ* (NDI frame) is used directly to measure
+    // orientation error. Neither needs conversion.
     double moveitQw = 1.0, moveitQx = 0.0, moveitQy = 0.0, moveitQz = 0.0;
     double ndiQ0 = 1.0, ndiQx = 0.0, ndiQy = 0.0, ndiQz = 0.0;
     bool hasOrientation = false;
@@ -663,11 +665,12 @@ double distanceMm(double dx, double dy, double dz) {
     return std::sqrt(dx * dx + dy * dy + dz * dz);
 }
 
-// Angle (degrees) between two orientations expressed as quaternions in the
-// SAME frame -- both callers here pass a pair that's already co-frame (NDI
-// vs. NDI), so no conversion is needed. abs() on the dot product handles
-// quaternion double-cover (q and -q are the same rotation); clamped to
-// [-1, 1] to guard against a >1.0 float-rounding value reaching acos().
+// Angle in degrees between two orientations expressed as quaternions in
+// the same frame. Both callers here pass a pair that is already in the
+// same frame, NDI versus NDI, so no conversion is needed. abs() on the
+// dot product handles quaternion double-cover, since q and -q are the
+// same rotation. The result is clamped to [-1, 1] to guard against a
+// value above 1.0 from float rounding reaching acos().
 double quaternionAngleDeg(
     double w1, double x1, double y1, double z1, double w2, double x2, double y2, double z2
 ) {
@@ -711,9 +714,9 @@ int main(int argc, char** argv) {
 
     // setJointValueTarget(pose) computes IK locally via MoveGroupInterface's
     // own private RobotModel, which has no IK plugin configured unless
-    // robot_description_kinematics is declared on this node -- so declare
-    // the same solver config cyton_moveit_config uses, before
-    // MoveGroupInterface is constructed (it reads these at construction).
+    // robot_description_kinematics is declared on this node. Declare the
+    // same solver config cyton_moveit_config uses before MoveGroupInterface
+    // is constructed, since it reads these parameters at construction.
     node->declare_parameter<std::string>(
         "robot_description_kinematics.arm.kinematics_solver",
         "kdl_kinematics_plugin/KDLKinematicsPlugin"

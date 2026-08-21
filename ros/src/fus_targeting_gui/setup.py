@@ -19,9 +19,9 @@ setup(
     maintainer="tyler zeng",
     maintainer_email="tonizengedu@gmail.com",
     description=(
-        "Skull-mesh point-picking GUI for tFUS acoustic characterization -- "
-        "loads a mesh, click-to-target, plans/executes via MoveIt. See "
-        "package.xml for the full description."
+        "Skull-mesh point-picking GUI for tFUS acoustic characterization. "
+        "Loads a mesh, click to target, plans and executes via MoveIt. "
+        "See package.xml for the full description."
     ),
     license="BSD",
     tests_require=["pytest"],

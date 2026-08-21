@@ -1,5 +1,5 @@
-"""Pure-math tests for registration.py -- no rclpy node, no GUI, no MoveIt
-needed to run these (just geometry_msgs' plain message classes)."""
+"""Pure-math tests for registration.py. Running these needs no rclpy
+node, no GUI, and no MoveIt, only geometry_msgs' plain message classes."""
 
 import math
 

@@ -33,10 +33,9 @@ public:
         bool compensateBacklash = true
     );
 
-    // compensateBacklash: see moveJointSafely() -- applied per-joint here.
-    // compensateOnlyJointIds: empty (default) compensates every joint in
-    // motorIds; non-empty restricts compensation to just those joint IDs
-    // (used to isolate one joint's backlash contribution experimentally).
+    // compensateBacklash is applied per joint here, same as in moveJointSafely().
+    // compensateOnlyJointIds, if non-empty, restricts compensation to those
+    // joint IDs. This isolates one joint's backlash contribution for testing.
     bool moveJointsSafely(
         const std::vector<int>& motorIds,
         const std::vector<uint16_t>& targetPositions,
@@ -104,10 +103,6 @@ public:
     );
 
     bool writeGoalPositionRaw(int motorId, uint16_t position);
-    bool readComplianceMargins(int motorId, uint8_t& cwMargin, uint8_t& ccwMargin);
-    bool writeComplianceMargins(int motorId, uint8_t cwMargin, uint8_t ccwMargin);
-    bool readComplianceSlopes(int motorId, uint8_t& cwSlope, uint8_t& ccwSlope);
-    bool writeComplianceSlopes(int motorId, uint8_t cwSlope, uint8_t ccwSlope);
     bool readPunch(int motorId, uint16_t& punch);
     bool writePunch(int motorId, uint16_t punch);
     bool readModelNumber(int motorId, uint16_t& modelNumber);
@@ -131,10 +126,6 @@ private:
     static const int ADDR_CW_ANGLE_LIMIT = 6;
     static const int ADDR_CCW_ANGLE_LIMIT = 8;
     static const int ADDR_TORQUE_ENABLE = 24;
-    static const int ADDR_CW_COMPLIANCE_MARGIN = 26;
-    static const int ADDR_CCW_COMPLIANCE_MARGIN = 27;
-    static const int ADDR_CW_COMPLIANCE_SLOPE = 28;
-    static const int ADDR_CCW_COMPLIANCE_SLOPE = 29;
     static const int ADDR_D_GAIN = 26;
     static const int ADDR_I_GAIN = 27;
     static const int ADDR_P_GAIN = 28;

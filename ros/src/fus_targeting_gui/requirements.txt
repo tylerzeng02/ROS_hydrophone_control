@@ -1,13 +1,13 @@
-# Third-party PyPI dependencies for fus_targeting_gui -- colcon/rosdep don't
-# manage these (no ROS package for most of them), so install with pip into
-# whatever Python environment `ros2 run` uses, before building/running this
-# package:
+# Third-party PyPI dependencies for fus_targeting_gui. colcon and rosdep
+# do not manage these, since there is no ROS package for most of them.
+# Install with pip into whatever Python environment `ros2 run` uses,
+# before building or running this package:
 #
 #   pip install -r requirements.txt
 #
-# rclpy, moveit_msgs, geometry_msgs, sensor_msgs, tf_transformations come
-# from the ROS 2 install itself (see package.xml's exec_depend list) --
-# not listed here.
+# rclpy, moveit_msgs, geometry_msgs, sensor_msgs, and tf_transformations
+# come from the ROS 2 install itself (see package.xml's exec_depend
+# list) and are not listed here.
 
 PySide6>=6.5
 pyvista>=0.43

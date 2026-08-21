@@ -1,16 +1,17 @@
 """Thin wrapper around pymoveit2's MoveIt2 class, built entirely from
-RobotConfig -- no Cyton-specific names anywhere in this file. Separates
-plan and execute into two calls (rather than pymoveit2's combined
-move_to_pose) specifically so the GUI can show a preview and wait for
-operator confirmation before anything actually moves, matching the
-plan-preview-then-confirm UX cyton_pose_commander/src/pose_commander.cpp
-already established for this project's other MoveIt tools.
+RobotConfig. No Cyton-specific names appear anywhere in this file.
+Plan and execute are separated into two calls, rather than using
+pymoveit2's combined move_to_pose, so the GUI can show a preview and wait
+for operator confirmation before anything actually moves. This matches
+the plan-preview-then-confirm UX already established in
+cyton_pose_commander/src/pose_commander.cpp for this project's other
+MoveIt tools.
 
-NOTE: written against pymoveit2's documented plan()/execute() split
-(https://github.com/AndrejOrsula/pymoveit2) -- smoke-test this against
+This is written against pymoveit2's documented plan/execute split
+(https://github.com/AndrejOrsula/pymoveit2). Smoke-test it against
 whatever pymoveit2 version actually gets installed (see requirements.txt)
-before trusting it; minor API differences across versions are possible
-and this hasn't been run yet.
+before trusting it. Minor API differences across versions are possible
+and this has not been run yet.
 """
 
 from PySide6.QtCore import QObject, QThread, Signal
@@ -24,10 +25,11 @@ from .config import RobotConfig, TargetingConfig
 
 
 class _ExecutorThread(QThread):
-    """Spins the rclpy executor in the background -- same requirement (and
-    same fix) as this project's C++ MoveGroupInterface tools: pymoveit2's
-    service/action clients need this node's callbacks actively serviced,
-    which nothing does unless something spins it."""
+    """Spins the rclpy executor in the background. This is the same
+    requirement, and the same fix, as this project's C++ MoveGroupInterface
+    tools use. pymoveit2's service and action clients need this node's
+    callbacks actively serviced, and nothing does that unless something
+    spins the executor."""
 
     def __init__(self, executor: SingleThreadedExecutor, parent=None):
         super().__init__(parent)
@@ -71,9 +73,9 @@ class MoveItBridge(QObject):
         self._executor_thread.wait()
 
     def plan_to_pose(self, pose: Pose):
-        """Blocking (called from a worker thread, not the GUI thread -- see
-        main_window.py) -- returns a planned trajectory, or None if
-        planning failed."""
+        """This call blocks and must be called from a worker thread, not
+        the GUI thread (see main_window.py). Returns a planned trajectory,
+        or None if planning failed."""
         self.status.emit("Planning...")
         try:
             trajectory = self._moveit2.plan(
@@ -83,7 +85,7 @@ class MoveItBridge(QObject):
                     pose.orientation.z, pose.orientation.w,
                 ],
             )
-        except Exception as e:  # noqa: BLE001 -- report to the GUI, don't crash it
+        except Exception as e:  # noqa: BLE001, reported to the GUI instead of crashing it
             self.status.emit(f"Planning FAILED: {e}")
             self.plan_ready.emit(None)
             return None
@@ -91,13 +93,13 @@ class MoveItBridge(QObject):
         if trajectory is None:
             self.status.emit("Planning FAILED: no trajectory returned.")
         else:
-            self.status.emit("Plan ready -- review before executing.")
+            self.status.emit("Plan ready. Review it before executing.")
         self.plan_ready.emit(trajectory)
         return trajectory
 
     def execute(self, trajectory):
-        """Blocking (called from a worker thread) -- executes an
-        already-planned trajectory and waits for completion."""
+        """This call blocks and must be called from a worker thread. It
+        executes an already-planned trajectory and waits for completion."""
         self.status.emit("Executing...")
         try:
             self._moveit2.execute(trajectory)

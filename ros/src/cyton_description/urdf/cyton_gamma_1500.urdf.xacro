@@ -7,7 +7,6 @@
   <xacro:arg name="protocol_version" default="1.0"/>
   <xacro:arg name="initial_positions_file" default="$(find cyton_description)/config/initial_positions.yaml"/>
   <xacro:arg name="compensate_backlash" default="false"/>
-  <xacro:arg name="compensate_pose_dependent" default="false"/>
 
   <!-- Robot geometry (links, joints, calibrated axes/origins/limits) -->
   <xacro:include filename="$(find cyton_description)/urdf/cyton_gamma_1500_robot.xacro"/>
@@ -21,7 +20,6 @@
     baud_rate="$(arg baud_rate)"
     protocol_version="$(arg protocol_version)"
     initial_positions_file="$(arg initial_positions_file)"
-    compensate_backlash="$(arg compensate_backlash)"
-    compensate_pose_dependent="$(arg compensate_pose_dependent)"/>
+    compensate_backlash="$(arg compensate_backlash)"/>
 
 </robot>
