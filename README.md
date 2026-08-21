@@ -5,13 +5,7 @@ Dynamixel-servo robot arm, kinematically calibrated against an **NDI
 Polaris Spectra** optical tracker, and driven through **ROS 2 + MoveIt 2**
 for real motion planning and execution.
 
-**The application:** positioning a hydrophone probe against a skull to
-validate that a transcranial focused ultrasound (tFUS) helmet is actually
-directing energy where intended. This is an alternative to gantry-style
-positioning systems, trading some raw precision for reach into positions a
-gantry cannot access. `ros/src/fus_targeting_gui/` is the operator-facing
-application for this: load a skull mesh, click a target point on its
-surface, and send the probe there via MoveIt.
+Currently developing operating-facing applications for tFUS acoustic characterization using this robotic system via `ros/src/fus_targeting_gui/`
 
 The native C++ hardware tools (`src/`, `tests/`, `calibration/collection/`)
 build with plain CMake and can run on the machine connected to the arm and
