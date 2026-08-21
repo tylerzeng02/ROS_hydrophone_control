@@ -17,6 +17,7 @@ tests/archive/
 trash/
 understanding/
 notes/
+pid_tuning/
 
 # Compiled files
 *.o
