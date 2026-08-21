@@ -54,8 +54,10 @@ the physical robot/tracker.
   the superseded 60-param model in `archive/60param_model/`).
 - **`ros/`** — the ROS 2 + MoveIt 2 workspace (`src/` holds the real
   packages: hardware interface, MoveIt config, NDI capture/accuracy-check
-  tools; loose files at the top level are real collected accuracy data,
-  see `ros/archive/README.md` for the superseded ones).
+  tools, and `fus_targeting_gui` — the skull-mesh point-picking targeting
+  application, see that package's own README; loose files at the top
+  level are real collected accuracy data, see `ros/archive/README.md` for
+  the superseded ones).
 - **`external/`** — vendored dependencies (DynamixelSDK, ndicapi,
   trac_ik) as git submodule links.
 - **`references/`** — the robot's URDF and related reference docs.

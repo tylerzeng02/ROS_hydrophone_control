@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematron="http://download.ros.org/schema/package_format3.xsd"?>
+<package format="3">
+  <name>fus_targeting_gui</name>
+  <version>0.1.0</version>
+  <description>
+    Standalone GUI for transcranial focused ultrasound (tFUS) acoustic
+    characterization: load a skull mesh, click a point on its surface, and
+    send the robot's end effector there via MoveIt. Deliberately contains
+    no robot-specific logic -- every robot-facing detail (planning group,
+    base/tip frame, mesh registration pose) comes from config.yaml, so a
+    future different (already-calibrated) arm is a config change, not a
+    code change. This is the first ament_python package in this workspace
+    (everything else is C++/ament_cmake); talks to MoveIt via pymoveit2
+    rather than moveit_py, which isn't installed here.
+  </description>
+  <maintainer email="tonizengedu@gmail.com">tyler zeng</maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>moveit_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>tf_transformations</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

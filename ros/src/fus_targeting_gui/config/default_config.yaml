@@ -1,0 +1,50 @@
+# fus_targeting_gui configuration.
+#
+# The "robot:" block is the ONLY thing that should need to change to point
+# this app at a different, already-calibrated MoveIt-configured arm --
+# nothing in fus_targeting_gui's own .py files should ever hardcode a
+# frame/group name. Values below match this repo's current Cyton Gamma
+# 1500 setup (ros/src/cyton_moveit_config/config/*.yaml/*.srdf).
+
+robot:
+  planning_group: arm
+  base_frame: base_link
+  end_effector_frame: virtual_endeffector
+  # Joint names, in the order MoveIt/ros2_control expect them -- matches
+  # cyton_hardware's kJointNames / the URDF's <ros2_control> joint list.
+  joint_names:
+    - shoulder_roll_joint
+    - shoulder_pitch_joint
+    - shoulder_yaw_joint
+    - elbow_pitch_joint
+    - elbow_yaw_joint
+    - wrist_pitch_joint
+    - wrist_roll_joint
+
+mesh:
+  # Absolute path to the skull mesh (STL/PLY). Overridable from the GUI's
+  # File > Open Mesh... menu at runtime; this is just the startup default.
+  default_path: /home/temp/CT5_DICOM_skull_mesh_decimated.stl
+  # Uniform scale applied after loading -- 0.001 for a mesh authored in mm
+  # (matches publish_skull_marker.py's own default/warning about this).
+  scale: 0.001
+
+# Fixed mesh-local -> base_frame registration transform. Same convention,
+# same values, as publish_skull_marker.py's --xyz/--rpy args (this mesh's
+# already-known-good placement relative to the robot) -- keep these two
+# files' values in sync if either is ever re-registered.
+registration:
+  xyz_m: [-0.17, 0.02, 0.15]
+  rpy_rad: [3.14159, 0.0, 0.0]
+
+targeting:
+  # Distance (mm) the probe stops short of the picked surface point along
+  # the approach vector, before any final closer approach is done manually
+  # or by a future extension -- keeps the very first planned move from
+  # driving the probe tip directly into the mesh surface.
+  standoff_mm: 10.0
+  # Planning/execution tuning -- see cyton_pose_commander/src/pose_commander.cpp
+  # for why these particular values (elbow_yaw's narrow locked window needs
+  # a larger time budget and more attempts than MoveIt's defaults).
+  planning_time_s: 30.0
+  num_planning_attempts: 15
