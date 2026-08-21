@@ -1,20 +1,20 @@
 // cartesian_path_demo: reads a CSV of Cartesian waypoints (x,y,z,roll,
-// pitch,yaw per row, meters/radians), computes ONE continuous Cartesian
+// pitch,yaw per row, meters/radians), computes one continuous Cartesian
 // path through all of them via MoveGroupInterface::computeCartesianPath(),
 // previews it in RViz (published automatically, same as a normal plan),
-// waits for Enter, then executes it -- driving the arm smoothly through
+// waits for Enter, then executes it, driving the arm smoothly through
 // every waypoint in sequence in one motion, rather than planning/executing
 // each point separately.
 //
 // Built for demo purposes: default usage is against mock_components
 // (hardware_type:=mock_components), so this is a safe, repeatable,
-// simulated animation of the arm sweeping through a sequence of points --
-// no real hardware required. Works identically against real hardware too
-// if that's ever wanted (same command, real launch instead of mock).
+// simulated animation of the arm sweeping through a sequence of points.
+// No real hardware is required. Works identically against real hardware
+// too if that is ever wanted (same command, real launch instead of mock).
 //
 // eef_step (the Cartesian interpolation resolution) is deliberately modest
-// (1cm) -- fine enough for a smooth-looking path, coarse enough that
-// computing the path over 20 widely-spaced points doesn't take long.
+// (1cm): fine enough for a smooth-looking path, coarse enough that
+// computing the path over 20 widely-spaced points does not take long.
 
 #include <array>
 #include <fstream>
@@ -36,7 +36,7 @@ constexpr const char* DEFAULT_INPUT_CSV = "demo_waypoints_20.csv";
 constexpr const char* PLANNING_GROUP = "arm";
 constexpr double PLANNING_TIME_SECONDS = 30.0;  // see move_x_test.cpp's own
                                                   // comment for why this
-                                                  // isn't the 5s default --
+                                                  // is not the 5s default:
                                                   // same elbow_yaw-locked-
                                                   // window IK search issue.
 constexpr double EEF_STEP_M = 0.01;
@@ -63,8 +63,8 @@ std::vector<Waypoint> loadWaypoints(const std::string& path) {
         throw std::runtime_error("Input CSV is empty: " + path);
     }
     // First line is assumed to be a header ("x,y,z,roll,pitch,yaw") and is
-    // discarded unconditionally -- unlike some other tools in this project,
-    // this one doesn't try to detect whether it's numeric, since a plain
+    // discarded unconditionally. Unlike some other tools in this project,
+    // this one does not try to detect whether it is numeric, since a plain
     // 6-column waypoint file has no unambiguous way to tell a header from
     // a legitimate first data row.
 

@@ -801,17 +801,17 @@ int main(int argc, char** argv) {
 
             if (target.hasOrientation) {
                 // Pin to the originally-recorded target instead of copying
-                // the arm's current orientation -- see file header.
+                // the arm's current orientation. See the file header.
                 targetPose.pose.orientation.w = target.moveitQw;
                 targetPose.pose.orientation.x = target.moveitQx;
                 targetPose.pose.orientation.y = target.moveitQy;
                 targetPose.pose.orientation.z = target.moveitQz;
             }
 
-            // Orientation must stay constrained -- an unconstrained one can
+            // Orientation must stay constrained. An unconstrained one can
             // rotate the moving marker away from the tracker's line of
             // sight. setJointValueTarget(pose), not setPoseTarget() (which
-            // hands OMPL a live constraint to randomly sample against --
+            // hands OMPL a live constraint to randomly sample against, and
             // timed out on elbow_yaw's ~4-degree locked window), computes
             // one IK solution seeded from the current joint state and hands
             // the planner a single known goal, failing fast if none exists.
@@ -854,7 +854,7 @@ int main(int argc, char** argv) {
             bool orientationErrorValid = false;
             double orientationErrorDeg = 0.0;
             if (target.hasOrientation) {
-                // Both quaternions are already in the NDI frame -- afterPose
+                // Both quaternions are already in the NDI frame. afterPose
                 // is the just-measured moving_relative_fixed orientation,
                 // target.ndiQ* is the recorded moving_relative_fixed
                 // orientation for this point. No conversion needed.

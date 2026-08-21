@@ -1021,6 +1021,16 @@ Per direct user request, after confirming the module was safe to remove: it was 
 
 **Not yet done:** a real `colcon build` of `cyton_hardware` and `cyton_description` on the Linux/ROS machine to confirm this compiles and launches cleanly there too, since it could not be built from this Windows session.
 
+### Fifteenth pass: comment style cleanup finished across every remaining flagged file (2026-08-21, same day)
+
+Resumed and finished the comment-style rewrite (no `--` dashes, no semicolon run-ons, plain declarative sentences, no external doc references) that the twelfth/thirteenth passes had left with a tracked "long tail" of remaining files. Worked through the full list, largest first: `pose_commander.cpp`, `record_hand_poses_multijoint_backlash_test.cpp`, `ndi_measure.cpp`, `move_xyz_test.cpp`/`move_x_test.cpp`, `calibrate_kinematics.py`, `waypoint_sequence_demo.cpp`, `record_waypoints.cpp`, `constrained_pose_ik_test.cpp`, `cyton_system_hardware.cpp`/`.hpp`, `move_between_points.cpp` (finishing the two comments left unaddressed since the twelfth pass), and the TRAC-IK plugin header/source. A follow-up repo-wide sweep then caught a further batch not on the original tally: `cartesian_path_demo.cpp`, `deployed_model_predictions.py`, `replay_ndi_capture.cpp`/`_sim.cpp`, `ndi_status_monitor.cpp`, `record_hand_poses.cpp`, `recover_motor4.cpp`, `read_motor_positions.cpp`, `run_accuracy_check.cpp`, and `refit_moveit_ndi_rotation.py`.
+
+Scope was kept to actual `//`/`#` code comments, not runtime `std::cout`/`print()` message strings shown to a user at the terminal (those are a different concern from code comments and were left as-is), and not literal CLI flag names like `--validate`/`--quick-test`/`--selftest`/`--help`, which are real argument text, not comment-style dashes. A repo-wide grep confirmed those are the only remaining `--` occurrences left in any active (non-archived) file.
+
+Two decorative banner-style comments (`// --- Everything below is carried over from pose_commander.cpp verbatim ---` in `replay_ndi_capture.cpp`/`_sim.cpp`) were also flattened to plain single-line comments, consistent with the fourteenth pass's banner removal.
+
+**Verified with brace-balance checks on every C++ file touched, `py_compile` on every Python file touched, and a full native rebuild** (`cmake .` regenerate + `nmake -f Makefile` from a Developer Command Prompt): every target, including every file edited in this pass, compiled and linked cleanly. The `ros/src/*` C++ files could not be verified with a real `colcon build` from this Windows session (brace-balance only, consistent with the same limitation noted in prior passes); this is comment-only work with no logic changes, so the risk is low, but a real ROS build is still the more complete check whenever the Linux/ROS machine is next available.
+
 ---
 
 ### Original investigation log (kept for reference — the causes below were all correctly ruled out; the actual root cause, found later via packet capture, is the `TX`/`BX` command choice above, which none of these individually address)

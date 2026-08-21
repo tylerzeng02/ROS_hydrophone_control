@@ -51,16 +51,16 @@ import calibrate_kinematics as ck
 
 # Deployed joint-level calibration (src/robot_calibration.cpp jointCalibrations,
 # as of 2026-08-06). direction is +1 for every joint on this arm.
-# radians = direction * scale * (tick - zeroTick) / TICKS_PER_RADIAN
-# -- exactly matches ticksToRadians() in src/robot_calibration.cpp.
+# radians = direction * scale * (tick - zeroTick) / TICKS_PER_RADIAN,
+# exactly matching ticksToRadians() in src/robot_calibration.cpp.
 DEPLOYED_ZERO_TICKS = [2048, 2047, 2060, 2102, 2078, 2042, 2048]
 DEPLOYED_DIRECTION = [1, 1, 1, 1, 1, 1, 1]
 DEPLOYED_SCALE = [0.988203, 1.001931, 0.964711, 1.014467, 1.0, 1.006796, 1.002933]
 
 # Deployed geometry (references/cyton_gamma_1500_trac_ik.urdf, as of
 # 2026-08-06). Axis tilt applied to all 7 joints except elbow_yaw (index 4,
-# left at its nominal axis -- poorly identified fit, moot since the joint is
-# now permanently locked). Origin correction applied only to shoulder_yaw
+# left at its nominal axis: a poorly identified fit, moot since the joint
+# is now permanently locked). Origin correction applied only to shoulder_yaw
 # (x,z), elbow_pitch (x,y,z), wrist_pitch (x,y,z); every other joint's
 # origin is unchanged from nominal.
 DEPLOYED_AXES_RAW = np.array([
@@ -84,9 +84,9 @@ DEPLOYED_ORIGINS_M = np.array([
     [-0.026255, 0.0, 0.051425],
 ])
 
-# virtual_endeffector_joint -- unchanged from nominal in the deployed URDF
+# virtual_endeffector_joint is unchanged from nominal in the deployed URDF
 # (the offline tool-frame correction was fit but never baked into the URDF
-# geometry itself; it's only ever used, here and elsewhere, as a free
+# geometry itself; it is only ever used, here and elsewhere, as a free
 # nuisance parameter to interpret the NDI marker-mount offset).
 DEPLOYED_TOOL_ORIGIN_M = ck.TOOL_ORIGIN_NOMINAL_M.copy()
 
@@ -108,7 +108,7 @@ def forward_kinematics_deployed(joint_angles_rad):
 
 
 # Frame-fit parameters (12): tool_xyz/rpy (3+3, weakly regularized around
-# nominal) + base_xyz/rpy (3+3, unregularized -- no small-value prior, same
+# nominal) + base_xyz/rpy (3+3, unregularized, no small-value prior, same
 # reasoning as calibrate_kinematics.py).
 
 def unpack(x):
@@ -141,8 +141,8 @@ def residual(x, angles, pos_mm, quat_xyzw):
         )
     # Regularize tool_xyz toward zero only (a mild small-value prior on the
     # marker-mount translation). tool_rpy/base_xyz/base_rpy are left
-    # unregularized, matching every "current best" script in this project --
-    # the core calibrate_kinematics.py's tight ±10mm/±10deg/±180deg
+    # unregularized, matching every "current best" script in this project.
+    # The core calibrate_kinematics.py's tight ±10mm/±10deg/±180deg
     # bounds+regularization on these caused bound-pinning (confirmed
     # directly: even the known-good 374-pose dataset blows up to ~70mm RMS
     # under those tight bounds), so this script follows the wider, proven

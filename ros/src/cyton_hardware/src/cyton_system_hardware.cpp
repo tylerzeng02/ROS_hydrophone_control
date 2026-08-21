@@ -18,16 +18,16 @@ rclcpp::Logger logger()
 // xacro args always arrive as strings, and xacro's ${...} property
 // substitution runs values through YAML-style type coercion before
 // re-stringifying, so a lowercase "true" can arrive here as "True" or
-// "TRUE" -- accept all case variants rather than trusting exact case.
+// "TRUE". Accept all case variants rather than trusting exact case.
 bool parseBoolParam(const std::string & value)
 {
   return value == "true" || value == "True" || value == "TRUE" || value == "1";
 }
 
-// Ordinary trajectory-following noise near a momentary hold shouldn't look
-// like a direction reversal. Untuned guess (see this file's own header
-// comment on backlash compensation) -- not yet validated against real
-// hardware.
+// Ordinary trajectory-following noise near a momentary hold should not
+// look like a direction reversal. Untuned guess (see this file's own
+// header comment on backlash compensation), not yet validated against
+// real hardware.
 constexpr int kDirectionDeadbandTicks = 2;
 }  // namespace
 
@@ -50,7 +50,7 @@ hardware_interface::CallbackReturn CytonSystemHardware::on_init(
   }
 
   // Enforce the URDF's ros2_control block declaring joints in exactly
-  // motor-ID order (0=shoulder_roll .. 6=wrist_roll) -- read()/write()
+  // motor-ID order (0=shoulder_roll .. 6=wrist_roll). read()/write()
   // below index straight into jointCalibrations by this same position,
   // so a silent name/order mismatch would command the wrong motor.
   for (int i = 0; i < kNumJoints; ++i)
@@ -112,8 +112,8 @@ std::vector<hardware_interface::CommandInterface> CytonSystemHardware::export_co
 hardware_interface::CallbackReturn CytonSystemHardware::on_activate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  // Fresh backlash-compensation state every activation -- no stale
-  // direction/hold data carried over from a previous run.
+  // Fresh backlash-compensation state every activation, so no stale
+  // direction/hold data carries over from a previous run.
   last_raw_tick_.fill(0);
   last_direction_.fill(0);
   has_previous_tick_.fill(false);
@@ -253,7 +253,7 @@ hardware_interface::return_type CytonSystemHardware::write(
     }
 
     // setGoalPosition() re-checks jointCalibrations' min/maxTick itself
-    // before writing -- same safety gate as every other motor-facing
+    // before writing, the same safety gate as every other motor-facing
     // program here, and a backstop against an out-of-range hold point.
     if (!motor_->setGoalPosition(calibration.id, static_cast<uint16_t>(tick)))
     {
@@ -329,7 +329,7 @@ int CytonSystemHardware::applyBacklashCompensation(int jointIndex, int rawTick)
       effectiveTick = std::max(rawTick, hold_point_tick_[idx]);
       if (rawTick >= hold_point_tick_[idx])
       {
-        hold_active_[idx] = false;  // raw target caught up on its own -- release the hold
+        hold_active_[idx] = false;  // raw target caught up on its own; release the hold
       }
     }
     else

@@ -3,36 +3,36 @@
 //
 // Workflow: position the arm however you like via MoveIt/RViz (this tool
 // never commands the arm itself), then press Enter here to record one
-// measurement -- it logs the live /joint_states and MoveGroupInterface's
+// measurement. It logs the live /joint_states and MoveGroupInterface's
 // own live getCurrentPose() (base_link frame) alongside the NDI-measured
 // moving-tool-relative-to-fixed-tool pose to CSV. Repeat for as many poses
 // as you want; Ctrl+C to quit.
 //
-// This is the NDI *measurement* half of
-// calibration/collection/ndi_capture_and_validate.cpp only -- the
+// This is the NDI measurement half of
+// calibration/collection/ndi_capture_and_validate.cpp only. The
 // NdiTracker class and its direct dependencies (structs, quaternion math,
 // BX polling/averaging) are ported over close to verbatim, since that code
-// is already hardware-validated. Real changes from the original:
+// is already hardware-validated. Changes from the original:
 //   1. The Windows-only <conio.h> pause/skip/manual-mode hotkeys are
-//      stripped entirely (handleUserControls() is now a no-op) -- this tool
-//      doesn't drive the arm through a long unattended pose list the way
-//      the original did, so there's nothing long-running to pause or skip.
+//      stripped entirely (handleUserControls() is now a no-op). This tool
+//      does not drive the arm through a long unattended pose list the way
+//      the original did, so there is nothing long-running to pause or skip.
 //      If a tool loses tracking visibility, this just keeps retrying
 //      indefinitely (same "warn periodically, never abort" philosophy as
 //      the original) until you either fix visibility or Ctrl+C.
 //   2. Joint values come from live ROS /joint_states (whatever MoveIt/
 //      ros2_control last reported), not from directly reading Dynamixel
-//      ticks -- this tool has no DynamixelMotor dependency at all.
-//   3. Each capture also logs MoveGroupInterface::getCurrentPose(): pairing
+//      ticks. This tool has no DynamixelMotor dependency at all.
+//   3. Each capture also logs MoveGroupInterface::getCurrentPose(). Pairing
 //      that MoveIt-frame pose with the same capture's NDI-frame pose is
 //      exactly the input a Kabsch/Procrustes fit needs to re-derive
 //      move_between_points.cpp's hardcoded NDI-to-MoveIt rotation, since
 //      the fixed marker's orientation can drift between sessions. Using
 //      MoveIt's own live pose here, rather than recomputing FK offline in
 //      Python from the joint angles, means this is exactly what MoveIt
-//      itself believes the pose is -- no risk of a subtle mismatch between
-//      an offline reimplementation and whatever the real URDF/robot_state
-//      is doing internally.
+//      itself believes the pose is, with no risk of a subtle mismatch
+//      between an offline reimplementation and whatever the real
+//      URDF/robot_state is doing internally.
 
 #include <algorithm>
 #include <array>
@@ -57,7 +57,7 @@
 
 namespace {
 
-// Configuration -- machine-specific, expect to update these per machine.
+// Configuration is machine-specific; expect to update these per machine.
 // Override via command-line args if needed; see printUsage() below.
 constexpr const char* DEFAULT_NDI_DEVICE = "/dev/ttyUSB1";
 constexpr const char* DEFAULT_MOVING_TOOL_ROM =
@@ -82,8 +82,8 @@ constexpr std::array<const char*, 7> JOINT_NAMES = {
     "wrist_roll_joint",
 };
 
-// Ported near-verbatim from ndi_capture_and_validate.cpp -- see that
-// file for the full derivation history of these types/functions.
+// Ported near-verbatim from ndi_capture_and_validate.cpp. See that
+// file for the full derivation history of these types and functions.
 
 enum class NdiToolStatus { Detected, Missing, OutOfVolume, Disabled, LowQuality };
 
@@ -583,7 +583,7 @@ private:
 };
 
 // Looks each of JOINT_NAMES up by name in the message rather than assuming
-// index order matches -- sensor_msgs/JointState makes no ordering
+// index order matches. sensor_msgs/JointState makes no ordering
 // guarantee, and joint_state_broadcaster's default config (no explicit
 // 'joints' list, see cyton_moveit_config's ros2_controllers.yaml comment)
 // publishes "all available state interfaces" in whatever order the
@@ -615,10 +615,11 @@ void writePoseFields(std::ofstream& csv, const std::string& prefix) {
         << prefix << "_visible_markers";
 }
 
-// MoveGroupInterface's own live pose (base_link frame) -- the MoveIt-frame
+// MoveGroupInterface's own live pose (base_link frame): the MoveIt-frame
 // side of the NDI-frame/MoveIt-frame pairs a Kabsch/Procrustes fit needs to
 // re-derive move_between_points.cpp's NDI-to-MoveIt rotation. Position is
-// converted m -> mm to match every other length unit already in this CSV.
+// converted from meters to millimeters to match every other length unit
+// already in this CSV.
 void writeMoveitPoseFields(std::ofstream& csv) {
     csv << ",moveit_pose_x_mm,moveit_pose_y_mm,moveit_pose_z_mm,"
            "moveit_pose_qw,moveit_pose_qx,moveit_pose_qy,moveit_pose_qz";

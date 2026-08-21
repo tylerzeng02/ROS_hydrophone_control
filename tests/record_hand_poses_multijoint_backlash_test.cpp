@@ -36,9 +36,9 @@ constexpr std::size_t JOINT_COUNT = 7;
 // ndi_capture_and_validate.cpp) isolates that joint's own backlash: a gap
 // larger than the tracker's own repeatability floor means real backlash.
 //
-// Only the joint currently under test is ever free (torque off); every
-// other joint -- including ones already tested earlier in this same
-// session -- is locked so it can't drift while a different joint is being
+// Only the joint currently under test is ever free (torque off). Every
+// other joint, including ones already tested earlier in this same
+// session, is locked so it cannot drift while a different joint is being
 // hand-moved. TEST_JOINT_IDS is processed front-to-back; reorder or trim
 // to re-test a subset instead of all 7.
 constexpr std::array<int, 7> TEST_JOINT_IDS = {0, 1, 2, 3, 4, 5, 6};
@@ -46,9 +46,9 @@ constexpr int POSES_PER_JOINT = 4;
 
 // Full raw tick range for these servos (4096 ticks/revolution). Widening
 // each motor's hardware CW/CCW angle-limit registers to this for the
-// duration of this program only lets the servo ACCEPT holding wherever a
-// human already physically placed it by hand -- it never causes the arm to
-// move anywhere it hasn't already been placed, so it introduces no new
+// duration of this program only lets the servo accept holding wherever a
+// human already physically placed it by hand. It never causes the arm to
+// move anywhere it has not already been placed, so it introduces no new
 // mechanical risk specific to this tool.
 constexpr uint16_t FULL_RANGE_CW_LIMIT = 0;
 constexpr uint16_t FULL_RANGE_CCW_LIMIT = 4095;
@@ -133,11 +133,11 @@ int main() {
     std::vector<RecordedPose> recordedPoses;
     loadExistingPoses(OUTPUT_CSV, recordedPoses);
 
-    // Group loaded poses by test joint, discarding any INCOMPLETE group
-    // (fewer than POSES_PER_JOINT poses) -- safer and simpler than trying
-    // to resume mid-sequence, since pose 4 depends on pose 2's tick from
-    // the SAME session. A joint with a partial group just gets re-tested
-    // from scratch.
+    // Group loaded poses by test joint, discarding any incomplete group
+    // (fewer than POSES_PER_JOINT poses). This is safer and simpler than
+    // trying to resume mid-sequence, since pose 4 depends on pose 2's tick
+    // from the same session. A joint with a partial group just gets
+    // re-tested from scratch.
     std::map<int, std::vector<RecordedPose>> byJoint;
     for (const auto& pose : recordedPoses) {
         byJoint[pose.testJointId].push_back(pose);
@@ -279,9 +279,9 @@ int main() {
         }
     };
 
-    // Locks a motor at whatever position it is CURRENTLY physically at --
-    // never commands it anywhere new, so this introduces no new mechanical
-    // risk regardless of which joint it's called on or when.
+    // Locks a motor at whatever position it is currently physically at.
+    // It never commands it anywhere new, so this introduces no new
+    // mechanical risk regardless of which joint it is called on or when.
     auto lockAtCurrentPosition = [&](int jointId) {
         uint16_t position = 0;
         if (!motor.readPosition(jointId, position)) {
@@ -418,9 +418,9 @@ int main() {
             const int testJointId = jointsRemaining[jointPos];
 
             if (jointPos > 0) {
-                // Lock the PREVIOUS joint (just finished) before freeing
-                // this one -- reads its current position (wherever pose 4
-                // of ITS test left it) and holds it there.
+                // Lock the previous joint (just finished) before freeing
+                // this one. Reads its current position (wherever pose 4
+                // of its test left it) and holds it there.
                 const int previousJoint = jointsRemaining[jointPos - 1];
                 lockAtCurrentPosition(previousJoint);
                 motor.disableTorque(testJointId);
@@ -448,13 +448,13 @@ int main() {
                 std::array<uint16_t, JOINT_COUNT> ticks{};
 
                 // Pose 4 (poseIndex == 3): rather than asking you to
-                // hand-pose back to "the same spot" -- impossible to do
-                // precisely by hand -- the servo drives itself to the
-                // EXACT tick recorded for pose 2, arriving from wherever
+                // hand-pose back to "the same spot," which is impossible
+                // to do precisely by hand, the servo drives itself to the
+                // exact tick recorded for pose 2, arriving from wherever
                 // pose 3 ("above") left it. This is more precise than
-                // hand-positioning could ever be, and it's actually the
-                // more correct test: backlash only cares about final-
-                // tick-vs-approach-direction, not how carefully a human
+                // hand-positioning could ever be, and it is actually the
+                // more correct test: backlash only cares about final tick
+                // versus approach direction, not how carefully a human
                 // reproduced a number.
                 if (poseIndex == 3) {
                     if (!havePoseTwoTick) {
@@ -577,8 +577,8 @@ int main() {
                             ticks[i] = position;
                         }
 
-                        // Only the TEST joint needs locking here -- every
-                        // other joint is already torqued/held from
+                        // Only the test joint needs locking here. Every
+                        // other joint is already torqued and held from
                         // before this joint's test started.
                         const uint16_t testJointPos =
                             ticks[static_cast<std::size_t>(testJointId)];
@@ -643,8 +643,8 @@ int main() {
                 writeCsv();
                 writeSnippet();
 
-                // Only release the TEST joint back to free-moving for the
-                // next pose -- everything else stays locked.
+                // Only release the test joint back to free-moving for the
+                // next pose. Everything else stays locked.
                 motor.disableTorque(testJointId);
             }
 

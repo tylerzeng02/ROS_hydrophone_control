@@ -1,25 +1,25 @@
 // record_waypoints: jog/plan the arm via RViz's MotionPlanning panel
-// (drag the marker, Plan, Execute -- however you like), and press Enter in
+// (drag the marker, Plan, Execute, however you like), and press Enter in
 // this terminal at each pose you want to keep. Each press reads the arm's
-// LIVE current joint state and appends one row to a CSV. No NDI tracker
-// needed at all -- this is pure MoveIt/joint-state recording.
+// live current joint state and appends one row to a CSV. No NDI tracker
+// is needed at all; this is pure MoveIt/joint-state recording.
 //
 // Output uses the exact same column schema (capture_id + the 7
 // *_joint_rad columns, header-resolved) that replay_ndi_capture.cpp /
-// replay_ndi_capture_sim.cpp already read -- so a file recorded here can
+// replay_ndi_capture_sim.cpp already read, so a file recorded here can
 // be fed straight back into either of those existing tools to replay the
 // sequence automatically, with no changes needed on that side. Extra
 // columns those tools' full ndi_measure-oriented schema also recognizes
 // (timestamp_ms, moveit_pose_*, moving_camera_*, etc.) are simply omitted
-// here -- replay_ndi_capture only requires capture_id and the 7 joint
+// here. replay_ndi_capture only requires capture_id and the 7 joint
 // columns, nothing else.
 //
-// Deliberately does NOT append to an existing file by default -- this
+// Deliberately does not append to an existing file by default. This
 // project has hit the same "hardcoded output path + silent resume"
 // cross-session-mixing bug more than once (record_hand_poses_fixed_
 // elbow_yaw.cpp, ndi_measure.cpp). If the target file already exists,
 // this tool refuses to start rather than silently gluing a new session
-// onto old data -- pass a different filename instead.
+// onto old data; pass a different filename instead.
 
 #include <array>
 #include <chrono>
@@ -110,7 +110,7 @@ int main(int argc, char** argv) {
             std::cout << "[waypoint " << (captureId + 1) << "] Press Enter to record (Ctrl+C to stop): "
                       << std::flush;
             if (!std::getline(std::cin, line)) {
-                break;  // EOF (e.g. piped input ran out) -- stop cleanly
+                break;  // EOF (e.g. piped input ran out); stop cleanly
             }
 
             auto currentState = moveGroup.getCurrentState(2.0);

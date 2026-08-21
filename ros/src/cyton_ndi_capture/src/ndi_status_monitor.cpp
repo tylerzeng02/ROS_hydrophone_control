@@ -1,14 +1,14 @@
 // ndi_status_monitor: minimal marker-visibility check. Connects to the NDI
 // tracker, loads both tool ROMs, then polls forever and prints each tool's
-// status only when it changes -- purely a "can the tracker currently see
-// my markers" diagnostic, no capture, no CSV, no ROS dependency (doesn't
-// need joint states, so it's plain C++ against ndicapi only). Ctrl+C to
-// quit.
+// status only when it changes. Purely a "can the tracker currently see
+// my markers" diagnostic, with no capture, no CSV, no ROS dependency (it
+// does not need joint states, so it is plain C++ against ndicapi only).
+// Ctrl+C to quit.
 //
 // Deliberately a separate, smaller program from ndi_measure rather than a
-// mode flag on it -- this one never blocks waiting for visibility (that's
-// the whole point, it's for watching the status *become* visible) and
-// never averages/logs a capture.
+// mode flag on it. This one never blocks waiting for visibility, since
+// the whole point is watching the status become visible, and it never
+// averages or logs a capture.
 
 #include <chrono>
 #include <cmath>
@@ -126,8 +126,8 @@ int main(int argc, char** argv) {
     const char* movingRom = argc > 2 ? argv[2] : DEFAULT_MOVING_TOOL_ROM;
     const char* fixedRom = argc > 3 ? argv[3] : DEFAULT_FIXED_TOOL_ROM;
 
-    // Force a flush after every '<<' -- without this, std::cout is fully
-    // buffered (not line-buffered) whenever stdout isn't a TTY (piped,
+    // Force a flush after every '<<'. Without this, std::cout is fully
+    // buffered (not line-buffered) whenever stdout is not a TTY (piped,
     // redirected to a file, or captured by a launcher/log tool), so output
     // silently sits in the buffer and never reaches the log until the
     // process exits normally. This program is meant to be watched live

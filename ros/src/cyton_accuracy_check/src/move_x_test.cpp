@@ -3,22 +3,23 @@
 // the NDI Polaris tracker to check how far it actually moved.
 //
 // Deliberately simpler than a full calibration-accuracy test: this is a
-// RELATIVE move (current pose + delta), not an absolute-position test, so
-// it sidesteps the base-frame/tool-frame-fitting problem entirely --
+// relative move (current pose + delta), not an absolute-position test, so
+// it sidesteps the base-frame and tool-frame fitting problem entirely.
 // NDI measures the moving marker relative to the fixed marker both before
-// and after the move, and the only thing compared is the DISTANCE between
-// those two NDI readings vs. the commanded 5cm. No knowledge of how the
+// and after the move, and the only thing compared is the distance between
+// those two NDI readings versus the commanded 5cm. No knowledge of how the
 // NDI frame relates to base_link is needed, since both readings are
 // already in the same (NDI) frame.
 //
-// This DOES exercise real IK (via MoveGroupInterface::setPoseTarget(),
+// This does exercise real IK (via MoveGroupInterface::setPoseTarget(),
 // unlike every joint-space-driven MoveIt tool built earlier this project)
 // and the real ros2_control execution path.
 //
 // NdiTracker and its dependencies are copied verbatim from
 // cyton_accuracy_check/src/run_accuracy_check.cpp (itself copied verbatim
-// from cyton_ndi_capture/src/ndi_measure.cpp) -- already hardware-validated
-// NDI connect/BX-polling/averaging code, not reimplemented here.
+// from cyton_ndi_capture/src/ndi_measure.cpp). This is already
+// hardware-validated NDI connect/BX-polling/averaging code, not
+// reimplemented here.
 
 #include <array>
 #include <cctype>
@@ -47,18 +48,18 @@ constexpr const char* DEFAULT_FIXED_TOOL_ROM =
     "/home/temp/Downloads/8700449- Polaris Passive 4-Marker Rigid Body 3(1).rom";
 
 constexpr const char* PLANNING_GROUP = "arm";
-// setNumPlanningAttempts() alone doesn't reliably fix elbow_yaw's narrow-
-// window IK problem: MoveIt's ParallelPlan runs a handful of threads
-// concurrently sharing the SAME planning-time budget, not each getting a
-// fresh one -- so a larger shared time budget matters more than more
+// setNumPlanningAttempts() alone does not reliably fix elbow_yaw's narrow-
+// window IK problem. MoveIt's ParallelPlan runs a handful of threads
+// concurrently sharing the same planning-time budget, not each getting a
+// fresh one, so a larger shared time budget matters more than more
 // attempts for "did a random seed land inside the narrow window in time."
 constexpr double PLANNING_TIME_SECONDS = 30.0;
 
 // Default commanded displacement: 5cm along +Z, in the MoveGroup's own
-// planning/reference frame (normally base_link) -- NOT the NDI tracker's
-// frame, and not necessarily an intuitive real-world direction; it's just
-// whatever the URDF's base_link axis happens to point. Override via argv
-// (delta, then axis: x/y/z).
+// planning/reference frame (normally base_link), not the NDI tracker's
+// frame, and not necessarily an intuitive real-world direction. It is
+// just whatever the URDF's base_link axis happens to point. Override via
+// argv (delta, then axis: x/y/z).
 constexpr double DEFAULT_DELTA_M = 0.05;
 constexpr char DEFAULT_AXIS = 'z';
 
@@ -69,8 +70,8 @@ constexpr int NDI_SAMPLE_INTERVAL_MS = 20;
 constexpr int REQUIRED_VISIBLE_MARKERS = 4;
 constexpr double MAX_NDI_ERROR = 0.50;
 
-// From cyton_ndi_capture/src/ndi_measure.cpp (NdiTracker and dependencies)
-// -- copied verbatim, same as run_accuracy_check.cpp already does.
+// From cyton_ndi_capture/src/ndi_measure.cpp (NdiTracker and dependencies),
+// copied verbatim, same as run_accuracy_check.cpp already does.
 
 enum class NdiToolStatus { Detected, Missing, OutOfVolume, Disabled, LowQuality };
 
@@ -573,11 +574,11 @@ int main(int argc, char** argv) {
         moveit::planning_interface::MoveGroupInterface moveGroup(node, PLANNING_GROUP);
         moveGroup.setPlanningTime(PLANNING_TIME_SECONDS);
         // elbow_yaw (motor 4) is permanently locked to a ~4-degree-wide tick
-        // range. Marking it <passive_joint> in the SRDF does NOT stop KDL's
-        // kinematics plugin from still treating it as a free IK variable --
-        // KDL builds its solve chain straight from the URDF tree and ignores
-        // the flag. A single planning attempt's random-seeded IK search can
-        // fail to land inside that narrow window and report
+        // range. Marking it <passive_joint> in the SRDF does not stop KDL's
+        // kinematics plugin from still treating it as a free IK variable.
+        // KDL builds its solve chain straight from the URDF tree and
+        // ignores the flag. A single planning attempt's random-seeded IK
+        // search can fail to land inside that narrow window and report
         // GOAL_STATE_INVALID even though a solution exists.
         // setNumPlanningAttempts() reruns the whole attempt with fresh
         // random seeds each time, matching that failure pattern.
@@ -646,7 +647,7 @@ int main(int argc, char** argv) {
         auto achievedState = moveGroup.getCurrentState(2.0);
         geometry_msgs::msg::PoseStamped achievedPose = moveGroup.getCurrentPose();
 
-        // MoveIt-frame before/after/delta, in mm -- unlike the NDI numbers
+        // MoveIt-frame before/after/delta, in mm. Unlike the NDI numbers
         // above, this stays in one consistent frame throughout, so a clean
         // single-axis move should show ~0 delta on the other two axes here.
         const double moveitDxMm = (achievedPose.pose.position.x - currentPose.pose.position.x) * 1000.0;

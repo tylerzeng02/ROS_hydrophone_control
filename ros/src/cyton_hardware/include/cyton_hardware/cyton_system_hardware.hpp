@@ -27,9 +27,9 @@ namespace cyton_hardware
 //
 // Backlash compensation (opt-in via "compensate_backlash", default
 // "false"): the existing, hardware-validated fix in dynamixel_motor.cpp
-// is designed around a single blocking move to one known target -- it has
+// is designed around a single blocking move to one known target, and has
 // no well-defined meaning for a streaming position command where "the
-// target" a reversal should overshoot below isn't known in advance. A
+// target" a reversal should overshoot below is not known in advance. A
 // naive per-cycle port would fire on nearly every cycle of a decreasing
 // segment, fighting the trajectory controller's own interpolation.
 // Implemented instead: a reversal-triggered hold-point compensator (see
@@ -87,8 +87,8 @@ private:
   uint16_t moving_speed_ = 40;  // matches this project's established MOVING_SPEED convention
 
   // ros2_control state/command storage. hw_velocities_ is always reported
-  // 0.0 -- DynamixelMotor::readPosition() only reads present position, not
-  // present speed, on this read path.
+  // 0.0, since DynamixelMotor::readPosition() only reads present position,
+  // not present speed, on this read path.
   std::array<double, kNumJoints> hw_positions_{};
   std::array<double, kNumJoints> hw_velocities_{};
   std::array<double, kNumJoints> hw_commands_{};

@@ -1,16 +1,16 @@
 // move_xyz_test: like move_x_test.cpp, but commands a Cartesian delta on
-// ALL THREE axes at once (dx, dy, dz all plugged in on the command line),
+// all three axes at once (dx, dy, dz all plugged in on the command line),
 // rather than one axis at a time. Otherwise identical mechanism: relative
 // move (current pose + delta) via real IK (MoveGroupInterface::
 // setPoseTarget()), verified against the NDI Polaris tracker's own
 // before/after measurement of the moving marker relative to the fixed
-// marker -- same reasoning as move_x_test.cpp for why this sidesteps the
-// base-frame/tool-frame-fitting problem entirely.
+// marker. See move_x_test.cpp for why this sidesteps the base-frame and
+// tool-frame fitting problem entirely.
 //
 // NdiTracker and its dependencies are copied verbatim from move_x_test.cpp
-// (itself copied verbatim from cyton_ndi_capture/src/ndi_measure.cpp) --
-// already hardware-validated NDI connect/BX-polling/averaging code, not
-// reimplemented here.
+// (itself copied verbatim from cyton_ndi_capture/src/ndi_measure.cpp).
+// This is already hardware-validated NDI connect/BX-polling/averaging
+// code, not reimplemented here.
 
 #include <array>
 #include <cmath>
@@ -37,7 +37,7 @@ constexpr const char* DEFAULT_FIXED_TOOL_ROM =
     "/home/temp/Downloads/8700449- Polaris Passive 4-Marker Rigid Body 3(1).rom";
 
 constexpr const char* PLANNING_GROUP = "arm";
-// Same values, same reasoning, as move_x_test.cpp -- see that file's own
+// Same values, same reasoning, as move_x_test.cpp. See that file's own
 // comment for the full explanation (elbow_yaw's narrow locked window and
 // why a larger shared planning-time budget addresses it more directly
 // than more planning attempts alone).
@@ -45,7 +45,7 @@ constexpr double PLANNING_TIME_SECONDS = 30.0;
 constexpr unsigned int NUM_PLANNING_ATTEMPTS = 15;
 
 // Default commanded displacement (meters), in the MoveGroup's own
-// planning/reference frame (normally base_link) -- NOT the NDI tracker's
+// planning/reference frame (normally base_link), not the NDI tracker's
 // frame. Override via argv (dx, dy, dz).
 constexpr double DEFAULT_DX_M = 0.0;
 constexpr double DEFAULT_DY_M = 0.0;
@@ -59,7 +59,7 @@ constexpr int REQUIRED_VISIBLE_MARKERS = 4;
 constexpr double MAX_NDI_ERROR = 0.50;
 
 // From move_x_test.cpp / cyton_ndi_capture/src/ndi_measure.cpp (NdiTracker
-// and dependencies) -- copied verbatim.
+// and dependencies), copied verbatim.
 
 enum class NdiToolStatus { Detected, Missing, OutOfVolume, Disabled, LowQuality };
 
@@ -606,10 +606,10 @@ int main(int argc, char** argv) {
 
         geometry_msgs::msg::PoseStamped achievedPose = moveGroup.getCurrentPose();
 
-        // MoveIt-frame before/after/delta, in mm -- directly comparable
+        // MoveIt-frame before/after/delta, in mm. Directly comparable
         // axis-by-axis to the commanded (dxM, dyM, dzM), unlike the NDI
-        // numbers above (different, unaligned frame -- only the magnitude
-        // is directly comparable there).
+        // numbers above, which are in a different, unaligned frame where
+        // only the magnitude is directly comparable.
         const double moveitDxMm = (achievedPose.pose.position.x - currentPose.pose.position.x) * 1000.0;
         const double moveitDyMm = (achievedPose.pose.position.y - currentPose.pose.position.y) * 1000.0;
         const double moveitDzMm = (achievedPose.pose.position.z - currentPose.pose.position.z) * 1000.0;

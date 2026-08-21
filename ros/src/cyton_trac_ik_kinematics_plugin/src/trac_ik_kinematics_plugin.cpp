@@ -77,7 +77,7 @@ bool TracIKKinematicsPlugin::initialize(const rclcpp::Node::SharedPtr& node,
   }
 
   // Collect this chain's actual moving joints (skip fixed joints) and the
-  // link name at the end of every segment -- same two lists
+  // link name at the end of every segment: the same two lists
   // KDLKinematicsPlugin exposes via getJointNames()/getLinkNames().
   joint_names_.clear();
   link_names_.clear();
@@ -117,7 +117,7 @@ bool TracIKKinematicsPlugin::initialize(const rclcpp::Node::SharedPtr& node,
   }
 
   // eps=1e-5 and SolveType::Speed match this project's KDL plugin's own
-  // general-purpose defaults as closely as TRAC-IK's API allows -- Speed
+  // general-purpose defaults as closely as TRAC-IK's API allows. Speed
   // returns the first valid solution found (fastest), as opposed to
   // Distance (closest to seed) / Manip1 / Manip2 (manipulability-weighted).
   // default_timeout_solver_ matches kinematics.yaml's existing
@@ -142,7 +142,7 @@ bool TracIKKinematicsPlugin::searchPositionIKImpl(const geometry_msgs::msg::Pose
                                                    moveit_msgs::msg::MoveItErrorCodes& error_code) const
 {
   (void)consistency_limits;  // TRAC-IK has no native consistency-limit concept; not enforced here.
-  (void)timeout;             // per-call timeout not threaded into the solver -- see header comment.
+  (void)timeout;             // per-call timeout not threaded into the solver; see header comment.
 
   if (!initialized_ || !trac_ik_solver_)
   {
@@ -275,7 +275,7 @@ bool TracIKKinematicsPlugin::getPositionFK(const std::vector<std::string>& link_
   for (std::size_t i = 0; i < link_names.size(); ++i)
   {
     // Find which chain segment ends at this link, so FK can be computed up
-    // to exactly that segment (not just the final tip) -- JntToCart's
+    // to exactly that segment (not just the final tip). JntToCart's
     // segmentNr is inclusive of that segment's own transform.
     int segmentIndex = -1;
     for (unsigned int s = 0; s < kdl_chain_.getNrOfSegments(); ++s)

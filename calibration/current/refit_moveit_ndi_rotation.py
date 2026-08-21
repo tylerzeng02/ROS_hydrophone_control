@@ -29,7 +29,7 @@ import numpy as np
 
 # The rotation currently deployed in move_between_points.cpp (refit
 # 2026-08-13 from ndi_moveit_rotation_calibration_data.csv, 13 valid
-# pairs) -- printed alongside any new fit for comparison / drift-since-then
+# pairs), printed alongside any new fit for a comparison / drift-since-then
 # check.
 CURRENT_R_MOVEIT_TO_NDI = np.array([
     [0.0033, 0.8971, 0.4418],
@@ -48,7 +48,7 @@ def load_pairs(path):
             qw, qx, qy, qz = (float(row["moveit_pose_qw"]), float(row["moveit_pose_qx"]),
                                float(row["moveit_pose_qy"]), float(row["moveit_pose_qz"]))
             # Detect the getCurrentPose()-failed sentinel: exact zero position
-            # with identity orientation -- not a real reading.
+            # with identity orientation, not a real reading.
             if mx == 0.0 and my == 0.0 and mz == 0.0 and qw == 1.0 and qx == 0.0 and qy == 0.0 and qz == 0.0:
                 skipped += 1
                 continue

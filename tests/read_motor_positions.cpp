@@ -4,12 +4,12 @@
 
 #include "dynamixel_motor.h"
 
-// Quick, read-only position check -- connects, reads every motor's present
+// Quick, read-only position check. Connects, reads every motor's present
 // position, prints it, disconnects. Never touches torque state (reading
-// the present-position register doesn't require torque enabled), so it's
-// safe to run at any time, including while the arm is being held/posed by
-// hand -- unlike the previous version of this file, which enabled torque
-// on every motor first for no reason this tool actually needs.
+// the present-position register does not require torque enabled), so it
+// is safe to run at any time, including while the arm is being held or
+// posed by hand, unlike the previous version of this file, which enabled
+// torque on every motor first for no reason this tool actually needs.
 int main()
 {
     const char* DEVICENAME = "COM4";
