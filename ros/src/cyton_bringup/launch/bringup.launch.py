@@ -16,6 +16,14 @@ of this project's fitted kinematic calibration -- e.g.
 See cyton_moveit_config/launch/demo.launch.py's own docstring for exactly
 what this does and doesn't change.
 
+Full 7-DOF simulation (2026-08-24): pass urdf_variant:=sim_7dof (mock_components
+only -- rejected with hardware_type:=real) to restore elbow_yaw_joint's full
+mechanical range for planning/simulation instead of the production ~4-degree
+lock -- e.g.
+    ros2 launch cyton_bringup bringup.launch.py urdf_variant:=sim_7dof
+See cyton_gamma_1500_robot_sim7dof.xacro's own header for why this is safe
+only in simulation.
+
 Streaming backlash compensation (2026-08-13): pass compensate_backlash:=true
 (only meaningful with hardware_type:=real) to enable cyton_hardware's new
 reversal-triggered hold-point compensator -- NOT yet validated against real
@@ -59,8 +67,8 @@ def generate_launch_description():
     urdf_variant_arg = DeclareLaunchArgument(
         "urdf_variant",
         default_value="calibrated",
-        description="'calibrated' (default) or 'uncalibrated' -- see demo.launch.py's "
-        "docstring for what this A/B toggle does.",
+        description="'calibrated' (default), 'uncalibrated', or 'sim_7dof' (full elbow_yaw "
+        "range, mock_components only) -- see demo.launch.py's docstring for what each does.",
     )
     compensate_backlash_arg = DeclareLaunchArgument(
         "compensate_backlash",

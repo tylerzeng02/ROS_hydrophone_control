@@ -90,8 +90,11 @@ class SkullMarkerPublisher(Node):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--mesh", default="/home/temp/CT5_DICOM_skull_mesh_decimated.stl",
-        help="Absolute path to the mesh file."
+        "--mesh", default="/home/temp/CT5_DICOM_skull_mesh.stl",
+        help="Absolute path to the mesh file. Full-resolution (206,983 tri) "
+        "version, not the old _decimated one (20,697 tri) -- same anatomy/"
+        "frame (bounds match to <0.1mm), just more detail; kept in sync "
+        "with fus_targeting_gui's own default_config.yaml mesh.default_path."
     )
     parser.add_argument(
         "--frame", default="base_link",

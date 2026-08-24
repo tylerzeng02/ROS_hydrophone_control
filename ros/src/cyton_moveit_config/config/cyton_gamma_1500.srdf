@@ -7,8 +7,19 @@
   No <end_effector> tag: this project's URDF intentionally excludes the
   gripper (motor 7) from the base_link->virtual_endeffector IK chain (see
   cyton_gamma_1500_robot.xacro), so there is no separate gripper group to
-  attach one to  -  "arm"'s own tip_link (virtual_endeffector) already
-  serves as the end-effector frame for planning purposes.
+  attach one to  -  "arm"'s own tip_link already serves as the end-effector
+  frame for planning purposes.
+
+  tip_link changed to hydrophone_tip (2026-08-24), a zero-size frame at
+  the far end of the hydrophone probe rod attached to virtual_endeffector
+  (see that link's own comment in cyton_gamma_1500_robot.xacro) -
+  previously virtual_endeffector itself, which meant IK/Cartesian targets
+  referred to the wrist-mounted point 10cm short of the actual physical
+  probe tip, requiring manual accounting when picking targets, and could
+  let the rod be driven straight through a target surface even when the
+  commanded pose was nominally "standoff distance short" of it (the
+  standoff was being measured from the wrong point on the arm). Now the
+  literal physical tip is what's commanded and what standoff applies to.
 
   elbow_yaw_joint marked <passive_joint> (2026-08-07): elbow_yaw (motor 4)
   is permanently locked in src/robot_calibration.cpp to a ~4-degree-wide
@@ -38,7 +49,7 @@
 -->
 <robot name="cyton_gamma_1500">
   <group name="arm">
-    <chain base_link="base_link" tip_link="virtual_endeffector"/>
+    <chain base_link="base_link" tip_link="hydrophone_tip"/>
     <passive_joint name="elbow_yaw_joint"/>
   </group>
 
@@ -66,4 +77,5 @@
   <disable_collisions link1="wrist_pitch" link2="wrist_roll" reason="Adjacent"/>
   <disable_collisions link1="wrist_roll" link2="virtual_endeffector" reason="Adjacent"/>
   <disable_collisions link1="virtual_endeffector" link2="hydrophone_rod" reason="Adjacent"/>
+  <disable_collisions link1="hydrophone_rod" link2="hydrophone_tip" reason="Adjacent"/>
 </robot>

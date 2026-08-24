@@ -1,45 +1,40 @@
-<?xml version="1.0" ?>
+<?xml version="1.0"?>
 
-<robot name="cyton_gamma_1500">
+<!--
+  SIMULATION-ONLY 7-DOF variant (2026-08-24). Identical to the real,
+  deployed cyton_gamma_1500_robot.xacro (see that file's own header for
+  everything else - geometry provenance, what's not included, etc.)
+  except for ONE change: elbow_yaw_joint's <limit> is widened back to the
+  full original mechanical range (lower="-1.727262" upper="1.790156",
+  preserved in cyton_gamma_1500_robot.xacro's own elbow_yaw_joint comment)
+  instead of the ~4-degree production lock.
 
-  <!--
-    KINEMATIC CALIBRATION USED FOR STANDALONE IK
+  WHY THIS IS SAFE ONLY IN SIMULATION: elbow_yaw is locked in production
+  because that joint's own calibration fit was poorly identified (it
+  barely moved in the dataset used to fit it) - not because the joint
+  itself is mechanically unsafe to move. On hardware_type=mock_components,
+  ros2_control uses its own built-in mock_components/GenericSystem plugin
+  (see cyton_gamma_1500.ros2_control.xacro), which never invokes
+  cyton_hardware/CytonSystemHardware or robot_calibration.cpp's hardware-
+  level safety clamp at all - on mock, this URDF's <limit> tags are the
+  ONLY thing constraining joint range, so widening it here only affects
+  simulated/planned motion, never a real servo.
 
-    Updated 2026-08-06 with the fitted corrections from this project's NDI-
-    based kinematic calibration (see CLAUDE.md's kinematic-calibration
-    section for the full history/methodology). Per-joint <axis> and (for
-    elbow_pitch/shoulder_yaw/wrist_pitch) <origin xyz> below now reflect
-    those corrections; see each joint's own inline comment for the specific
-    change and its original nominal value.
+  DO NOT combine this variant with hardware_type=real. Nothing in this
+  file enforces that by itself (a URDF fragment can't see the hardware_type
+  arg) - the launch-level guard is in cyton_moveit_config/launch/
+  demo.launch.py, which rejects urdf_variant=sim_7dof + hardware_type=real
+  outright. If you're adding a new way to launch this variant, add the
+  same guard there too.
 
-    URDF joint              Motor ID   zero tick   safe ticks     scale     corrected?
-    shoulder_roll_joint        0          2048      276..3772   0.988203   tilt only (offset skipped: base-frame degeneracy)
-    shoulder_pitch_joint       1          2047      851..3231   1.001931   offset+scale+tilt
-    shoulder_yaw_joint         2          2060      912..3327   0.964711   offset+scale+tilt+origin
-    elbow_pitch_joint          3          2102      799..3307   1.014467   offset+scale+tilt+origin (widened 2026-08-07, was 829..3277, see joint's own comment)
-    elbow_yaw_joint             4          2078     2060..2130  1.0        NONE — deliberately locked near
-                                                                              midpoint in production; its own fit
-                                                                              is poorly identified (joint barely
-                                                                              moved in the dataset used to fit it)
-    wrist_pitch_joint          5          2042      751..3344   1.006796   offset+scale+tilt+origin
-    wrist_roll_joint           6          2048      335..3761   1.002933   tilt only (offset skipped: tool-frame degeneracy)
+  DO NOT hand-edit any calibration number other than elbow_yaw_joint's
+  <limit> here - for everything else this must stay a straight copy of
+  cyton_gamma_1500_robot.xacro (and by extension,
+  references/cyton_gamma_1500_trac_ik.urdf); keep both in sync by hand
+  if either's non-elbow_yaw calibration ever changes.
+-->
 
-    Motor ID 7 is the gripper and is intentionally excluded from the
-    base_link -> virtual_endeffector IK chain.
-
-    NOT integrated here, and not representable in a static URDF at all:
-    joint-coupling (3 terms), gravity/elastostatic deflection (7 terms), and
-    the shoulder_pitch Fourier term — all pose-dependent, would need a
-    real-time correction layer in whatever control stack ends up driving
-    this robot, not a geometry change. Backlash compensation is separately
-    already implemented as C++ logic in src/dynamixel_motor.cpp (per-joint
-    overshoot on direction reversal) and needs porting into that same
-    control layer, not this file.
-
-    The limits below were converted using 4096 ticks per revolution.
-    Joint axes and positive directions must still be verified physically.
-    velocity=1.0 is retained as an unverified planning placeholder.
-  -->
+<robot name="cyton_gamma_1500" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
   <!-- base -->
 
@@ -65,7 +60,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://cyton_gamma_1500_description/meshes/base.dae"/>
+        <mesh filename="package://cyton_description/meshes/base.dae"/>
       </geometry>
     </visual>
 
@@ -100,12 +95,10 @@
       lower="-2.564816"
       upper="2.644583"
       velocity="1.0"/>
-    <!-- Axis tilt correction applied 2026-08-06, from the kinematic
-         calibration fit (see CLAUDE.md's kinematic-calibration section).
-         Original nominal axis: 0 0 1. (This joint's fitted zero-offset was
-         NOT applied to zeroTick in robot_calibration.cpp — entangled with
-         the calibration-time base frame's rotation — but axis tilt does
-         not share that degeneracy and is safe to apply here.) -->
+    <!-- Axis tilt correction (2026-08-06 kinematic calibration fit).
+         Original nominal axis: 0 0 1. Fitted zero-offset NOT applied
+         (base-frame degeneracy)  -  axis tilt does not share that
+         degeneracy and is safe to apply here. -->
     <axis xyz="0.013792 0.014877 0.999794"/>
   </joint>
 
@@ -113,7 +106,7 @@
     <visual>
       <origin rpy="1.5708 0 0.384" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://cyton_gamma_1500_description/meshes/shoulder_roll.dae"/>
+        <mesh filename="package://cyton_description/meshes/shoulder_roll.dae"/>
       </geometry>
     </visual>
 
@@ -141,8 +134,7 @@
       lower="-1.833107"
       upper="1.814699"
       velocity="1.0"/>
-    <!-- Axis tilt correction applied 2026-08-06, from the kinematic
-         calibration fit (see CLAUDE.md's kinematic-calibration section).
+    <!-- Axis tilt correction (2026-08-06 kinematic calibration fit).
          Original nominal axis: 1 0 0. -->
     <axis xyz="0.998997 -0.043573 -0.010357"/>
   </joint>
@@ -151,7 +143,7 @@
     <visual>
       <origin rpy="1.5708 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://cyton_gamma_1500_description/meshes/shoulder_pitch.dae"/>
+        <mesh filename="package://cyton_description/meshes/shoulder_pitch.dae"/>
       </geometry>
     </visual>
 
@@ -173,10 +165,9 @@
   <joint name="shoulder_yaw_joint" type="revolute">
     <parent link="shoulder_pitch"/>
     <child link="shoulder_yaw"/>
-    <!-- Origin and axis tilt corrections applied 2026-08-06, from the
-         kinematic calibration fit (see CLAUDE.md's kinematic-calibration
-         section). Original nominal origin xyz: -0.0215 -0.0205 0.1255
-         (only x,z corrected; y untouched by the fit's parameterization).
+    <!-- Origin and axis tilt corrections (2026-08-06 kinematic calibration
+         fit). Original nominal origin xyz: -0.0215 -0.0205 0.1255 (only
+         x,z corrected; y untouched by the fit's parameterization).
          Original nominal axis: 0 -1 0. -->
     <origin rpy="0 0 0" xyz="-0.02478414 -0.0205 0.1308452"/>
     <limit
@@ -191,7 +182,7 @@
     <visual>
       <origin rpy="1.5708 0 -1.5708" xyz="0 0 0.0"/>
       <geometry>
-        <mesh filename="package://cyton_gamma_1500_description/meshes/shoulder_yaw.dae"/>
+        <mesh filename="package://cyton_description/meshes/shoulder_yaw.dae"/>
       </geometry>
     </visual>
 
@@ -213,26 +204,20 @@
   <joint name="elbow_pitch_joint" type="revolute">
     <parent link="shoulder_yaw"/>
     <child link="elbow_pitch"/>
-    <!-- Origin and axis tilt corrections applied 2026-08-06, from the
-         kinematic calibration fit (see CLAUDE.md's kinematic-calibration
-         section). Original nominal origin xyz: 0.018 0.0206 0.1158.
+    <!-- Origin and axis tilt corrections (2026-08-06 kinematic calibration
+         fit). Original nominal origin xyz: 0.018 0.0206 0.1158.
          Original nominal axis: 1 0 0. -->
     <origin rpy="0 0 0" xyz="0.01656849 0.02722018 0.11356304"/>
     <!-- Limit widened 2026-08-07 (was lower="-1.961961" upper="1.788622")
          to add a 30-tick margin on each side of jointCalibrations[3]'s
-         minTick/maxTick (robot_calibration.cpp) - real-hardware MoveIt
+         minTick/maxTick (robot_calibration.cpp)  -  real-hardware MoveIt
          sessions repeatedly showed the arm's actual settled position
          landing a few ticks up to ~25 ticks past the exact hand-verified
-         extreme (ordinary servo settling/backlash noise), which
-         MoveIt's CheckStartStateBounds check has zero tolerance for and
-         will not plan past. Recomputed directly from the widened
-         [799, 3307] tick range, not just delta-adjusted from the old
-         values - doing so surfaced that the *previous* limit here had
-         quietly drifted ~12-26 ticks tighter than jointCalibrations'
-         then-current [829, 3277] anyway (likely stale from an earlier
-         zeroTick/scale revision that was never propagated here), so this
-         edit also fixes that pre-existing mismatch, not just adds
-         margin. -->
+         extreme (ordinary servo settling/backlash noise), which MoveIt's
+         CheckStartStateBounds check has zero tolerance for. See
+         references/cyton_gamma_1500_trac_ik.urdf's matching joint comment
+         for the full explanation, including a pre-existing (now fixed)
+         mismatch this recomputation also caught. -->
     <limit
       effort="100.0"
       lower="-2.027693"
@@ -245,7 +230,7 @@
     <visual>
       <origin rpy="1.5708 0 3.1416" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://cyton_gamma_1500_description/meshes/elbow_pitch.dae"/>
+        <mesh filename="package://cyton_description/meshes/elbow_pitch.dae"/>
       </geometry>
     </visual>
 
@@ -267,30 +252,22 @@
   <joint name="elbow_yaw_joint" type="revolute">
     <parent link="elbow_pitch"/>
     <child link="elbow_yaw"/>
-    <!-- elbow_yaw_joint deliberately left UNCORRECTED (2026-08-06): this
-         joint is locked near its calibrated midpoint in production (see
-         src/robot_calibration.cpp's jointCalibrations comment and CLAUDE.md's
-         kinematic-calibration section, "reduced-DOF breakthrough") and barely
-         moved in the dataset used to fit it, so its own tilt/scale/offset
-         correction is poorly identified and not trustworthy — moot anyway
-         since it's not meant to move in real use. -->
+    <!-- elbow_yaw_joint's tilt/scale/offset correction is still left
+         UNCORRECTED here (same reasoning as the real calibrated file:
+         poorly identified, barely moved in the fit dataset) - only the
+         <limit> below differs from that file, per this file's own header
+         comment. -->
     <origin rpy="0 0 0" xyz="-0.0171 -0.018 0.09746"/>
-    <!-- Limit tightened 2026-08-06 to match this joint's hardware lock
-         (jointCalibrations[4]'s minTick/maxTick, robot_calibration.cpp)
-         — MUST stay consistent with that C++ range, not the original wide
-         mechanical limit, or MoveIt will plan trajectories the hardware
-         safety clamp will reject. Original wide limit was
-         lower="-1.727262" upper="1.790156".
-         Widened slightly again 2026-08-07 (was lower="-0.004602"
-         upper="0.056757") - 15 ticks of margin added each side of
-         jointCalibrations[4]'s range (now [2060, 2130]), same real-
-         hardware-settling-noise reasoning as elbow_pitch_joint's limit
-         above. Still a deliberately tiny ~4 degree window; this joint
-         stays "locked" in every practical sense. -->
+    <!-- SIM-ONLY WIDENING (2026-08-24): full original mechanical range,
+         not the production hardware lock - see this file's own header
+         comment for why that's safe here (mock_components only) and
+         nowhere else. The production-locked value (for reference, and
+         what every OTHER urdf_variant still uses) is
+         lower="-0.027612" upper="0.079767". -->
     <limit
       effort="100.0"
-      lower="-0.027612"
-      upper="0.079767"
+      lower="-1.727262"
+      upper="1.790156"
       velocity="1.0"/>
     <axis xyz="0 -1 0"/>
   </joint>
@@ -299,7 +276,7 @@
     <visual>
       <origin rpy="1.5708 0 1.5708" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://cyton_gamma_1500_description/meshes/elbow_yaw.dae"/>
+        <mesh filename="package://cyton_description/meshes/elbow_yaw.dae"/>
       </geometry>
     </visual>
 
@@ -321,9 +298,8 @@
   <joint name="wrist_pitch_joint" type="revolute">
     <parent link="elbow_yaw"/>
     <child link="wrist_pitch"/>
-    <!-- Origin and axis tilt corrections applied 2026-08-06, from the
-         kinematic calibration fit (see CLAUDE.md's kinematic-calibration
-         section). Original nominal origin xyz: 0.02626 0.018 0.0718.
+    <!-- Origin and axis tilt corrections (2026-08-06 kinematic calibration
+         fit). Original nominal origin xyz: 0.02626 0.018 0.0718.
          Original nominal axis: 1 0 0. -->
     <origin rpy="0 0 0" xyz="0.02765348 0.01273746 0.07244612"/>
     <limit
@@ -338,7 +314,7 @@
     <visual>
       <origin rpy="1.5708 0 1.5708" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://cyton_gamma_1500_description/meshes/wrist_pitch.dae"/>
+        <mesh filename="package://cyton_description/meshes/wrist_pitch.dae"/>
       </geometry>
     </visual>
 
@@ -366,12 +342,10 @@
       lower="-2.627709"
       upper="2.618505"
       velocity="1.0"/>
-    <!-- Axis tilt correction applied 2026-08-06, from the kinematic
-         calibration fit (see CLAUDE.md's kinematic-calibration section).
-         Original nominal axis: 0 0 1. (This joint's fitted zero-offset was
-         NOT applied to zeroTick in robot_calibration.cpp — entangled with
-         the calibration-time tool frame's rotation — but axis tilt does
-         not share that degeneracy and is safe to apply here.) -->
+    <!-- Axis tilt correction (2026-08-06 kinematic calibration fit).
+         Original nominal axis: 0 0 1. Fitted zero-offset NOT applied
+         (tool-frame degeneracy)  -  axis tilt does not share that
+         degeneracy and is safe to apply here. -->
     <axis xyz="-0.006451 -0.018572 0.999807"/>
   </joint>
 
@@ -379,7 +353,7 @@
     <visual>
       <origin rpy="3.1416 0 -1.5708" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://cyton_gamma_1500_description/meshes/wrist_roll.dae"/>
+        <mesh filename="package://cyton_description/meshes/wrist_roll.dae"/>
       </geometry>
     </visual>
 

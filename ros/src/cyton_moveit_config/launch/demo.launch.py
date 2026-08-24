@@ -25,6 +25,15 @@ using the exact same accuracy-check tools either way. Does NOT affect
 robot_calibration.cpp's separate real-servo tick<->radian calibration --
 only what MoveIt's planner believes the robot's geometry is.
 
+urdf_variant:=sim_7dof (added 2026-08-24) loads
+cyton_gamma_1500_sim7dof.urdf.xacro -- identical to the calibrated variant
+except elbow_yaw_joint's <limit> is widened back to its full mechanical
+range instead of the ~4-degree production lock, restoring genuine 7-DOF
+motion for planning/simulation. ONLY valid with hardware_type:=mock_components
+-- combining it with hardware_type:=real raises an error (see
+launch_setup() below and cyton_gamma_1500_robot_sim7dof.xacro's own header
+for why).
+
 compensate_backlash (added 2026-08-13) defaults to "false". Pass
 compensate_backlash:=true (only meaningful with hardware_type:=real) to
 enable cyton_hardware's new streaming-compatible backlash compensator --
@@ -56,15 +65,28 @@ from moveit_configs_utils import MoveItConfigsBuilder
 
 def launch_setup(context, *args, **kwargs):
     urdf_variant = LaunchConfiguration("urdf_variant").perform(context)
-    if urdf_variant not in ("calibrated", "uncalibrated"):
+    if urdf_variant not in ("calibrated", "uncalibrated", "sim_7dof"):
         raise ValueError(
-            f"urdf_variant must be 'calibrated' or 'uncalibrated', got '{urdf_variant}'"
+            "urdf_variant must be 'calibrated', 'uncalibrated', or 'sim_7dof', "
+            f"got '{urdf_variant}'"
         )
-    urdf_filename = (
-        "cyton_gamma_1500_uncalibrated.urdf.xacro"
-        if urdf_variant == "uncalibrated"
-        else "cyton_gamma_1500.urdf.xacro"
-    )
+    hardware_type = LaunchConfiguration("hardware_type").perform(context)
+    if urdf_variant == "sim_7dof" and hardware_type == "real":
+        # sim_7dof widens elbow_yaw_joint's <limit> back to the full
+        # mechanical range instead of the production ~4-degree lock -- see
+        # cyton_gamma_1500_robot_sim7dof.xacro's own header for why that's
+        # only safe on mock_components (which never invokes
+        # robot_calibration.cpp's hardware-level safety clamp at all).
+        # Real hardware must never plan against this widened range.
+        raise ValueError(
+            "urdf_variant=sim_7dof cannot be combined with hardware_type=real -- "
+            "that widened elbow_yaw range is only safe in simulation. See "
+            "cyton_gamma_1500_robot_sim7dof.xacro's header comment."
+        )
+    urdf_filename = {
+        "uncalibrated": "cyton_gamma_1500_uncalibrated.urdf.xacro",
+        "sim_7dof": "cyton_gamma_1500_sim7dof.urdf.xacro",
+    }.get(urdf_variant, "cyton_gamma_1500.urdf.xacro")
 
     ik_solver = LaunchConfiguration("ik_solver").perform(context)
     if ik_solver not in ("kdl", "trac_ik"):
@@ -195,9 +217,11 @@ def generate_launch_description():
         "urdf_variant",
         default_value="calibrated",
         description="Which top-level URDF xacro MoveIt plans against: 'calibrated' (real, "
-        "deployed kinematic corrections -- default) or 'uncalibrated' (original, uncorrected "
-        "joint geometry -- see cyton_gamma_1500_robot_uncalibrated.xacro's header). Does not "
-        "affect robot_calibration.cpp's real-servo calibration either way.",
+        "deployed kinematic corrections -- default), 'uncalibrated' (original, uncorrected "
+        "joint geometry -- see cyton_gamma_1500_robot_uncalibrated.xacro's header), or "
+        "'sim_7dof' (calibrated geometry but elbow_yaw_joint's full mechanical range instead "
+        "of the production lock -- mock_components only, rejected with hardware_type=real). "
+        "Does not affect robot_calibration.cpp's real-servo calibration either way.",
     )
     compensate_backlash_arg = DeclareLaunchArgument(
         "compensate_backlash",

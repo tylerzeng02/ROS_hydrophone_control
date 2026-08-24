@@ -31,6 +31,21 @@ def _euler_to_matrix(rpy_rad):
     return tf_transformations.euler_matrix(roll, pitch, yaw)
 
 
+def rotation_matrix_to_rpy(R):
+    """Inverse of _euler_to_matrix()'s rotation part -- given a 3x3
+    rotation matrix (e.g. from point_registration.fit_rigid_transform()),
+    returns (roll, pitch, yaw) radians in the exact same convention, so a
+    fitted registration round-trips correctly into config.yaml's
+    registration.rpy_rad field. Deliberately goes through
+    tf_transformations.euler_from_matrix() (the real inverse of
+    euler_matrix()) rather than a hand-derived formula -- guarantees
+    convention consistency instead of risking a subtly-wrong axis order."""
+    matrix4 = np.eye(4)
+    matrix4[0:3, 0:3] = R
+    roll, pitch, yaw = tf_transformations.euler_from_matrix(matrix4)
+    return roll, pitch, yaw
+
+
 def quaternion_looking_along(direction, up_hint=(0.0, 0.0, 1.0), roll_deg=0.0):
     """Quaternion (x, y, z, w) whose local +Z axis points along `direction`.
     `up_hint` only resolves the otherwise-free rotation about that axis;
@@ -74,6 +89,16 @@ class Registration(ABC):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def transform_points_to_base_frame(self, points_local):
+        """Batch version of the position half of mesh_point_to_target_pose()
+        -- transforms an (N, 3) array of mesh-local points into base_frame,
+        with no standoff/tilt/orientation math. Used to move a whole mesh
+        (e.g. for a MoveIt collision object, see
+        MoveItBridge.set_skull_collision_object()) into base_frame at once,
+        rather than one point at a time."""
+        raise NotImplementedError
+
 
 class FixedPoseRegistration(Registration):
     """Registers the mesh to base_frame via one fixed, hand-specified pose
@@ -85,6 +110,11 @@ class FixedPoseRegistration(Registration):
     def __init__(self, xyz_m, rpy_rad):
         self._matrix = _euler_to_matrix(rpy_rad)
         self._matrix[0:3, 3] = xyz_m
+
+    def transform_points_to_base_frame(self, points_local):
+        points = np.asarray(points_local, dtype=float)
+        homogeneous = np.hstack([points, np.ones((len(points), 1))])
+        return (self._matrix @ homogeneous.T).T[:, 0:3]
 
     def mesh_point_to_target_pose(
         self, point_local, normal_local, standoff_mm,

@@ -9,7 +9,11 @@
 robot:
   planning_group: arm
   base_frame: base_link
-  end_effector_frame: virtual_endeffector
+  # hydrophone_tip (2026-08-24), not virtual_endeffector -- the actual
+  # physical tip of the 10cm hydrophone probe rod, matching the SRDF's
+  # "arm" group tip_link (see cyton_gamma_1500.srdf's own comment on why).
+  # Picked targets now correctly refer to the literal probe tip position.
+  end_effector_frame: hydrophone_tip
   # Joint names, in the order MoveIt/ros2_control expect them -- matches
   # cyton_hardware's kJointNames / the URDF's <ros2_control> joint list.
   joint_names:
@@ -24,7 +28,11 @@ robot:
 mesh:
   # Absolute path to the skull mesh (STL/PLY). Overridable from the GUI's
   # File > Open Mesh... menu at runtime; this is just the startup default.
-  default_path: /home/temp/CT5_DICOM_skull_mesh_decimated.stl
+  # The full-resolution mesh (206,983 triangles), not the "_decimated" one
+  # (20,697) -- confirmed same anatomy/frame (bounds/center match to
+  # <0.1mm), just more detail. Keep in sync with publish_skull_marker.py's
+  # own --mesh default if either is ever changed.
+  default_path: /home/temp/CT5_DICOM_skull_mesh.stl
   # Uniform scale applied after loading -- 0.001 for a mesh authored in mm
   # (matches publish_skull_marker.py's own default/warning about this).
   scale: 0.001

@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<!--
+  Top-level entry point for the SIMULATION-ONLY 7-DOF variant - identical
+  to cyton_gamma_1500.urdf.xacro (same args, same ros2_control block)
+  except it includes cyton_gamma_1500_robot_sim7dof.xacro instead of the
+  real calibrated cyton_gamma_1500_robot.xacro. See that fragment's own
+  header for exactly what's different (elbow_yaw_joint's <limit> only)
+  and why it's safe only with hardware_type=mock_components.
+
+  This file exists so the real, deployed cyton_gamma_1500.urdf.xacro never
+  has to be touched (or risk a bug) to support full-7-DOF simulation -
+  point a launch's robot_description at THIS file instead; everything else
+  (ros2_control, hardware interface, real servo calibration in
+  robot_calibration.cpp) is identical to a normal launch.
+
+  DO NOT combine with hardware_type=real - see cyton_moveit_config/launch/
+  demo.launch.py's urdf_variant validation, which rejects that combination.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="cyton_gamma_1500">
+
+  <xacro:arg name="hardware_type" default="mock_components"/>
+  <xacro:arg name="serial_port" default="/dev/ttyUSB0"/>
+  <xacro:arg name="baud_rate" default="1000000"/>
+  <xacro:arg name="protocol_version" default="1.0"/>
+  <xacro:arg name="initial_positions_file" default="$(find cyton_description)/config/initial_positions.yaml"/>
+  <xacro:arg name="compensate_backlash" default="false"/>
+  <xacro:arg name="compensate_pose_dependent" default="false"/>
+
+  <!-- Robot geometry (links, joints) - SIM-ONLY 7-DOF variant -->
+  <xacro:include filename="$(find cyton_description)/urdf/cyton_gamma_1500_robot_sim7dof.xacro"/>
+
+  <!-- ros2_control hardware block - identical to the normal launch -->
+  <xacro:include filename="$(find cyton_description)/urdf/cyton_gamma_1500.ros2_control.xacro"/>
+  <xacro:cyton_gamma_1500_ros2_control
+    name="CytonGamma1500"
+    hardware_type="$(arg hardware_type)"
+    serial_port="$(arg serial_port)"
+    baud_rate="$(arg baud_rate)"
+    protocol_version="$(arg protocol_version)"
+    initial_positions_file="$(arg initial_positions_file)"
+    compensate_backlash="$(arg compensate_backlash)"
+    compensate_pose_dependent="$(arg compensate_pose_dependent)"/>
+
+</robot>
