@@ -28,6 +28,13 @@ mesh:
   # Uniform scale applied after loading -- 0.001 for a mesh authored in mm
   # (matches publish_skull_marker.py's own default/warning about this).
   scale: 0.001
+  # Optional: CSV of pre-marked target points (e.g. exported from CAD),
+  # selectable from the GUI's "Predefined Points" list instead of (or in
+  # addition to) free-hand surface picking. Columns: label,x,y,z[,normal_x,
+  # normal_y,normal_z] -- x/y/z in this mesh's own native/raw units (the
+  # same units the STL file itself was authored in -- NOT already-scaled
+  # meters; `scale` above is applied to these too). Leave blank for none.
+  predefined_points_path: ""
 
 # Fixed mesh-local -> base_frame registration transform. Same convention,
 # same values, as publish_skull_marker.py's --xyz/--rpy args (this mesh's
@@ -48,3 +55,6 @@ targeting:
   # a larger time budget and more attempts than MoveIt's defaults).
   planning_time_s: 30.0
   num_planning_attempts: 15
+  # Starting value pre-filled into the "Search Area" grid-spacing control
+  # -- editable per-area in the GUI itself before clicking "Finish Area".
+  default_search_area_spacing_mm: 5.0

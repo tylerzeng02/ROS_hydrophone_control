@@ -8,9 +8,15 @@
 # rclpy, moveit_msgs, geometry_msgs, sensor_msgs, tf_transformations come
 # from the ROS 2 install itself (see package.xml's exec_depend list) --
 # not listed here.
+#
+# pymoveit2 is NOT here even though this package depends on it -- despite
+# its README once suggesting a pip-installable layout, it is currently an
+# ament_cmake/ament_cmake_python ROS 2 package (CMakeLists.txt + package.xml
+# at its repo root, no setup.py/pyproject.toml), not something `pip install
+# git+...` can build. Clone it into this workspace's src/ and build it with
+# colcon instead -- see this package's own README.md "Setup" section.
 
 PySide6>=6.5
 pyvista>=0.43
 pyvistaqt>=0.11
-pymoveit2 @ git+https://github.com/AndrejOrsula/pymoveit2.git
 PyYAML>=6.0

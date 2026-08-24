@@ -25,6 +25,12 @@
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>tf_transformations</exec_depend>
   <exec_depend>ament_index_python</exec_depend>
+  <!-- Not resolvable via rosdep -- no released binary package. Must be
+       cloned into this workspace's src/ (see README.md "Setup") so colcon
+       builds it locally; declaring it here just gets colcon's own
+       intra-workspace dependency ordering right (build pymoveit2 before
+       this package) when both are present in the same workspace. -->
+  <exec_depend>pymoveit2</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

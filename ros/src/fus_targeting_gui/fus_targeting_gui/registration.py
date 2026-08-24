@@ -15,12 +15,15 @@ import numpy as np
 import tf_transformations
 from geometry_msgs.msg import Pose
 
+from .geometry_utils import look_at_basis, tilt_direction
+
 
 @dataclass
 class TargetingConfig:
     standoff_mm: float
     planning_time_s: float
     num_planning_attempts: int
+    default_search_area_spacing_mm: float = 5.0
 
 
 def _euler_to_matrix(rpy_rad):
@@ -28,36 +31,20 @@ def _euler_to_matrix(rpy_rad):
     return tf_transformations.euler_matrix(roll, pitch, yaw)
 
 
-def quaternion_looking_along(direction, up_hint=(0.0, 0.0, 1.0)):
-    """Rotation that maps the end effector's local +Z axis onto `direction`
-    (both in the same frame), with the remaining rotation-about-the-approach
-    -axis degree of freedom resolved via `up_hint` (a "look-at" style
-    construction, not a claim about the physically-correct tool roll).
+def quaternion_looking_along(direction, up_hint=(0.0, 0.0, 1.0), roll_deg=0.0):
+    """Quaternion (x, y, z, w) whose local +Z axis points along `direction`.
+    `up_hint` only resolves the otherwise-free rotation about that axis;
+    `roll_deg` is the knob that actually controls hydrophone roll, rotating
+    further about the approach axis on top of whatever `up_hint` picked --
+    up_hint's own zero point isn't physically meaningful, just consistent.
 
     IMPORTANT: which local axis of `end_effector_frame` should point along
     the approach direction is a property of how the probe is physically
-    mounted, and could not be verified from this repo alone (only the
-    arm's own virtual_endeffector frame is defined here, not the probe
-    tool's own frame convention). +Z is the assumption below -- confirm
-    against the real mount before trusting a computed orientation (e.g. by
-    checking a planned/executed pose in RViz against the physical probe).
+    mounted, and could not be verified from this repo alone. +Z is the
+    assumption below -- confirm against the real mount before trusting a
+    computed orientation on real hardware.
     """
-    z = np.array(direction, dtype=float)
-    norm = np.linalg.norm(z)
-    if norm < 1e-9:
-        raise ValueError("Zero-length approach direction.")
-    z /= norm
-
-    up = np.array(up_hint, dtype=float)
-    if abs(np.dot(z, up)) > 0.999:
-        # direction is (anti)parallel to the up hint -- pick a different
-        # reference so cross() below doesn't degenerate.
-        up = np.array([1.0, 0.0, 0.0])
-
-    x = np.cross(up, z)
-    x /= np.linalg.norm(x)
-    y = np.cross(z, x)
-
+    x, y, z = look_at_basis(direction, up_hint=up_hint, roll_deg=roll_deg)
     rot = np.eye(4)
     rot[0:3, 0] = x
     rot[0:3, 1] = y
@@ -67,12 +54,24 @@ def quaternion_looking_along(direction, up_hint=(0.0, 0.0, 1.0)):
 
 class Registration(ABC):
     @abstractmethod
-    def mesh_point_to_target_pose(self, point_local, normal_local, standoff_mm):
+    def mesh_point_to_target_pose(
+        self, point_local, normal_local, standoff_mm,
+        tilt_deg: float = 0.0, azimuth_deg: float = 0.0, roll_deg: float = 0.0,
+    ):
         """point_local/normal_local: (x, y, z) in the mesh's own (local,
         pre-registration) coordinate frame, as returned by mesh_view's
-        picker. Returns a geometry_msgs/Pose in the robot's base_frame,
-        offset `standoff_mm` back along the (transformed) outward normal
-        from the picked surface point."""
+        picker. Returns a geometry_msgs/Pose in the robot's base_frame.
+
+        The approach axis starts at the outward surface normal and can be
+        tilted away from it by `tilt_deg` (0 = straight-on, toward 90 =
+        grazing), in the tangent-plane direction selected by `azimuth_deg`
+        (0-360, rotating around the normal). `roll_deg` additionally
+        rotates the probe about its own final approach axis. The probe
+        stops `standoff_mm` short of the picked point, measured back along
+        that same (possibly tilted) approach axis -- not simply along the
+        surface normal -- so it always ends up exactly standoff_mm from the
+        target point regardless of tilt/azimuth.
+        """
         raise NotImplementedError
 
 
@@ -87,18 +86,29 @@ class FixedPoseRegistration(Registration):
         self._matrix = _euler_to_matrix(rpy_rad)
         self._matrix[0:3, 3] = xyz_m
 
-    def mesh_point_to_target_pose(self, point_local, normal_local, standoff_mm):
+    def mesh_point_to_target_pose(
+        self, point_local, normal_local, standoff_mm,
+        tilt_deg: float = 0.0, azimuth_deg: float = 0.0, roll_deg: float = 0.0,
+    ):
         point_h = np.array([*point_local, 1.0])
         point_robot = (self._matrix @ point_h)[0:3]
 
         normal_robot = self._matrix[0:3, 0:3] @ np.array(normal_local, dtype=float)
         normal_robot /= np.linalg.norm(normal_robot)
 
-        standoff_m = standoff_mm / 1000.0
-        approach_dir = -normal_robot  # travel INTO the surface
-        target_position = point_robot + normal_robot * standoff_m
+        # Tilt is applied here in the robot frame (post-registration).
+        # mesh_view's live preview applies the same tilt/azimuth in the
+        # mesh's local frame instead, for simplicity, which can pick a
+        # differently-oriented (but equally arbitrary) azimuth=0 reference
+        # -- harmless, since azimuth's zero point isn't physically
+        # meaningful either way, but means the preview's exact rotation
+        # won't always match this actual computed pose bit-for-bit.
+        approach_dir = tilt_direction(-normal_robot, tilt_deg, azimuth_deg)
 
-        quat = quaternion_looking_along(approach_dir)
+        standoff_m = standoff_mm / 1000.0
+        target_position = point_robot - approach_dir * standoff_m
+
+        quat = quaternion_looking_along(approach_dir, roll_deg=roll_deg)
 
         pose = Pose()
         pose.position.x, pose.position.y, pose.position.z = target_position.tolist()

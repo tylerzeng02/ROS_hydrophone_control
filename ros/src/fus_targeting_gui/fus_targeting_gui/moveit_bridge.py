@@ -8,9 +8,10 @@ already established for this project's other MoveIt tools.
 
 NOTE: written against pymoveit2's documented plan()/execute() split
 (https://github.com/AndrejOrsula/pymoveit2) -- smoke-test this against
-whatever pymoveit2 version actually gets installed (see requirements.txt)
-before trusting it; minor API differences across versions are possible
-and this hasn't been run yet.
+whatever pymoveit2 version actually gets built (it's a colcon-built ROS 2
+package, not a pip package -- see README.md's Setup section) before
+trusting it; minor API differences across versions are possible and this
+hasn't been run yet.
 """
 
 from PySide6.QtCore import QObject, QThread, Signal
@@ -59,6 +60,16 @@ class MoveItBridge(QObject):
             group_name=robot.planning_group,
             callback_group=callback_group,
         )
+        # Without these, MoveIt's 5s/1-attempt defaults are nowhere near
+        # enough to randomly sample a valid goal state through elbow_yaw's
+        # locked ~4-degree window -- RRTConnect fails with "Unable to
+        # sample any valid states for goal tree" almost every time, not
+        # because the pose is unreachable but because the search budget is
+        # too small. Same fix cyton_pose_commander/src/pose_commander.cpp
+        # already needed for this arm (see config/default_config.yaml's
+        # own comment on these two values).
+        self._moveit2.planning_time = targeting.planning_time_s
+        self._moveit2.num_planning_attempts = targeting.num_planning_attempts
         self._moveit2.planner_id = "RRTConnectkConfigDefault"
 
         self._executor = SingleThreadedExecutor()
