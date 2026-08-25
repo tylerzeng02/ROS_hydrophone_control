@@ -1,7 +1,6 @@
-"""Launches the fus_targeting_gui node on its own. Run this ALONGSIDE
-cyton_bringup's bringup.launch.py (which must already be up -- move_group
-has to be running for the GUI's MoveIt bridge to connect to), not instead
-of it:
+"""Launches the fus_targeting_gui node on its own. Run this alongside
+cyton_bringup's bringup.launch.py, not instead of it. move_group must
+already be running for the GUI's MoveIt bridge to connect to it:
 
     # terminal 1
     ros2 launch cyton_bringup bringup.launch.py

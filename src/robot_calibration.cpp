@@ -7,12 +7,13 @@
 // fitted gear-ratio correction, applied in radiansToTicks()/
 // ticksToRadians() below.
 //
-// Joints 0 (shoulder_roll) and 6 (wrist_roll) don't get their fitted offset:
-// each is first/last in the chain with nothing rotational between it and
-// the base/tool frame, so the offset is entangled with that (discarded)
-// frame rotation -- applying it alone would introduce error, not fix it.
-// Scale IS applied to both (grows with angle, not a constant bias, so it
-// doesn't share the degeneracy). Joint 4 gets neither -- see its comment.
+// Joints 0 (shoulder_roll) and 6 (wrist_roll) do not get their fitted
+// offset. Each is first or last in the chain with nothing rotational
+// between it and the base or tool frame, so the offset is entangled with
+// that discarded frame rotation. Applying it alone would introduce error
+// rather than fix it. Scale is applied to both, since it grows with angle
+// rather than being a constant bias and does not share the degeneracy.
+// Joint 4 gets neither correction. See its comment below for why.
 std::vector<JointCalibration> jointCalibrations = {
     // id, zeroTick, direction, minTick, maxTick, scale
     {0, 2048, +1, 276, 3772, 0.988203},                  // offset skipped (base-frame degeneracy)
@@ -23,13 +24,13 @@ std::vector<JointCalibration> jointCalibrations = {
     // outside the declared range, and ordinary servo settling/backlash
     // noise is enough to occasionally land just past it.
     {3, 2102, +1, 799, 3307, 1.014467},                  // offset +0.5297deg
-    // Joint 4 (elbow_yaw) is deliberately LOCKED near its midpoint -- it's
+    // Joint 4 (elbow_yaw) is deliberately locked near its midpoint. It is
     // the single worst-measured backlash joint (7.68mm) and a confirmed
-    // coupling/gravity-deflection hotspot; excluding it from motion
+    // coupling and gravity-deflection hotspot. Excluding it from motion
     // planning measurably improved the other 6 joints' accuracy. No
-    // offset/scale applied: it barely moved in the fit dataset (locked the
-    // whole time), so its own correction is poorly identified and moot
-    // anyway while locked. Range is a deliberately tiny ~4-degree window,
+    // offset or scale is applied because it barely moved in the fit
+    // dataset while locked, so its own correction is poorly identified
+    // and moot anyway. The range is a deliberately tiny 4-degree window,
     // with just enough slack to absorb settling noise without tripping
     // MoveIt's bounds check.
     {4, 2078, +1, 2060, 2130, 1.0},

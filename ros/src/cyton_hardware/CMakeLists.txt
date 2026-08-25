@@ -36,7 +36,6 @@ add_library(cyton_hardware SHARED
   src/cyton_system_hardware.cpp
   "${CYTON_REPO_ROOT}/src/dynamixel_motor.cpp"
   "${CYTON_REPO_ROOT}/src/robot_calibration.cpp"
-  "${CYTON_REPO_ROOT}/src/pose_dependent_correction.cpp"
 )
 
 target_include_directories(cyton_hardware PRIVATE

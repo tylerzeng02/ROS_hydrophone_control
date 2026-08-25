@@ -1,7 +1,7 @@
-# Third-party PyPI dependencies for fus_targeting_gui -- colcon/rosdep don't
-# manage these (no ROS package for most of them), so install with pip into
-# whatever Python environment `ros2 run` uses, before building/running this
-# package:
+# Third-party PyPI dependencies for fus_targeting_gui. colcon and rosdep
+# do not manage these, since there is no ROS package for most of them.
+# Install with pip into whatever Python environment `ros2 run` uses,
+# before building or running this package:
 #
 #   pip install -r requirements.txt
 #

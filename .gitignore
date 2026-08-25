@@ -14,9 +14,11 @@ build/archive/
 calibration/archive/
 ros/archive/
 tests/archive/
+src/archive/
 trash/
 understanding/
 notes/
+pid_tuning/
 
 # Compiled files
 *.o

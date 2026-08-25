@@ -1,6 +1,6 @@
 // run_accuracy_check: single combined program that both commands the arm
 // via MoveIt and captures each pose's NDI measurement, in one synchronized
-// loop -- move, confirm success, settle, capture, log, repeat. Same shape
+// loop: move, confirm success, settle, capture, log, repeat. Same shape
 // as the original calibration/collection/ndi_capture_and_validate.cpp,
 // but MoveIt does the moving instead of raw Dynamixel ticks.
 //
@@ -20,8 +20,8 @@
 //     polling/averaging code).
 //
 // Tick<->radian conversion goes through robot_calibration.cpp's
-// ticksToRadians()/radiansToTicks() (compiled directly into this binary)
-// -- not reimplemented here.
+// ticksToRadians()/radiansToTicks() (compiled directly into this binary),
+// not reimplemented here.
 
 #include <algorithm>
 #include <array>

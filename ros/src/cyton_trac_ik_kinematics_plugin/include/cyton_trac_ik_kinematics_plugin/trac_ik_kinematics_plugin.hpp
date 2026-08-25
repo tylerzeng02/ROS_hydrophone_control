@@ -1,20 +1,20 @@
 #pragma once
 
 // A fresh, MoveIt2-native kinematics::KinematicsBase implementation wrapping
-// TRAC-IK's core solver (external/trac_ik/trac_ik_lib) -- NOT a mechanical
+// TRAC-IK's core solver (external/trac_ik/trac_ik_lib), not a mechanical
 // port of trac_ik_kinematics_plugin.cpp (that file, and trac_ik_ros.cpp, are
 // ROS1/catkin code depending on roscpp/tf_conversions/the ROS1 parameter
 // server, none of which exist in ROS2). The core solver itself
-// (trac_ik.cpp/nlopt_ik.cpp/kdl_tl.cpp -- see TRAC_IK::TRAC_IK below) has NO
+// (trac_ik.cpp/nlopt_ik.cpp/kdl_tl.cpp; see TRAC_IK::TRAC_IK below) has no
 // ROS dependency at all, just KDL/Eigen/Boost/NLopt, and is compiled
 // directly from external/trac_ik/trac_ik_lib/src (this package's
-// CMakeLists.txt), same pattern as cyton_hardware compiling
-// dynamixel_motor.cpp or cyton_ndi_capture compiling ndicapi -- not a copy,
-// so it can never drift from the vendored submodule.
+// CMakeLists.txt), the same pattern as cyton_hardware compiling
+// dynamixel_motor.cpp or cyton_ndi_capture compiling ndicapi. It is not a
+// copy, so it can never drift from the vendored submodule.
 //
-// The KDL::Chain + joint limits this solver needs are built directly from
-// the MoveIt RobotModel's own parsed URDF (via kdl_parser), the same
-// approach the installed KDLKinematicsPlugin uses -- this is what makes it
+// The KDL::Chain and joint limits this solver needs are built directly
+// from the MoveIt RobotModel's own parsed URDF (via kdl_parser), the same
+// approach the installed KDLKinematicsPlugin uses. This is what makes it
 // possible to skip trac_ik_ros.cpp's ROS1 parameter-server URDF loading
 // entirely.
 
@@ -80,7 +80,7 @@ public:
 
 private:
   // Shared implementation behind every searchPositionIK/getPositionIK
-  // overload above -- all of them ultimately reduce to "one seed, one
+  // overload above. All of them ultimately reduce to "one seed, one
   // target pose, one timeout, optional consistency limits and validation
   // callback". consistency_limits may be empty (unused).
   bool searchPositionIKImpl(const geometry_msgs::msg::Pose& ik_pose, const std::vector<double>& ik_seed_state,
@@ -95,7 +95,7 @@ private:
   std::vector<std::string> link_names_;
 
   // mutable: searchPositionIK's own interface is const (per KinematicsBase),
-  // but TRAC_IK::CartToJnt is not itself const -- same reasoning as any
+  // but TRAC_IK::CartToJnt is not itself const. Same reasoning as any
   // other MoveIt kinematics plugin wrapping a stateful solver behind a
   // const query API.
   mutable std::unique_ptr<TRAC_IK::TRAC_IK> trac_ik_solver_;

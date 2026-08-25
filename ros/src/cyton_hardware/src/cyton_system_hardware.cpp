@@ -18,16 +18,16 @@ rclcpp::Logger logger()
 // xacro args always arrive as strings, and xacro's ${...} property
 // substitution runs values through YAML-style type coercion before
 // re-stringifying, so a lowercase "true" can arrive here as "True" or
-// "TRUE" -- accept all case variants rather than trusting exact case.
+// "TRUE". Accept all case variants rather than trusting exact case.
 bool parseBoolParam(const std::string & value)
 {
   return value == "true" || value == "True" || value == "TRUE" || value == "1";
 }
 
-// Ordinary trajectory-following noise near a momentary hold shouldn't look
-// like a direction reversal. Untuned guess (see this file's own header
-// comment on backlash compensation) -- not yet validated against real
-// hardware.
+// Ordinary trajectory-following noise near a momentary hold should not
+// look like a direction reversal. Untuned guess (see this file's own
+// header comment on backlash compensation), not yet validated against
+// real hardware.
 constexpr int kDirectionDeadbandTicks = 2;
 }  // namespace
 
@@ -50,7 +50,7 @@ hardware_interface::CallbackReturn CytonSystemHardware::on_init(
   }
 
   // Enforce the URDF's ros2_control block declaring joints in exactly
-  // motor-ID order (0=shoulder_roll .. 6=wrist_roll) -- read()/write()
+  // motor-ID order (0=shoulder_roll .. 6=wrist_roll). read()/write()
   // below index straight into jointCalibrations by this same position,
   // so a silent name/order mismatch would command the wrong motor.
   for (int i = 0; i < kNumJoints; ++i)
@@ -77,7 +77,6 @@ hardware_interface::CallbackReturn CytonSystemHardware::on_init(
   protocol_version_ = std::stof(getParam("protocol_version", "1.0"));
   moving_speed_ = static_cast<uint16_t>(std::stoi(getParam("moving_speed", "40")));
   compensate_backlash_ = parseBoolParam(getParam("compensate_backlash", "false"));
-  compensate_pose_dependent_ = parseBoolParam(getParam("compensate_pose_dependent", "false"));
 
   hw_positions_.fill(0.0);
   hw_velocities_.fill(0.0);
@@ -113,8 +112,8 @@ std::vector<hardware_interface::CommandInterface> CytonSystemHardware::export_co
 hardware_interface::CallbackReturn CytonSystemHardware::on_activate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  // Fresh backlash-compensation state every activation -- no stale
-  // direction/hold data carried over from a previous run.
+  // Fresh backlash-compensation state every activation, so no stale
+  // direction/hold data carries over from a previous run.
   last_raw_tick_.fill(0);
   last_direction_.fill(0);
   has_previous_tick_.fill(false);
@@ -129,15 +128,6 @@ hardware_interface::CallbackReturn CytonSystemHardware::on_activate(
       "compensate_backlash is ENABLED -- this is a NEW, real design (not a guess) but has "
       "NEVER been validated against real hardware, unlike dynamixel_motor.cpp's blocking-move "
       "fix. Watch closely.");
-  }
-
-  if (compensate_pose_dependent_)
-  {
-    RCLCPP_WARN(
-      logger(),
-      "compensate_pose_dependent is ENABLED -- joint-coupling/gravity/shoulder_pitch-Fourier "
-      "correction, ported from the offline calibration model, has NEVER been validated as live "
-      "control against real hardware. Watch closely.");
   }
 
   motor_ = std::make_unique<DynamixelMotor>(serial_port_.c_str(), baud_rate_, protocol_version_);
@@ -244,26 +234,10 @@ hardware_interface::return_type CytonSystemHardware::write(
     return hardware_interface::return_type::ERROR;
   }
 
-  // Pose-dependent correction needs all 7 joints' commanded angles at once
-  // (coupling/gravity are cross-joint), so it's computed ONCE per write()
-  // cycle here, ahead of the per-joint loop below, rather than per-joint
-  // inside it. Defaults to a zero correction on every joint when disabled.
-  std::array<double, kNumJoints> poseDependentCorrection{};
-  if (compensate_pose_dependent_)
-  {
-    poseDependentCorrection = pose_dependent_correction::computeCorrection(hw_commands_);
-  }
-
   for (int i = 0; i < kNumJoints; ++i)
   {
     const JointCalibration & calibration = jointCalibrations[static_cast<size_t>(i)];
-    // Subtract the predicted pose-dependent deviation before the static
-    // tick conversion (feedforward: command less than the desired angle
-    // by however much coupling/gravity/Fourier effects are predicted to
-    // add back once physically realized -- see pose_dependent_correction.h).
-    const double correctedCommand =
-      hw_commands_[static_cast<size_t>(i)] - poseDependentCorrection[static_cast<size_t>(i)];
-    int tick = radiansToTicks(calibration, correctedCommand);
+    int tick = radiansToTicks(calibration, hw_commands_[static_cast<size_t>(i)]);
 
     if (tick < 0 || tick > 4095)
     {
@@ -279,7 +253,7 @@ hardware_interface::return_type CytonSystemHardware::write(
     }
 
     // setGoalPosition() re-checks jointCalibrations' min/maxTick itself
-    // before writing -- same safety gate as every other motor-facing
+    // before writing, the same safety gate as every other motor-facing
     // program here, and a backstop against an out-of-range hold point.
     if (!motor_->setGoalPosition(calibration.id, static_cast<uint16_t>(tick)))
     {
@@ -355,7 +329,7 @@ int CytonSystemHardware::applyBacklashCompensation(int jointIndex, int rawTick)
       effectiveTick = std::max(rawTick, hold_point_tick_[idx]);
       if (rawTick >= hold_point_tick_[idx])
       {
-        hold_active_[idx] = false;  // raw target caught up on its own -- release the hold
+        hold_active_[idx] = false;  // raw target caught up on its own; release the hold
       }
     }
     else

@@ -21,18 +21,18 @@ int getMotorTolerance(int motorId)
 
 // Per-joint backlash overshoot margin, from hand-verified reversal tests.
 // Each value is the joint's measured backlash gap plus a modest safety
-// margin -- kept modest since overshooting past the true gap only adds
-// settling noise, not correction benefit.
+// margin. The margin is kept modest because overshooting past the true
+// gap only adds settling noise, not correction benefit.
 int getBacklashOvershootTicks(int motorId)
 {
     static const int overshootPerJoint[7] = {
-        3,   // motor 0, shoulder_roll   -- measured ~0.28mm (negligible)
-        5,   // motor 1, shoulder_pitch  -- measured ~1.01mm (small)
-        10,  // motor 2, shoulder_yaw    -- measured ~3.20mm
-        15,  // motor 3, elbow_pitch     -- measured ~5.11mm
-        30,  // motor 4, elbow_yaw       -- measured ~7.68mm (largest)
-        23,  // motor 5, wrist_pitch     -- measured ~4.02mm
-        20,  // motor 6, wrist_roll      -- measured ~2.09mm
+        3,   // motor 0, shoulder_roll: measured 0.28mm, negligible
+        5,   // motor 1, shoulder_pitch: measured 1.01mm, small
+        10,  // motor 2, shoulder_yaw: measured 3.20mm
+        15,  // motor 3, elbow_pitch: measured 5.11mm
+        30,  // motor 4, elbow_yaw: measured 7.68mm, the largest
+        23,  // motor 5, wrist_pitch: measured 4.02mm
+        20,  // motor 6, wrist_roll: measured 2.09mm
     };
 
     if (motorId >= 0 && motorId < 7)
@@ -282,78 +282,6 @@ bool DynamixelMotor::writeGoalPositionRaw(int motorId, uint16_t position)
     return checkCommResult(commResult, dxlError, motorId, "Set goal position");
 }
 
-bool DynamixelMotor::readComplianceMargins(int motorId, uint8_t& cwMargin, uint8_t& ccwMargin)
-{
-    uint8_t dxlError = 0;
-
-    int commResult = packetHandler_->read1ByteTxRx(
-        portHandler_, motorId, ADDR_CW_COMPLIANCE_MARGIN, &cwMargin, &dxlError
-    );
-    if (!checkCommResult(commResult, dxlError, motorId, "Read CW compliance margin"))
-    {
-        return false;
-    }
-
-    commResult = packetHandler_->read1ByteTxRx(
-        portHandler_, motorId, ADDR_CCW_COMPLIANCE_MARGIN, &ccwMargin, &dxlError
-    );
-    return checkCommResult(commResult, dxlError, motorId, "Read CCW compliance margin");
-}
-
-bool DynamixelMotor::writeComplianceMargins(int motorId, uint8_t cwMargin, uint8_t ccwMargin)
-{
-    uint8_t dxlError = 0;
-
-    int commResult = packetHandler_->write1ByteTxRx(
-        portHandler_, motorId, ADDR_CW_COMPLIANCE_MARGIN, cwMargin, &dxlError
-    );
-    if (!checkCommResult(commResult, dxlError, motorId, "Write CW compliance margin"))
-    {
-        return false;
-    }
-
-    commResult = packetHandler_->write1ByteTxRx(
-        portHandler_, motorId, ADDR_CCW_COMPLIANCE_MARGIN, ccwMargin, &dxlError
-    );
-    return checkCommResult(commResult, dxlError, motorId, "Write CCW compliance margin");
-}
-
-bool DynamixelMotor::readComplianceSlopes(int motorId, uint8_t& cwSlope, uint8_t& ccwSlope)
-{
-    uint8_t dxlError = 0;
-
-    int commResult = packetHandler_->read1ByteTxRx(
-        portHandler_, motorId, ADDR_CW_COMPLIANCE_SLOPE, &cwSlope, &dxlError
-    );
-    if (!checkCommResult(commResult, dxlError, motorId, "Read CW compliance slope"))
-    {
-        return false;
-    }
-
-    commResult = packetHandler_->read1ByteTxRx(
-        portHandler_, motorId, ADDR_CCW_COMPLIANCE_SLOPE, &ccwSlope, &dxlError
-    );
-    return checkCommResult(commResult, dxlError, motorId, "Read CCW compliance slope");
-}
-
-bool DynamixelMotor::writeComplianceSlopes(int motorId, uint8_t cwSlope, uint8_t ccwSlope)
-{
-    uint8_t dxlError = 0;
-
-    int commResult = packetHandler_->write1ByteTxRx(
-        portHandler_, motorId, ADDR_CW_COMPLIANCE_SLOPE, cwSlope, &dxlError
-    );
-    if (!checkCommResult(commResult, dxlError, motorId, "Write CW compliance slope"))
-    {
-        return false;
-    }
-
-    commResult = packetHandler_->write1ByteTxRx(
-        portHandler_, motorId, ADDR_CCW_COMPLIANCE_SLOPE, ccwSlope, &dxlError
-    );
-    return checkCommResult(commResult, dxlError, motorId, "Write CCW compliance slope");
-}
-
 bool DynamixelMotor::readPunch(int motorId, uint16_t& punch)
 {
     uint8_t dxlError = 0;
@@ -513,8 +441,8 @@ bool DynamixelMotor::setMovingSpeed(int motorId, uint16_t speed)
 
     if (compensateBacklash && targetPosition < startPosition)
     {
-        // Would arrive by decreasing -- overshoot below the target first so
-        // the real approach always increases instead (see header comment).
+        // This move would arrive by decreasing. Overshoot below the target
+        // first so the real approach always increases (see header comment).
         int overshoot = static_cast<int>(targetPosition) -
             getBacklashOvershootTicks(motorId);
 
@@ -748,7 +676,7 @@ bool DynamixelMotor::moveJointsSafely(
                     /*compensateBacklash=*/false
                 ))
             {
-                // Not fatal -- same reasoning as moveJointSafely() above.
+                // Not fatal. Same reasoning as moveJointSafely() above.
                 std::cerr
                     << "Warning: backlash-compensation overshoot did not "
                     << "fully converge for all joints; proceeding to the "

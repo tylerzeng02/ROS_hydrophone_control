@@ -1,8 +1,9 @@
-"""Blocked 8-fold CV for the REDUCED model only (offset+scale+tilt+origin,
-NO Fourier/coupling/gravity) on the same 374-pose dataset and same fold
-boundaries as final_model_full_report.py's full-model CV -- for a clean,
-apples-to-apples "what if we hadn't added the pose-dependent terms"
-comparison.
+"""Validates the deployed 48-param model (offset/scale/tilt/origin, no
+coupling/gravity/Fourier) via blocked 8-fold cross-validation: folds are
+contiguous pose_id ranges, not a random shuffle. TARGET_POSES is a
+sequence of near-identical trajectory steps, so a random split puts each
+held-out pose's near-twin in the training set and reports an optimistic
+test RMS; blocked folds do not have that leak.
 """
 
 import csv

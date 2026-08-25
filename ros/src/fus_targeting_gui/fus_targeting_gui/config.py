@@ -1,7 +1,7 @@
 """Loads config.yaml into small, typed structures. This is the one file
-every other module reads robot/mesh/registration/targeting settings
-through -- nothing else in this package should read config.yaml directly
-or hardcode a frame/group name."""
+every other module reads robot, mesh, registration, and targeting
+settings through. Nothing else in this package should read config.yaml
+directly or hardcode a frame or group name."""
 
 from dataclasses import dataclass
 

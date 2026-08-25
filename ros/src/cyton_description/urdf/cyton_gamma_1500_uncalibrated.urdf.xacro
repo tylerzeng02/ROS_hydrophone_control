@@ -1,17 +1,18 @@
 <?xml version="1.0"?>
 <!--
-  Top-level entry point for the UNCALIBRATED comparison variant - identical
-  to cyton_gamma_1500.urdf.xacro (same args, same ros2_control block) except
-  it includes cyton_gamma_1500_robot_uncalibrated.xacro instead of the real
-  calibrated cyton_gamma_1500_robot.xacro. See that fragment's own header
-  for exactly what's reverted and why.
+  Top-level entry point for the uncalibrated comparison variant. This is
+  identical to cyton_gamma_1500.urdf.xacro, with the same args and the
+  same ros2_control block, except it includes
+  cyton_gamma_1500_robot_uncalibrated.xacro instead of the real calibrated
+  cyton_gamma_1500_robot.xacro. See that fragment's own header for
+  exactly what is reverted and why.
 
-  This file exists so the real, deployed cyton_gamma_1500.urdf.xacro never
-  has to be touched (or risk a bug) to support this one-off comparison -
-  point a launch's robot_description at THIS file instead to get the
-  uncalibrated planning model; everything else (ros2_control, hardware
-  interface, real servo calibration in robot_calibration.cpp) is identical
-  to a normal launch.
+  This file exists so the real, deployed cyton_gamma_1500.urdf.xacro
+  never has to be touched, or risk a bug, to support this one-off
+  comparison. Point a launch's robot_description at this file instead to
+  get the uncalibrated planning model. Everything else, including
+  ros2_control, the hardware interface, and real servo calibration in
+  robot_calibration.cpp, is identical to a normal launch.
 -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="cyton_gamma_1500">
 
@@ -21,12 +22,11 @@
   <xacro:arg name="protocol_version" default="1.0"/>
   <xacro:arg name="initial_positions_file" default="$(find cyton_description)/config/initial_positions.yaml"/>
   <xacro:arg name="compensate_backlash" default="false"/>
-  <xacro:arg name="compensate_pose_dependent" default="false"/>
 
-  <!-- Robot geometry (links, joints) - UNCALIBRATED variant -->
+  <!-- Robot geometry (links, joints), uncalibrated variant -->
   <xacro:include filename="$(find cyton_description)/urdf/cyton_gamma_1500_robot_uncalibrated.xacro"/>
 
-  <!-- ros2_control hardware block - identical to the normal launch -->
+  <!-- ros2_control hardware block, identical to the normal launch -->
   <xacro:include filename="$(find cyton_description)/urdf/cyton_gamma_1500.ros2_control.xacro"/>
   <xacro:cyton_gamma_1500_ros2_control
     name="CytonGamma1500"
@@ -35,7 +35,6 @@
     baud_rate="$(arg baud_rate)"
     protocol_version="$(arg protocol_version)"
     initial_positions_file="$(arg initial_positions_file)"
-    compensate_backlash="$(arg compensate_backlash)"
-    compensate_pose_dependent="$(arg compensate_pose_dependent)"/>
+    compensate_backlash="$(arg compensate_backlash)"/>
 
 </robot>

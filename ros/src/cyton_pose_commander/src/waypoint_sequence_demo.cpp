@@ -1,22 +1,22 @@
 // waypoint_sequence_demo: reads a CSV of Cartesian waypoints (x,y,z,roll,
-// pitch,yaw per row, meters/radians), and visits them ONE AT A TIME --
-// each point gets its own independent setPoseTarget()/IK solve/plan/
+// pitch,yaw per row, meters/radians), and visits them one at a time.
+// Each point gets its own independent setPoseTarget()/IK solve/plan/
 // execute, then the arm pauses briefly before moving to the next point.
 // This is deliberately different from cartesian_path_demo.cpp's single
-// continuous interpolated path -- that one produces one smooth motion
-// through all waypoints; this one produces N separate point-to-point
+// continuous interpolated path, which produces one smooth motion
+// through all waypoints. This one produces N separate point-to-point
 // moves with a visible stop at each, which is what was actually wanted
 // for this demo (both tools are kept, since they answer different
-// questions -- smooth sweep vs. discrete visit-and-pause).
+// questions: smooth sweep versus discrete visit-and-pause).
 //
-// Runs fully automatically (no per-point Enter confirmation) -- advances
-// on its own after each pause, since the point is a hands-off animation/
-// demo, not an interactive review workflow like pose_commander's.
+// Runs fully automatically (no per-point Enter confirmation) and advances
+// on its own after each pause, since the point is a hands-off animation
+// or demo, not an interactive review workflow like pose_commander's.
 //
 // Same elbow_yaw-locked-window IK considerations as move_x_test.cpp/
 // move_between_points.cpp apply here (each point does an independent
-// Cartesian IK solve) -- setPlanningTime/setNumPlanningAttempts are set
-// the same way, see those files' own comments for why.
+// Cartesian IK solve). setPlanningTime/setNumPlanningAttempts are set
+// the same way; see those files' own comments for why.
 
 #include <chrono>
 #include <fstream>
@@ -54,7 +54,7 @@ std::vector<Waypoint> loadWaypoints(const std::string& path) {
     if (!std::getline(file, line)) {
         throw std::runtime_error("Input CSV is empty: " + path);
     }
-    // First line assumed to be a header, discarded unconditionally -- see
+    // First line assumed to be a header, discarded unconditionally. See
     // the identical note in cartesian_path_demo.cpp for why.
 
     std::vector<Waypoint> waypoints;

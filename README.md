@@ -1,75 +1,197 @@
-# cyton_setup
+# Cyton Gamma 1500 ROS and tFUS Acoustic Characterization Applications
 
-C++17 control/integration codebase for a **Cyton Gamma 1500** 7-DOF
-Dynamixel-servo robot arm, with an **NDI Polaris Spectra** optical tracker
-integration used to kinematically calibrate the arm against real,
-independently-measured ground truth. Includes a ROS 2 + MoveIt 2
-integration (`ros/`) for real motion planning and execution on the
-physical hardware.
+Control and integration codebase for a **Cyton Gamma 1500** 7-DOF
+Dynamixel-servo robot arm, kinematically calibrated against an **NDI
+Polaris Spectra** optical tracker, and driven through **ROS 2 + MoveIt 2**
+for real motion planning and execution.
 
-The application driving this work: using the arm to position a hydrophone
-probe against a skull, to validate that an ultrasound helmet is actually
-directing energy where intended — an alternative to gantry-style
-positioning systems, trading some raw precision for reach into positions
-a gantry can't access.
+`ros/src/fus_targeting_gui/` is the operator-facing application for tFUS acoustic characterization with this arm.
 
-## Build (native, C++ hardware tools)
+The native C++ hardware tools (`src/`, `tests/`, `calibration/collection/`)
+build with plain CMake and can run on the machine connected to the arm and
+tracker. The `ros/` workspace (ROS 2 + MoveIt 2) needs a Linux ROS 2
+install with `colcon`.
 
-Requires an MSVC developer environment on `PATH` (NMake Makefiles
-generator) — build from a **Developer Command Prompt for VS 2022**, or
-source `vcvars64.bat` first in another shell:
+## Table of contents
 
-```bat
-call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-cd build
-nmake -f Makefile
+- [Hardware](#hardware)
+- [Repository layout](#repository-layout)
+- [Software prerequisites](#software-prerequisites)
+- [Getting started: native C++ build](#getting-started-native-c-build)
+- [Getting started: ROS 2 / MoveIt workspace](#getting-started-ros-2--moveit-workspace)
+- [Getting started: Python calibration tooling](#getting-started-python-calibration-tooling)
+- [Getting started: fus_targeting_gui](#getting-started-fus_targeting_gui)
+- [Typical workflow, in order](#typical-workflow-in-order)
+
+## Hardware
+
+- **Cyton Gamma 1500** arm, connected over USB-to-serial (Dynamixel bus,
+  1,000,000 baud, Protocol 1.0). Motor IDs 0-6 are the arm joints
+  (`shoulder_roll`, `shoulder_pitch`, `shoulder_yaw`, `elbow_pitch`,
+  `elbow_yaw`, `wrist_pitch`, `wrist_roll`). Motor 7 is the gripper and is
+  excluded from the calibrated IK chain.
+- **NDI Polaris Spectra** optical tracker, connected over its own
+  USB-to-serial adapter, with two passive marker rigid bodies (`.rom`
+  geometry files). One is mounted on the arm's end effector (the "moving"
+  tool) and one is fixed relative to the work area (the "fixed" tool). See
+  `references/marker_mount.stl` for the moving-marker mounting bracket.
+- A skull or phantom target, with a segmented surface mesh (STL) for
+  `fus_targeting_gui` to load.
+
+## Repository layout
+
+- **`src/`**: core motor control (`dynamixel_motor.{h,cpp}`) and the
+  per-joint calibration table (`robot_calibration.{h,cpp}`) that every
+  motor-facing program in this repo goes through for safety clamping and
+  tick/radian conversion.
+- **`tests/`**: one standalone hardware-in-the-loop program per file
+  (tick/radian checks, home-pose move, NDI single-tool diagnostic,
+  multi-joint backlash test). Not a unit test suite; each is built and run
+  individually against the physical robot and/or tracker.
+- **`calibration/`**: the kinematic-calibration pipeline.
+  - `collection/`: the C++ tools that talk to the hardware and collect
+    data. `ndi_capture_and_validate.cpp` is the main NDI capture and
+    `--validate` tool, used for every calibration dataset in this project.
+    `record_hand_poses.cpp` records hand-posed joint configurations for
+    later NDI capture.
+  - `current/`: the active Python fitting/validation scripts for the
+    deployed 48-parameter model (`calibrate_kinematics.py`,
+    `final_deployment_fit.py`, `deployed_model_predictions.py`, and a few
+    others). 
+  - `data/`: the dataset the deployed model was fit on
+    (`deployed_model_training_dataset_374pose.csv`). See
+    `calibration/data/README.md`.
+- **`ros/`**: the ROS 2 + MoveIt 2 workspace. `src/` holds the packages.
+  - `cyton_description`: URDF/xacro and meshes for the arm.
+  - `cyton_hardware`: the `ros2_control` hardware interface plugin
+    bridging the Dynamixel servos to ROS 2/MoveIt.
+  - `cyton_moveit_config`: MoveIt 2 configuration (SRDF, kinematics,
+    planning, controllers) and the main `demo.launch.py`.
+  - `cyton_bringup`: the single top-level launch entry point
+    (`bringup.launch.py`), a thin wrapper around `cyton_moveit_config`'s
+    launch file.
+  - `cyton_trac_ik_kinematics_plugin`: an alternative TRAC-IK-based IK
+    solver to the default KDL.
+  - `cyton_ndi_capture`: `ndi_measure`, a standalone NDI measurement tool
+    for checking MoveIt-commanded poses against independent tracker
+    ground truth.
+  - `cyton_pose_commander`: drives the arm through a CSV of tick-domain
+    joint targets via MoveIt, with a plan-preview-then-confirm workflow.
+  - `cyton_accuracy_check`: `run_accuracy_check`, a combined
+    move-then-measure program that commands the arm via MoveIt and
+    captures each pose's NDI measurement in one synchronized loop.
+  - `fus_targeting_gui`: the skull-mesh point-picking targeting
+    application. See its own `README.md` for setup and usage.
+
+  Loose files at the top level of `ros/` are collected accuracy data.
+- **`external/`**: vendored dependencies as git submodules.
+  `DynamixelSDK` and `ndicapi` are populated; `trac_ik` is only needed if
+  you plan to build `cyton_trac_ik_kinematics_plugin` and is empty in many
+  checkouts, since a plain `git submodule update --init --recursive` does
+  not populate it (see [Software prerequisites](#software-prerequisites)).
+- **`references/`**: the robot's URDF (`cyton_gamma_1500_trac_ik.urdf`)
+  and the moving-marker mounting bracket CAD (`marker_mount.stl`).
+
+## Software prerequisites
+
+- CMake and a C++17 compiler toolchain, for the native hardware tools.
+- ROS 2 (Jazzy or later) with MoveIt 2 and `colcon`, for the `ros/`
+  workspace.
+- `ros-<distro>-joint-state-broadcaster` and
+  `ros-<distro>-joint-trajectory-controller`. These are not always
+  installed by default; without them, `ros2_control`'s controllers fail
+  to load.
+- Git, with submodule support.
+- [`uv`](https://docs.astral.sh/uv/) for the Python calibration scripts,
+  or plain `pip` using `pyproject.toml`'s dependency list (`numpy`,
+  `scipy`).
+
+**Submodules:** only `external/ndicapi` has a real `.gitmodules` entry.
+`external/DynamixelSDK` and `external/trac_ik` are submodule references
+with no `.gitmodules` entry, so `git submodule update --init --recursive`
+will not populate them on a fresh clone. If either is missing, populate it
+manually by cloning `ROBOTIS-GIT/DynamixelSDK` or `traclabs/trac_ik` into
+the corresponding `external/` directory at the commit this repo's git
+tree references. The root `CMakeLists.txt` and `ros/src/cyton_hardware`'s
+`CMakeLists.txt` both stop with a `FATAL_ERROR` if `external/DynamixelSDK`
+is missing. NDI and TRAC-IK targets are optional and are skipped if their
+`external/` directory is not populated.
+
+## Getting started: native C++ build
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
 ```
 
-To (re)configure the build directory from scratch:
+Every hardware-facing tool has its own device path and baud rate as
+constants near the top of its `.cpp` file. Update these to match your
+machine before running anything against real hardware.
 
+There is no unit test framework. `tests/*.cpp` and
+`calibration/collection/*.cpp` are standalone, hardware-in-the-loop
+programs, each built into its own executable and run individually against
+the physical robot and/or tracker, typically with interactive
+Enter-to-proceed prompts between motion steps.
+
+## Getting started: ROS 2 / MoveIt workspace
+
+```bash
+cd ros
+colcon build
+source install/setup.bash
 ```
-cmake -S . -B build -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Debug
+
+`fus_targeting_gui` is the one pure-Python (`ament_python`) package in
+this workspace and needs its own PyPI dependencies installed first, since
+`colcon`/`rosdep` do not manage third-party PyPI packages:
+
+```bash
+pip install -r ros/src/fus_targeting_gui/requirements.txt
 ```
 
-There's no unit test framework — `tests/*.cpp` are standalone,
-hardware-in-the-loop programs, each built and run individually against
-the physical robot/tracker.
+Bring the whole stack up with a safe, hardware-free default (nothing
+moves):
 
-## Layout
+```bash
+ros2 launch cyton_bringup bringup.launch.py
+```
 
-- **`src/`** — core motor control (`dynamixel_motor.{h,cpp}`) and the
-  per-joint calibration table (`robot_calibration.{h,cpp}`) every
-  motor-facing program goes through.
-- **`tests/`** — one standalone hardware-in-the-loop program per file
-  (tick/radian checks, NDI capture, calibration data collection, etc.) —
-  not a unit test suite. I-gain/PID-tuning-specific tools live in
-  `pid_tuning/tests/` instead, not here.
-- **`pid_tuning/`** — everything related to the shoulder_pitch I-gain
-  investigation, consolidated into one place: `tests/` (C++ tools),
-  `scripts/` (Python analysis + PowerShell sweep automation), `data/`
-  (collected pose sets and sweep results). See `pid_tuning/README.md`.
-- **`calibration/`** — the Python kinematic-calibration pipeline
-  (`current/` is the active fitting/analysis code for the deployed
-  48-param model; `archive/` holds ~110 one-off diagnostic scripts plus
-  the superseded 60-param model in `archive/60param_model/`).
-- **`ros/`** — the ROS 2 + MoveIt 2 workspace (`src/` holds the real
-  packages: hardware interface, MoveIt config, NDI capture/accuracy-check
-  tools, and `fus_targeting_gui` — the skull-mesh point-picking targeting
-  application, see that package's own README; loose files at the top
-  level are real collected accuracy data, see `ros/archive/README.md` for
-  the superseded ones).
-- **`external/`** — vendored dependencies (DynamixelSDK, ndicapi,
-  trac_ik) as git submodule links.
-- **`references/`** — the robot's URDF and related reference docs.
+Against real hardware, with the arm connected, powered, and clear to
+move:
 
-`trash/` and `understanding/` exist locally but are gitignored (not part
-of the tracked repo) — the former is discarded material kept around only
-as a safety net, the latter a presentation-specific reference package;
-neither is needed to build or run anything here.
+```bash
+ros2 launch cyton_bringup bringup.launch.py hardware_type:=real serial_port:=/dev/ttyUSB0
+```
 
-## Full project history
+See `ros/src/cyton_bringup/launch/bringup.launch.py`'s own docstring for
+every other launch argument (backlash compensation, uncalibrated A/B
+comparison, TRAC-IK vs. KDL).
 
-**`CLAUDE.md`** is this project's detailed, continuously-updated decision
-log — every real bug found, every calibration result, every dead end
-ruled out, and why. It's long, but it's the authoritative source for
-"why is this the way it is" on anything not obvious from the code itself.
+## Getting started: Python calibration tooling
+
+```bash
+uv run --with numpy --with scipy python calibration/current/calibrate_kinematics.py --selftest
+```
+
+`--selftest` runs against synthetic ground-truth data and needs no
+hardware. Run this before trusting the script on real data. To refit
+against the real deployed dataset:
+
+```bash
+uv run python calibration/current/final_deployment_fit.py
+```
+
+## Getting started: fus_targeting_gui
+
+With `move_group` already running (see above), in a second terminal:
+
+```bash
+ros2 launch fus_targeting_gui targeting_gui.launch.py
+```
+
+Or run the node directly with `ros2 run fus_targeting_gui targeting_gui`.
+See `ros/src/fus_targeting_gui/README.md` for the app's architecture and
+`ros/src/fus_targeting_gui/config/default_config.yaml` for the one file
+that would need editing to point this at a different, already-calibrated
+robot arm.

@@ -1,5 +1,5 @@
-"""Mesh loading + rendering + surface point-picking. No ROS dependency at
-all -- runnable and testable standalone:
+"""Mesh loading, rendering, and surface point-picking. This module has no
+ROS dependency and is runnable and testable standalone:
 
     python3 -m fus_targeting_gui.mesh_view /path/to/mesh.stl
 """
@@ -23,9 +23,9 @@ _TARGET_LABELS_ACTOR_NAME = "target_labels"
 
 
 class MeshView(QWidget):
-    """Emits point_picked(point_xyz: tuple, normal_xyz: tuple) -- both in
-    the mesh's own local (pre-registration) coordinate frame -- every time
-    the user clicks a point on the mesh surface."""
+    """Emits point_picked(point_xyz: tuple, normal_xyz: tuple) every time
+    the user clicks a point on the mesh surface. Both values are in the
+    mesh's own local, pre-registration coordinate frame."""
 
     point_picked = Signal(tuple, tuple)
 
@@ -414,7 +414,7 @@ def _standalone_main():
     )
     view.load_mesh(path, scale=scale)
     view.resize(1000, 800)
-    view.setWindowTitle(f"MeshView standalone -- {path}")
+    view.setWindowTitle(f"MeshView standalone: {path}")
     view.show()
     sys.exit(app.exec())
 

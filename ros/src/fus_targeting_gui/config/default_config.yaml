@@ -1,10 +1,10 @@
 # fus_targeting_gui configuration.
 #
-# The "robot:" block is the ONLY thing that should need to change to point
-# this app at a different, already-calibrated MoveIt-configured arm --
-# nothing in fus_targeting_gui's own .py files should ever hardcode a
-# frame/group name. Values below match this repo's current Cyton Gamma
-# 1500 setup (ros/src/cyton_moveit_config/config/*.yaml/*.srdf).
+# The "robot:" block is the only thing that should need to change to
+# point this app at a different, already-calibrated MoveIt-configured
+# arm. Nothing in fus_targeting_gui's own .py files should ever hardcode
+# a frame or group name. Values below match this repo's current Cyton
+# Gamma 1500 setup (ros/src/cyton_moveit_config/config/*.yaml, *.srdf).
 
 robot:
   planning_group: arm
@@ -50,28 +50,28 @@ mesh:
 # already-known-good placement relative to the robot) -- keep these two
 # files' values in sync if either is ever re-registered.
 #
-# Rotated 90deg around base_link's Z axis on 2026-08-25 (was
-# [-0.27, 0.02, 0.15]) -- a scan of 15 random skull-surface points at 50mm
-# standoff with the skull collision object present found only 3/15
-# reachable at the old position, suggesting the issue wasn't standoff
-# distance but the skull sitting in an awkward, near-the-base region of
-# the arm's reach (low height, off to one side). This keeps the same
-# radial distance from base_link (0.271m in the XY plane) and the same
-# height (0.15m), just rotated to an adjacent side -- untested as of this
-# comment, re-verify with a fresh reachability scan before trusting it.
+# x shifted -10cm on 2026-08-25 (from the original -0.17) after a scan of
+# 15 random skull-surface points at 50mm standoff with the skull collision
+# object present found only 3/15 reachable at the original position. A
+# subsequent 90deg-around-Z rotation test (same radius/height, different
+# side) also came back 3/15 -- no better -- so skull position/rotation
+# alone isn't the fix; see CLAUDE.md for the fuller investigation
+# (orientation-tolerance tightness turned out to be the dominant factor,
+# not skull placement).
 registration:
   xyz_m: [0.02, 0.27, 0.15]
   rpy_rad: [3.14159, 0.0, 0.0]
 
 targeting:
-  # Distance (mm) the probe stops short of the picked surface point along
-  # the approach vector, before any final closer approach is done manually
-  # or by a future extension -- keeps the very first planned move from
-  # driving the probe tip directly into the mesh surface.
+  # Distance in mm the probe stops short of the picked surface point
+  # along the approach vector, before any final closer approach is done
+  # manually or by a future extension. This keeps the very first planned
+  # move from driving the probe tip directly into the mesh surface.
   standoff_mm: 10.0
-  # Planning/execution tuning -- see cyton_pose_commander/src/pose_commander.cpp
-  # for why these particular values (elbow_yaw's narrow locked window needs
-  # a larger time budget and more attempts than MoveIt's defaults).
+  # Planning and execution tuning. See
+  # cyton_pose_commander/src/pose_commander.cpp for why these particular
+  # values are used: elbow_yaw's narrow locked window needs a larger
+  # time budget and more attempts than MoveIt's defaults.
   planning_time_s: 30.0
   num_planning_attempts: 15
   # Starting value pre-filled into the "Search Area" grid-spacing control

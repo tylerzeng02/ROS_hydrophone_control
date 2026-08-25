@@ -4,14 +4,14 @@
 //
 // Unlike pose_commander.cpp (which reads tick targets and converts them
 // via ticksToRadians()), this file's input already has the 7 joint angles
-// in radians as named columns -- no conversion needed, just direct
+// in radians as named columns. No conversion is needed, just direct
 // setJointValueTarget() per joint by name. Columns are resolved by header
 // name (not fixed position), same pattern move_between_points.cpp uses.
 //
 // Everything else (plan-preview-then-confirm workflow, the
 // ensureCurrentStateWithinBounds()/sendCorrectiveTrajectory() out-of-bounds
 // recovery for elbow_pitch/elbow_yaw's razor-thin locked windows) is
-// carried over from pose_commander.cpp verbatim -- already hardware-
+// carried over from pose_commander.cpp verbatim, already hardware-
 // validated there, not reimplemented differently here.
 
 #include <algorithm>
@@ -46,7 +46,7 @@ constexpr double PLANNING_TIME_SECONDS = 5.0;
 constexpr double RECOVERY_BUFFER_RAD = 0.01;
 
 // Same order as pose_commander.cpp / jointCalibrations / the URDF's
-// <ros2_control> block -- and matches the column-name prefixes ndi_measure
+// <ros2_control> block, matching the column-name prefixes ndi_measure
 // writes (shoulder_roll_joint_rad, etc.).
 constexpr std::array<const char*, 7> JOINT_NAMES = {
     "shoulder_roll_joint", "shoulder_pitch_joint", "shoulder_yaw_joint",
@@ -143,7 +143,7 @@ void waitForEnter(const std::string& message) {
     std::getline(std::cin, line);
 }
 
-// --- Everything below is carried over from pose_commander.cpp verbatim ---
+// Everything below is carried over from pose_commander.cpp verbatim.
 
 std::pair<double, double> safeBoundsRadians(const JointCalibration& calibration) {
     const double a = ticksToRadians(calibration, calibration.minTick);

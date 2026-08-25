@@ -1,4 +1,4 @@
-"""ros2 run fus_targeting_gui targeting_gui -- entry point. Initializes
+"""Entry point for ros2 run fus_targeting_gui targeting_gui. Initializes
 rclpy, loads config.yaml, builds the MoveIt bridge, and runs the Qt app."""
 
 import argparse
@@ -17,8 +17,9 @@ def _resolve_default_config_path():
     try:
         return get_package_share_directory("fus_targeting_gui") + "/config/default_config.yaml"
     except Exception:
-        # Not installed via colcon (e.g. running straight from the source
-        # tree during development) -- fall back to the source-tree path.
+        # Not installed via colcon, for example when running straight from
+        # the source tree during development. Fall back to the source-tree
+        # path.
         return "config/default_config.yaml"
 
 
@@ -29,8 +30,9 @@ def main(argv=None):
         help="Path to config.yaml (default: this package's installed default_config.yaml)."
     )
     args, ros_args = parser.parse_known_args(argv if argv is not None else sys.argv[1:])
-    # Empty string (e.g. from targeting_gui.launch.py's unset `config` arg
-    # default) means "use the bundled default", same as omitting --config.
+    # An empty string, for example from targeting_gui.launch.py's unset
+    # config argument default, means "use the bundled default", the same
+    # as omitting --config.
     config_path = args.config if args.config else _resolve_default_config_path()
 
     config = load_config(config_path)

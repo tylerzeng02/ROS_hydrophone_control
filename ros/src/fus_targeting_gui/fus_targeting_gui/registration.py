@@ -1,11 +1,11 @@
-"""Converts a picked mesh-local surface point (+ normal) into a target
+"""Converts a picked mesh-local surface point and normal into a target
 geometry_msgs/Pose in the robot's planning frame.
 
-Deliberately isolated behind the Registration base class so a future
-NDI-fiducial-based (or any other) registration scheme can replace
-FixedPoseRegistration without touching mesh_view.py or moveit_bridge.py --
-neither of those imports anything from this module except a Registration
-instance.
+This is deliberately isolated behind the Registration base class so a
+future NDI-fiducial-based, or any other, registration scheme can replace
+FixedPoseRegistration without touching mesh_view.py or moveit_bridge.py.
+Neither of those files imports anything from this module except a
+Registration instance.
 """
 
 from abc import ABC, abstractmethod
@@ -63,7 +63,7 @@ def quaternion_looking_along(direction, up_hint=(0.0, 0.0, 1.0), roll_deg=0.0):
     further about the approach axis on top of whatever `up_hint` picked --
     up_hint's own zero point isn't physically meaningful, just consistent.
 
-    IMPORTANT: which local axis of `end_effector_frame` should point along
+    Important: which local axis of `end_effector_frame` should point along
     the approach direction is a property of how the probe is physically
     mounted, and could not be verified from this repo alone. +Z is the
     assumption below -- confirm against the real mount before trusting a
@@ -111,10 +111,11 @@ class Registration(ABC):
 
 
 class FixedPoseRegistration(Registration):
-    """Registers the mesh to base_frame via one fixed, hand-specified pose
-    -- exactly the transform publish_skull_marker.py already uses to place
-    this same mesh in RViz. Keep this and that script's --xyz/--rpy in
-    sync if the mesh is ever re-registered against the real setup.
+    """Registers the mesh to base_frame using one fixed, hand-specified
+    pose. This is exactly the transform publish_skull_marker.py already
+    uses to place this same mesh in RViz. Keep this and that script's
+    xyz and rpy arguments in sync if the mesh is ever re-registered
+    against the real setup.
     """
 
     def __init__(self, xyz_m, rpy_rad):

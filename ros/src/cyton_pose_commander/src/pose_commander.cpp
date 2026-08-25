@@ -3,11 +3,11 @@
 // instead of commanding raw ticks directly.
 //
 // Plan-preview-then-confirm workflow: for each pose, this program PLANS
-// the move (moveGroup.plan(), not move()) and stops -- MoveIt auto-
+// the move (moveGroup.plan(), not move()) and stops. MoveIt automatically
 // publishes the planned trajectory to /display_planned_path, which
-// RViz's MotionPlanning display shows with no extra code here. Waits for
-// Enter before calling execute() on that plan, so you get a visual
-// preview before committing. Ctrl+C at any point to quit early.
+// RViz's MotionPlanning display shows with no extra code here. It waits
+// for Enter before calling execute() on that plan, so you get a visual
+// preview before committing. Ctrl+C at any point quits early.
 //
 // Originally the "move" half of a two-terminal MoveIt-driven NDI accuracy
 // check, superseded for that purpose by cyton_accuracy_check's single
@@ -17,12 +17,12 @@
 //
 // Default input is build/repeatability_test_8points_labeled.csv (only the
 // first 8 columns used; deviation columns printed for reference).
-// Deliberately not validation_ticks.csv -- that dataset predates the
+// Deliberately not validation_ticks.csv. That dataset predates the
 // elbow_yaw permanent lock and targets tick_4 values outside its current
 // range.
 //
-// Tick->radian conversion goes through robot_calibration.cpp's
-// ticksToRadians() (compiled directly into this binary) -- not
+// Tick to radian conversion goes through robot_calibration.cpp's
+// ticksToRadians() (compiled directly into this binary), not
 // reimplemented, per this project's rule that every jointCalibrations
 // consumer shares one calibrated conversion.
 
@@ -56,7 +56,7 @@ constexpr double PLANNING_TIME_SECONDS = 5.0;
 // How far inside jointCalibrations' min/maxTick-derived bounds a recovery
 // correction lands, so it doesn't just clamp back onto the boundary it
 // just tripped (which real settling noise could immediately re-cross).
-// ~0.01 rad is roughly 6.5 ticks -- small, just enough headroom.
+// ~0.01 rad is roughly 6.5 ticks, small enough to be just enough headroom.
 constexpr double RECOVERY_BUFFER_RAD = 0.01;
 
 // Motor-ID order, matching jointCalibrations / the URDF's <ros2_control>
@@ -159,13 +159,13 @@ std::pair<double, double> safeBoundsRadians(const JointCalibration& calibration)
 }
 
 // Sends a one-off corrective trajectory directly to the arm_controller,
-// bypassing MoveIt's planning pipeline entirely -- deliberate, since
+// bypassing MoveIt's planning pipeline entirely. This is deliberate:
 // move_group refuses to plan anything while the current state is out of
-// bounds (START_STATE_INVALID), so MoveGroupInterface can't fix it itself.
-// Shells out to the same `ros2 action send_goal` mechanism already proven
-// reliable for this exact recovery by hand -- simpler and lower-risk than
-// a hand-rolled action client sharing this node with MoveGroupInterface's
-// own internal spinning behavior.
+// bounds (START_STATE_INVALID), so MoveGroupInterface cannot fix it
+// itself. Shells out to the same `ros2 action send_goal` mechanism
+// already proven reliable for this exact recovery by hand, which is
+// simpler and lower-risk than a hand-rolled action client sharing this
+// node with MoveGroupInterface's own internal spinning behavior.
 bool sendCorrectiveTrajectory(const std::array<double, 7>& radians) {
     const std::string logPath = "/tmp/pose_commander_recovery.log";
 
@@ -184,8 +184,8 @@ bool sendCorrectiveTrajectory(const std::array<double, 7>& radians) {
     std::system(cmd.str().c_str());
 
     // Check the actual reported outcome in the log, not just the shell's
-    // exit code -- matches this project's own established "verify the
-    // real result, don't trust exit status alone" practice.
+    // exit code, matching this project's own established practice of
+    // verifying the real result rather than trusting exit status alone.
     std::ifstream log(logPath);
     const std::string content(
         (std::istreambuf_iterator<char>(log)), std::istreambuf_iterator<char>()
@@ -199,11 +199,12 @@ bool sendCorrectiveTrajectory(const std::array<double, 7>& radians) {
 // trajectory if any joint is out. Returns true if already fine or
 // correction succeeded.
 //
-// Called PROACTIVELY before every plan attempt, not just reactively after
-// a START_STATE_INVALID failure -- the same problem can also surface
+// Called proactively before every plan attempt, not just reactively after
+// a START_STATE_INVALID failure. The same problem can also surface
 // through move_group's CheckStartStateBounds adapter, which aborts before
-// assigning a specific error code (client just sees generic FAILURE),
-// which the old reactive-only version didn't recognize as recoverable.
+// assigning a specific error code (the client just sees a generic
+// FAILURE), which the old reactive-only version did not recognize as
+// recoverable.
 bool ensureCurrentStateWithinBounds(moveit::planning_interface::MoveGroupInterface& moveGroup) {
     auto currentState = moveGroup.getCurrentState(2.0);
     if (!currentState) {
@@ -254,9 +255,10 @@ int main(int argc, char** argv) {
 
     // getCurrentState() (used by the recovery path) depends on this node's
     // CurrentStateMonitor subscription to /joint_states, which needs the
-    // node actually spinning -- without it, getCurrentState() times out
-    // ("latest received state has time 0.000000"). Standard, supported
-    // pattern alongside MoveGroupInterface's own internal handling.
+    // node to actually be spinning. Without it, getCurrentState() times
+    // out ("latest received state has time 0.000000"). This is a
+    // standard, supported pattern alongside MoveGroupInterface's own
+    // internal handling.
     rclcpp::executors::SingleThreadedExecutor executor;
     executor.add_node(node);
     std::thread spinThread([&executor]() { executor.spin(); });
@@ -301,12 +303,12 @@ int main(int argc, char** argv) {
             }
             if (anyTargetRejected) {
                 // Must continue the outer per-pose loop, not just the inner
-                // per-joint one -- otherwise move() runs with a stale/
+                // per-joint one, otherwise move() runs with a stale or
                 // partial target.
                 continue;
             }
 
-            // Proactive check before planning -- see ensureCurrentStateWithinBounds().
+            // Proactive check before planning; see ensureCurrentStateWithinBounds().
             if (!ensureCurrentStateWithinBounds(moveGroup)) {
                 std::cout << "  Could not correct an out-of-bounds current state -- skipping "
                              "this pose.\n";

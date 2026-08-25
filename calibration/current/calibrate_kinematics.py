@@ -1,26 +1,13 @@
 """Kinematic calibration for the Cyton Gamma 1500 arm using NDI Polaris
 Spectra data collected by calibration/collection/ndi_capture_and_validate.cpp.
 
-Solves for a minimal, identifiable parameter set (19 unknowns):
-  - one zero-offset correction per joint (7 params, radians)
-  - a small correction to the tool frame (virtual_endeffector -> moving
-    marker rigid body), 6 params: xyz (m) + rpy (rad)
-  - the base frame transform (fixed marker rigid body -> URDF base_link),
-    6 params: xyz (m) + rpy (rad) -- this one is NOT a small perturbation,
-    it is a genuinely unknown rigid transform (we have no prior on where
-    the fixed tool physically sits relative to the robot base), so it is
-    not regularized toward zero the way the other corrections are.
-
-Usage:
-    python calibrate_kinematics.py five_pose_ndi_capture.csv
-    python calibrate_kinematics.py --selftest
-
---selftest generates synthetic data from a known ground-truth set of
-corrections and checks that the optimizer recovers them. Run this first
-to sanity-check the script in your own Python environment (it was
-developed without a local Python interpreter available to execute it).
-
-Requires: numpy, scipy
+Fits 19 parameters:
+  - joint_offsets (7, rad): per-joint zero-offset correction.
+  - tool_xyz/tool_rpy (6): correction to the tool frame (virtual_endeffector
+    -> moving marker).
+  - base_xyz/base_rpy (6): fixed marker -> URDF base_link transform. Not
+    regularized, unlike the other two: the marker's position relative to
+    the robot base has no known nominal value.
 """
 
 import argparse
@@ -33,12 +20,10 @@ from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
 
 
-# URDF-derived kinematic chain
-# (references/cyton_gamma_1500_trac_ik.urdf, base_link -> virtual_endeffector)
-#
-# Every joint <origin> in that URDF has rpy="0 0 0" -- rotation only ever
-# comes from each revolute joint's own axis rotation, so each joint's
-# transform is just Translate(origin_xyz) then Rotate(axis, angle).
+# Kinematic chain from references/cyton_gamma_1500_trac_ik.urdf
+# (base_link -> virtual_endeffector). Every joint <origin> has rpy="0 0 0",
+# so each joint's transform reduces to Translate(origin_xyz) then
+# Rotate(axis, angle) instead of a general rotation+translation.
 
 JOINT_NAMES = [
     "shoulder_roll_joint",
@@ -99,10 +84,8 @@ class CalibParams:
     joint_offsets: np.ndarray   # (7,) radians, added to measured joint angle
     tool_xyz: np.ndarray        # (3,) meters, correction to TOOL_ORIGIN_NOMINAL_M
     tool_rpy: np.ndarray        # (3,) radians, correction to tool orientation
-    # base_xyz / base_rpy: pose of base_link EXPRESSED IN the fixed marker's
-    # own coordinate frame (i.e. "where/how is the robot base, as measured
-    # from a coordinate system anchored at the fixed reference tool") -- see
-    # build_base_transform() and the derivation in initial_base_guess().
+    # base_xyz / base_rpy: pose of base_link expressed in the fixed
+    # marker's frame, not the reverse. See build_base_transform().
     base_xyz: np.ndarray        # (3,) meters
     base_rpy: np.ndarray        # (3,) radians
 
@@ -137,9 +120,9 @@ def homogeneous_transform(rotation_matrix: np.ndarray, translation: np.ndarray) 
 
 
 def forward_kinematics(joint_angles_rad: np.ndarray) -> np.ndarray:
-    """4x4 transform from base_link to the nominal virtual_endeffector frame
-    (tool-frame correction NOT included -- compose with build_tool_transform
-    separately)."""
+    """4x4 transform from base_link to the nominal virtual_endeffector frame.
+    Tool-frame correction is not included; compose with build_tool_transform
+    separately."""
     T = np.eye(4)
     for i in range(N_JOINTS):
         joint_rotation = Rotation.from_rotvec(JOINT_AXES[i] * joint_angles_rad[i]).as_matrix()
@@ -154,37 +137,23 @@ def build_tool_transform(tool_xyz: np.ndarray, tool_rpy: np.ndarray) -> np.ndarr
 
 
 def build_base_transform(base_xyz: np.ndarray, base_rpy: np.ndarray) -> np.ndarray:
-    """Pose of base_link expressed in the fixed marker's coordinate frame
-    (translation/rotation FROM base_link coordinates TO fixed-marker
-    coordinates) -- this is the direction predict_relative_pose() needs
-    when composed on the left of T_fk @ T_tool, since T_fk @ T_tool already
-    equals "moving marker expressed in base_link coordinates," and left-
-    multiplying by this transform cancels the base_link frame, leaving
-    "moving marker expressed in fixed-marker coordinates" -- exactly the
-    measured quantity."""
+    """base_link -> fixed-marker transform, not the reverse: this is the
+    direction that cancels base_link when left-multiplied onto
+    T_fk @ T_tool in predict_relative_pose()."""
     R = Rotation.from_euler("xyz", base_rpy).as_matrix()
     return homogeneous_transform(R, base_xyz)
 
 
 def predict_relative_pose(measured_angles_rad: np.ndarray, params: CalibParams) -> np.ndarray:
-    """Predicted 4x4 pose of the moving marker's rigid-body frame as seen
-    from the fixed marker's rigid-body frame -- directly comparable to the
-    "moving_relative_fixed" columns ndi_capture_and_validate.cpp writes,
-    since that computation already removes the tracker's own arbitrary
-    position/orientation from the measurement."""
+    """Predicted moving-marker pose in the fixed marker's frame. Directly
+    comparable to the "moving_relative_fixed" columns
+    ndi_capture_and_validate.cpp writes, since that computation already
+    removes the tracker's own arbitrary reference frame."""
     corrected_angles = measured_angles_rad + params.joint_offsets
     T_fk = forward_kinematics(corrected_angles)
     T_tool = build_tool_transform(params.tool_xyz, params.tool_rpy)
     T_base = build_base_transform(params.base_xyz, params.base_rpy)
     return T_base @ T_fk @ T_tool
-
-
-# Bounds -- physically-motivated, not arbitrary. See the "how do you prevent
-# an unrealistic parameter" discussion this script came out of: joint
-# offsets and tool-frame corrections are small perturbations from a known
-# nominal (so tightly bounded and regularized toward zero); the base
-# transform has no such prior (we don't know where the fixed tool sits
-# relative to base_link) so it gets a generous bound and NO regularization.
 
 JOINT_OFFSET_BOUND_RAD = np.radians(8.0)
 TOOL_XYZ_BOUND_M = 0.01
@@ -210,10 +179,9 @@ def initial_base_guess(
     first_measured_pos_mm: np.ndarray,
     first_measured_quat_xyzw: np.ndarray,
 ):
-    """Closed-form initial guess for the base transform: solve it exactly
-    for one pose (assuming zero joint/tool correction), so least_squares
-    starts near a sane answer instead of at identity, which could be very
-    far from a base transform that in reality could be anywhere in the room."""
+    """Closed-form base-transform guess from one pose (zero joint/tool
+    correction assumed), since the base transform could be anywhere in the
+    room and an identity starting guess is not a useful prior."""
     T_fk = forward_kinematics(first_measured_angles)
     T_tool_nominal = build_tool_transform(np.zeros(3), np.zeros(3))
     T_partial = T_fk @ T_tool_nominal
@@ -230,18 +198,10 @@ def initial_base_guess(
 
 # Residuals
 
-ORIENTATION_WEIGHT = 0.3      # de-emphasized: the real target is position accuracy
-ORIENTATION_SCALE_MM = 100.0  # brings radians into a comparable numeric scale to mm
-# joint_offset[0] (shoulder_roll) and joint_offset[6] (wrist_roll) sit right
-# next to the base-frame and tool-frame rotations respectively in the chain,
-# and share a weak, real coupling with them (confirmed via the Jacobian SVD
-# during development -- see calibration/README notes). Since the base/tool
-# frames have no small-value prior but the joint offsets do, a stronger pull
-# toward zero here biases the optimizer to explain any near-degenerate
-# rotation via the frame transform rather than the joint offset when both
-# fit the data equally well.
-JOINT_OFFSET_REG_WEIGHT = 8.0     # mm-equivalent penalty per radian of joint offset
-TOOL_REG_WEIGHT = 1.0             # mm-equivalent penalty per m/rad of tool correction
+ORIENTATION_WEIGHT = 0.3      # position accuracy is the actual target; de-weighted, not dropped
+ORIENTATION_SCALE_MM = 100.0  # rad -> comparable numeric scale to the mm position residuals
+JOINT_OFFSET_REG_WEIGHT = 8.0
+TOOL_REG_WEIGHT = 1.0
 
 
 def residual_function(
@@ -272,7 +232,6 @@ def residual_function(
         params.joint_offsets * (JOINT_OFFSET_REG_WEIGHT / max(JOINT_OFFSET_BOUND_RAD, 1e-9)),
         params.tool_xyz * (TOOL_REG_WEIGHT / max(TOOL_XYZ_BOUND_M, 1e-9)),
         params.tool_rpy * (TOOL_REG_WEIGHT / max(TOOL_RPY_BOUND_RAD, 1e-9)),
-        # base_xyz / base_rpy deliberately NOT regularized -- no small-value prior.
     ])
 
     return np.concatenate([pos_residuals.ravel(), orient_residuals.ravel(), reg_residual])
@@ -289,12 +248,10 @@ def rms_position_error_mm(param_vector: np.ndarray, measured_angles, measured_po
 
 
 def rms_orientation_error_deg(param_vector: np.ndarray, measured_angles, measured_quat_xyzw):
-    """Full predicted-vs-measured orientation error. Unlike comparing
-    joint_offset[0]/[6] or base_rpy/tool_rpy in isolation, this stays small
-    even across the joint0<->base_rpy and joint6<->tool_rpy gauge freedom
-    (see calibrate_from_csv/selftest notes) because it evaluates the
-    COMBINED, actually-predicted orientation -- which is exactly what those
-    ambiguous parameter pairs leave unchanged."""
+    """Full predicted-vs-measured orientation error. Insensitive to the
+    joint0<->base_rpy / joint6<->tool_rpy gauge freedom (see selftest()),
+    unlike comparing those individual parameters, since it evaluates the
+    combined orientation those ambiguous pairs leave unchanged."""
     params = unpack_params(param_vector)
     errors = np.zeros(len(measured_angles))
     for i in range(len(measured_angles)):
@@ -358,8 +315,7 @@ def run_calibration(measured_angles, measured_pos_mm, measured_quat_xyzw, verbos
     )
 
     lower, upper = build_bounds()
-    # The closed-form base guess must itself sit inside the bounds passed to
-    # least_squares -- widen if a genuinely large tracker offset pushed it out.
+    # Widen the bounds if the closed-form guess itself falls outside them.
     lower = np.minimum(lower, initial_params - 1e-6)
     upper = np.maximum(upper, initial_params + 1e-6)
 
@@ -522,18 +478,12 @@ def selftest():
     print(f"RMS orientation error vs. noisy synthetic measurements: {rms_orient_deg:.3f} deg")
 
     identifiability_report(result)
-
-    # joint_offset[0] (shoulder_roll) and joint_offset[6] (wrist_roll) are
-    # EXCLUDED from the per-parameter check below on purpose: the Jacobian
-    # SVD above proves they trade off exactly against base_rpy/tool_rpy
-    # respectively (their singular value is set entirely by the
-    # pose-count-independent regularization term, not by any pose data --
-    # confirmed by re-running this self-test with 60 vs 500 poses and
-    # getting an identical minimum singular value both times). No fit can
-    # recover them independently, and it doesn't need to: the RMS
-    # position/orientation checks below directly verify that the combined,
-    # actually-predicted pose is correct regardless of how the fit split
-    # the credit between a joint offset and its neighboring frame rotation.
+    # joint_offset[0]/[6] are excluded here: each is degenerate with
+    # base_rpy/tool_rpy respectively (confirmed via Jacobian SVD), so no
+    # fit can recover them independently. rms_pos_mm/rms_orient_deg above
+    # already validate the combined, actually-predicted pose regardless of
+    # how the fit splits credit between a joint offset and its neighboring
+    # frame rotation.
     other_joint_offset_err_deg = np.delete(joint_offset_err_deg, [0, 6])
 
     passed = (

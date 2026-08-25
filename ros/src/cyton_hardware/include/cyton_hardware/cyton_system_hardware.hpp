@@ -14,7 +14,6 @@
 
 #include "dynamixel_motor.h"
 #include "robot_calibration.h"
-#include "pose_dependent_correction.h"
 
 namespace cyton_hardware
 {
@@ -28,24 +27,15 @@ namespace cyton_hardware
 //
 // Backlash compensation (opt-in via "compensate_backlash", default
 // "false"): the existing, hardware-validated fix in dynamixel_motor.cpp
-// is designed around a single blocking move to one known target -- it has
+// is designed around a single blocking move to one known target, and has
 // no well-defined meaning for a streaming position command where "the
-// target" a reversal should overshoot below isn't known in advance. A
+// target" a reversal should overshoot below is not known in advance. A
 // naive per-cycle port would fire on nearly every cycle of a decreasing
 // segment, fighting the trajectory controller's own interpolation.
 // Implemented instead: a reversal-triggered hold-point compensator (see
 // applyBacklashCompensation() in the .cpp) that only engages once per
-// genuine reversal. Never validated against real hardware -- enable
+// genuine reversal. Never validated against real hardware. Enable
 // deliberately and watch closely, not as a default.
-//
-// Pose-dependent correction (opt-in via "compensate_pose_dependent",
-// default "false"): applies pose_dependent_correction::computeCorrection()
-// (joint coupling, lumped gravity/elastostatic deflection, shoulder_pitch
-// Fourier term) to every joint's commanded angle each write() cycle,
-// before the static tick/radian conversion and backlash compensation.
-// Same standing as compensate_backlash: math is checked against the
-// Python model it ports, but never validated as live control on real
-// hardware.
 class CytonSystemHardware : public hardware_interface::SystemInterface
 {
 public:
@@ -95,11 +85,10 @@ private:
   int baud_rate_ = 1000000;
   float protocol_version_ = 1.0f;
   uint16_t moving_speed_ = 40;  // matches this project's established MOVING_SPEED convention
-  bool compensate_pose_dependent_ = false;
 
   // ros2_control state/command storage. hw_velocities_ is always reported
-  // 0.0 -- DynamixelMotor::readPosition() only reads present position, not
-  // present speed, on this read path.
+  // 0.0, since DynamixelMotor::readPosition() only reads present position,
+  // not present speed, on this read path.
   std::array<double, kNumJoints> hw_positions_{};
   std::array<double, kNumJoints> hw_velocities_{};
   std::array<double, kNumJoints> hw_commands_{};

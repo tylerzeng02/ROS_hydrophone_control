@@ -1,17 +1,19 @@
 """Thin wrapper around pymoveit2's MoveIt2 class, built entirely from
-RobotConfig -- no Cyton-specific names anywhere in this file. Separates
-plan and execute into two calls (rather than pymoveit2's combined
-move_to_pose) specifically so the GUI can show a preview and wait for
-operator confirmation before anything actually moves, matching the
-plan-preview-then-confirm UX cyton_pose_commander/src/pose_commander.cpp
-already established for this project's other MoveIt tools.
+RobotConfig. No Cyton-specific names appear anywhere in this file.
+Plan and execute are separated into two calls, rather than using
+pymoveit2's combined move_to_pose, so the GUI can show a preview and wait
+for operator confirmation before anything actually moves. This matches
+the plan-preview-then-confirm UX already established in
+cyton_pose_commander/src/pose_commander.cpp for this project's other
+MoveIt tools.
 
-NOTE: written against pymoveit2's documented plan()/execute() split
-(https://github.com/AndrejOrsula/pymoveit2) -- smoke-test this against
-whatever pymoveit2 version actually gets built (it's a colcon-built ROS 2
-package, not a pip package -- see README.md's Setup section) before
-trusting it; minor API differences across versions are possible and this
-hasn't been run yet.
+Written against pymoveit2's documented plan()/execute() split
+(https://github.com/AndrejOrsula/pymoveit2), built via colcon per this
+package's own README.md "Setup" section (pymoveit2 is not a pip package
+-- see requirements.txt for why). Confirmed working against a live
+move_group (2026-08-24/25): real plan()/execute() calls, position-only
+and orientation-constrained targets, and the bounds-recovery mechanism
+below have all been run and verified, not just written.
 """
 
 import threading
@@ -50,10 +52,11 @@ _RECOVERY_BUFFER_RAD = 0.01
 
 
 class _ExecutorThread(QThread):
-    """Spins the rclpy executor in the background -- same requirement (and
-    same fix) as this project's C++ MoveGroupInterface tools: pymoveit2's
-    service/action clients need this node's callbacks actively serviced,
-    which nothing does unless something spins it."""
+    """Spins the rclpy executor in the background. This is the same
+    requirement, and the same fix, as this project's C++ MoveGroupInterface
+    tools use. pymoveit2's service and action clients need this node's
+    callbacks actively serviced, and nothing does that unless something
+    spins the executor."""
 
     def __init__(self, executor: SingleThreadedExecutor, parent=None):
         super().__init__(parent)
@@ -397,13 +400,13 @@ class MoveItBridge(QObject):
         if trajectory is None:
             self.status.emit("Planning FAILED: no trajectory returned.")
         else:
-            self.status.emit("Plan ready -- review before executing.")
+            self.status.emit("Plan ready. Review it before executing.")
         self.plan_ready.emit(trajectory)
         return trajectory
 
     def execute(self, trajectory):
-        """Blocking (called from a worker thread) -- executes an
-        already-planned trajectory and waits for completion."""
+        """This call blocks and must be called from a worker thread. It
+        executes an already-planned trajectory and waits for completion."""
         self.status.emit("Executing...")
         try:
             self._moveit2.execute(trajectory)

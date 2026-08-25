@@ -19,7 +19,7 @@ constexpr std::size_t JOINT_COUNT = 7;
 
 // Reduced-DOF data collection: elbow_yaw (motor 4) is commanded to its
 // calibrated range's midpoint and held there (torqued) for the whole
-// session -- it's the single largest measured backlash contributor
+// session. It is the single largest measured backlash contributor
 // (7.68mm) of any joint, and a confirmed joint-coupling/gravity-deflection
 // hotspot.
 // Fixing it removes both its own motion error and the IK redundancy it
@@ -27,7 +27,7 @@ constexpr std::size_t JOINT_COUNT = 7;
 // joints are freely hand-posed (torque off) exactly like the original
 // recorded_hand_poses (1)/(2)/(3).csv batches, so this data drops straight
 // into the same pipeline used all session (excluded-range extraction,
-// TARGET_POSES generation, etc.) -- just with motor 4 constant across
+// TARGET_POSES generation, etc.), just with motor 4 constant across
 // every row instead of varying.
 constexpr int LOCKED_JOINT_ID = 4;
 constexpr uint16_t LOCKED_JOINT_TICK = 2095;  // (944 + 3245) / 2, current calibrated range
@@ -38,9 +38,9 @@ constexpr int LOCK_MOVE_TIMEOUT_SECONDS = 10;
 
 // Full raw tick range for these servos (4096 ticks/revolution). Widening
 // each motor's hardware CW/CCW angle-limit registers to this for the
-// duration of this program only lets the servo ACCEPT holding wherever a
-// human already physically placed it by hand -- it never causes the arm to
-// move anywhere it hasn't already been placed, so it introduces no new
+// duration of this program only lets the servo accept holding wherever a
+// human already physically placed it by hand. It never causes the arm to
+// move anywhere it has not already been placed, so it introduces no new
 // mechanical risk specific to this tool. (The one exception is the locked
 // joint's own commanded move to its midpoint, which goes through the
 // normal safety-checked moveJointSafely() before this widening matters.)

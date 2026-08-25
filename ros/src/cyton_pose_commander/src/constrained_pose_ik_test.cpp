@@ -1,16 +1,16 @@
 // constrained_pose_ik_test: deliberately replicates the harder-than-
 // necessary IK scenario move_between_points.cpp used before switching to
-// seeded setJointValueTarget() -- setPoseTarget() with orientation held
-// fixed, handing a full 6-DOF Cartesian constraint to OMPL's random-seeded
-// goal sampling. That's what produced real 30-second RRTConnect timeouts
+// seeded setJointValueTarget(). setPoseTarget() with orientation held
+// fixed hands a full 6-DOF Cartesian constraint to OMPL's random-seeded
+// goal sampling. That is what produced real 30-second RRTConnect timeouts
 // against elbow_yaw's razor-thin locked window.
 //
 // Purpose: isolate whether a different IK plugin (TRAC-IK vs. KDL) would
-// handle this harder, random-seeded case any better -- run once against
+// handle this harder, random-seeded case any better. Run once against
 // ik_solver:=kdl and once against ik_solver:=trac_ik and compare success
-// rate/timing directly.
+// rate and timing directly.
 //
-// No NDI dependency -- pure MoveIt planning/execution stress test. Reads
+// No NDI dependency; pure MoveIt planning/execution stress test. Reads
 // a small Cartesian offset (meters, position-only) per CSV line; for each,
 // reads the arm's live current pose, builds an absolute target = current
 // position + offset (orientation held at whatever it currently is), calls
@@ -35,14 +35,14 @@ namespace {
 constexpr const char* DEFAULT_INPUT_CSV = "constrained_pose_ik_test_offsets.csv";
 constexpr const char* PLANNING_GROUP = "arm";
 // Same values established for this exact class of problem elsewhere in
-// this project (move_x_test.cpp, the original move_between_points.cpp) --
+// this project (move_x_test.cpp, the original move_between_points.cpp),
 // kept identical here so a KDL run and a TRAC-IK run are compared under
 // the same budget, not an apples-to-oranges one.
 constexpr double PLANNING_TIME_SECONDS = 30.0;
 constexpr unsigned int NUM_PLANNING_ATTEMPTS = 15;
 
-// Built-in default offsets (meters), used if no CSV is given or found --
-// deliberately spans a similar small-to-moderate magnitude range as the
+// Built-in default offsets (meters), used if no CSV is given or found.
+// Deliberately spans a similar small-to-moderate magnitude range as the
 // real easypoints commanded deltas seen elsewhere in this project
 // (roughly 1-36mm), so this test is representative of real usage rather
 // than artificially easy or hard.
@@ -76,7 +76,7 @@ std::vector<std::array<double, 3>> loadOffsets(const std::string& path) {
                 fields.push_back(std::stod(field));
             } catch (...) {
                 fields.clear();
-                break;  // non-numeric row (e.g. header) -- skip
+                break;  // non-numeric row (e.g. header); skip
             }
         }
         if (firstLine) {
@@ -150,8 +150,8 @@ int main(int argc, char** argv) {
             targetPose.pose.position.x += offset[0];
             targetPose.pose.position.y += offset[1];
             targetPose.pose.position.z += offset[2];
-            // Orientation deliberately left unchanged (copied from currentPose) --
-            // this is the harder constraint, matching the original pre-fix behavior.
+            // Orientation deliberately left unchanged (copied from currentPose).
+            // This is the harder constraint, matching the original pre-fix behavior.
 
             moveGroup.setPoseTarget(targetPose);
 
