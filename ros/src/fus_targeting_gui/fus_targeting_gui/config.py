@@ -16,6 +16,7 @@ class RobotConfig:
     base_frame: str
     end_effector_frame: str
     joint_names: list
+    controller_action_name: str = "arm_controller/follow_joint_trajectory"
 
 
 @dataclass
@@ -42,6 +43,9 @@ def load_config(path: str) -> AppConfig:
         base_frame=raw["robot"]["base_frame"],
         end_effector_frame=raw["robot"]["end_effector_frame"],
         joint_names=list(raw["robot"]["joint_names"]),
+        controller_action_name=raw["robot"].get(
+            "controller_action_name", "arm_controller/follow_joint_trajectory"
+        ),
     )
     mesh = MeshConfig(
         default_path=raw["mesh"]["default_path"],
@@ -55,6 +59,7 @@ def load_config(path: str) -> AppConfig:
         default_search_area_spacing_mm=float(
             raw["targeting"].get("default_search_area_spacing_mm", 5.0)
         ),
+        enforce_orientation=bool(raw["targeting"].get("enforce_orientation", False)),
     )
     registration = FixedPoseRegistration(
         xyz_m=raw["registration"]["xyz_m"],

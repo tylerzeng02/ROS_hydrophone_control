@@ -101,8 +101,11 @@ def main():
         help="TF frame the marker's pose is expressed in."
     )
     parser.add_argument(
-        "--xyz", nargs=3, type=float, default=[-0.17, 0.02, 0.15], metavar=("X", "Y", "Z"),
-        help="Position in meters."
+        "--xyz", nargs=3, type=float, default=[0.02, 0.27, 0.15], metavar=("X", "Y", "Z"),
+        help="Position in meters. Rotated 90deg around Z on 2026-08-25 "
+             "(was [-0.27, 0.02, 0.15]) -- same radius/height from "
+             "base_link, moved to an adjacent side -- keep in sync with "
+             "fus_targeting_gui's default_config.yaml registration.xyz_m."
     )
     parser.add_argument(
         "--rpy", nargs=3, type=float, default=[3.14159, 0.0, 0.0], metavar=("R", "P", "Y"),

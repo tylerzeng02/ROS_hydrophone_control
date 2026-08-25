@@ -24,6 +24,16 @@ class TargetingConfig:
     planning_time_s: float
     num_planning_attempts: int
     default_search_area_spacing_mm: float = 5.0
+    # 2026-08-25: disabled by default. A scan of 15 random skull-surface
+    # points found only 3/15 reachable with the probe's approach angle
+    # constrained to ~0.057deg of exact-perpendicular, vs. 10/15 reachable
+    # with no orientation constraint at all -- the tight angle requirement,
+    # not the skull obstacle or general arm reachability, was the dominant
+    # cause of planning failures. User-chosen tradeoff: maximize
+    # reachability for now; the probe's angle on arrival is unconstrained
+    # until this is revisited (e.g. a looser but nonzero tolerance) once
+    # real hydrophone coupling accuracy needs are known.
+    enforce_orientation: bool = False
 
 
 def _euler_to_matrix(rpy_rad):

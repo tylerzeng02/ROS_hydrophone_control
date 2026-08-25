@@ -597,6 +597,11 @@ class MainWindow(QMainWindow):
     def _on_bridge_status(self, text: str):
         self.status_label.setText(text)
         self.logger.log(text, "info")
+        # Also mirror to stdout -- the GUI window can't always be brought to
+        # front for a screenshot (no window-management tool available in
+        # every environment this runs in), so this is what makes bridge
+        # status visible via the process's own redirected log file too.
+        print(f"[status] {text}", flush=True)
 
     # ---- shared target-adding pipeline (manual pick / predefined / search area) ----
 
