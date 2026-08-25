@@ -1,3 +1,10 @@
+/**
+ * @file test_radians.cpp
+ * @brief Moves a single hardcoded joint by a small radians offset and
+ * back, to sanity-check radiansToTicks()/ticksToRadians() and
+ * moveJointSafely() against real hardware.
+ */
+
 #include <iostream>
 #include <thread>
 #include <chrono>

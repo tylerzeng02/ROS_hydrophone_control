@@ -1,3 +1,11 @@
+/**
+ * @file record_hand_poses_multijoint_backlash_test.cpp
+ * @brief Records a below/at/above/at-again 4-pose sequence per joint,
+ * with every other joint locked, to measure each joint's own mechanical
+ * backlash gap. See the design comment above TEST_JOINT_IDS below for the
+ * full pose sequence and how it isolates backlash.
+ */
+
 #include <array>
 #include <chrono>
 #include <cstdlib>
@@ -56,21 +64,35 @@ constexpr uint16_t FULL_RANGE_CCW_LIMIT = 4095;
 constexpr const char* OUTPUT_CSV = "recorded_hand_poses_PID.csv";
 constexpr const char* OUTPUT_CPP_SNIPPET = "recorded_hand_poses_target_poses.txt";
 
+/**
+ * @brief One recorded pose: which joint was under test, its position
+ * (1-based) in that joint's 4-pose sequence, and the full 7-joint tick
+ * snapshot.
+ */
 struct RecordedPose {
     int testJointId;
-    int poseIndexInTest;  // 1-based, 1..POSES_PER_JOINT
+    int poseIndexInTest;  ///< 1-based, 1..POSES_PER_JOINT.
     std::array<uint16_t, JOINT_COUNT> ticks;
 };
 
+/**
+ * @brief Prints `message` and blocks until Enter is pressed.
+ * @param message Prompt text to print before waiting.
+ */
 void waitForEnter(const std::string& message) {
     std::cout << message << std::flush;
     std::string line;
     std::getline(std::cin, line);
 }
 
-// Loads any poses already recorded by a previous run of this program, so a
-// new session continues the same batch instead of starting over. Silently
-// does nothing if the file doesn't exist yet (first run).
+/**
+ * @brief Loads any poses already recorded by a previous run of this
+ * program, so a new session continues the same batch instead of starting
+ * over.
+ * @param path CSV path to load from.
+ * @param[out] poses Loaded poses are appended here. Left unchanged if
+ *        `path` does not exist yet (first run).
+ */
 void loadExistingPoses(
     const std::string& path,
     std::vector<RecordedPose>& poses
@@ -452,8 +474,8 @@ int main() {
                 // to do precisely by hand, the servo drives itself to the
                 // exact tick recorded for pose 2, arriving from wherever
                 // pose 3 ("above") left it. This is more precise than
-                // hand-positioning could ever be, and it is actually the
-                // more correct test: backlash only cares about final tick
+                // hand-positioning could ever be, and it is the more
+                // correct test: backlash only cares about final tick
                 // versus approach direction, not how carefully a human
                 // reproduced a number.
                 if (poseIndex == 3) {

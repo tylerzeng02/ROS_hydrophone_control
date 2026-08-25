@@ -1,25 +1,25 @@
-// record_waypoints: jog/plan the arm via RViz's MotionPlanning panel
-// (drag the marker, Plan, Execute, however you like), and press Enter in
-// this terminal at each pose you want to keep. Each press reads the arm's
-// live current joint state and appends one row to a CSV. No NDI tracker
-// is needed at all; this is pure MoveIt/joint-state recording.
-//
-// Output uses the exact same column schema (capture_id + the 7
-// *_joint_rad columns, header-resolved) that replay_ndi_capture.cpp /
-// replay_ndi_capture_sim.cpp already read, so a file recorded here can
-// be fed straight back into either of those existing tools to replay the
-// sequence automatically, with no changes needed on that side. Extra
-// columns those tools' full ndi_measure-oriented schema also recognizes
-// (timestamp_ms, moveit_pose_*, moving_camera_*, etc.) are simply omitted
-// here. replay_ndi_capture only requires capture_id and the 7 joint
-// columns, nothing else.
-//
-// Deliberately does not append to an existing file by default. This
-// project has hit the same "hardcoded output path + silent resume"
-// cross-session-mixing bug more than once (record_hand_poses_fixed_
-// elbow_yaw.cpp, ndi_measure.cpp). If the target file already exists,
-// this tool refuses to start rather than silently gluing a new session
-// onto old data; pass a different filename instead.
+/**
+ * @file record_waypoints.cpp
+ * @brief Jog or plan the arm via RViz's MotionPlanning panel (drag the
+ * marker, Plan, Execute, however desired), and press Enter in this
+ * terminal at each pose to keep. Each press reads the arm's live current
+ * joint state and appends one row to a CSV. No NDI tracker is needed;
+ * this is pure MoveIt/joint-state recording.
+ *
+ * Output uses the same column schema (capture_id plus the 7 *_joint_rad
+ * columns, header-resolved) that replay_ndi_capture.cpp and
+ * replay_ndi_capture_sim.cpp read, so a file recorded here can be fed
+ * straight back into either to replay the sequence, with no changes
+ * needed on that side. Extra columns those tools' full
+ * ndi_measure-oriented schema also recognizes (timestamp_ms,
+ * moveit_pose_*, moving_camera_*, etc.) are omitted here;
+ * replay_ndi_capture only requires capture_id and the 7 joint columns.
+ *
+ * Deliberately does not append to an existing file by default: if the
+ * target file already exists, this tool refuses to start rather than
+ * silently gluing a new session onto old data. Pass a different filename
+ * instead.
+ */
 
 #include <array>
 #include <chrono>

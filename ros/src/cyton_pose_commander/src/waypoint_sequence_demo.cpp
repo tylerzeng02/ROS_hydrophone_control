@@ -1,22 +1,26 @@
-// waypoint_sequence_demo: reads a CSV of Cartesian waypoints (x,y,z,roll,
-// pitch,yaw per row, meters/radians), and visits them one at a time.
-// Each point gets its own independent setPoseTarget()/IK solve/plan/
-// execute, then the arm pauses briefly before moving to the next point.
-// This is deliberately different from cartesian_path_demo.cpp's single
-// continuous interpolated path, which produces one smooth motion
-// through all waypoints. This one produces N separate point-to-point
-// moves with a visible stop at each, which is what was actually wanted
-// for this demo (both tools are kept, since they answer different
-// questions: smooth sweep versus discrete visit-and-pause).
-//
-// Runs fully automatically (no per-point Enter confirmation) and advances
-// on its own after each pause, since the point is a hands-off animation
-// or demo, not an interactive review workflow like pose_commander's.
-//
-// Same elbow_yaw-locked-window IK considerations as move_x_test.cpp/
-// move_between_points.cpp apply here (each point does an independent
-// Cartesian IK solve). setPlanningTime/setNumPlanningAttempts are set
-// the same way; see those files' own comments for why.
+/**
+ * @file waypoint_sequence_demo.cpp
+ * @brief Reads a CSV of Cartesian waypoints (x,y,z,roll,pitch,yaw per
+ * row, meters/radians) and visits them one at a time. Each point gets its
+ * own independent setPoseTarget()/IK solve/plan/execute, then the arm
+ * pauses briefly before moving to the next point.
+ *
+ * Deliberately different from cartesian_path_demo.cpp's single
+ * continuous interpolated path, which produces one smooth motion through
+ * all waypoints: this produces N separate point-to-point moves with a
+ * visible stop at each. Both tools are kept, since they answer different
+ * questions: smooth sweep versus discrete visit-and-pause.
+ *
+ * Runs fully automatically, with no per-point Enter confirmation, and
+ * advances on its own after each pause, since this is a hands-off
+ * animation or demo, not an interactive review workflow like
+ * pose_commander's.
+ *
+ * Same elbow_yaw-locked-window IK considerations as move_x_test.cpp and
+ * move_between_points.cpp apply here, since each point does an
+ * independent Cartesian IK solve; setPlanningTime/setNumPlanningAttempts
+ * are set the same way.
+ */
 
 #include <chrono>
 #include <fstream>

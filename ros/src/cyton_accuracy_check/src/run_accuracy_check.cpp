@@ -1,27 +1,27 @@
-// run_accuracy_check: single combined program that both commands the arm
-// via MoveIt and captures each pose's NDI measurement, in one synchronized
-// loop: move, confirm success, settle, capture, log, repeat. Same shape
-// as the original calibration/collection/ndi_capture_and_validate.cpp,
-// but MoveIt does the moving instead of raw Dynamixel ticks.
-//
-// Built to replace the separate cyton_pose_commander + cyton_ndi_capture
-// two-terminal workflow, which had a real timing race: a human manually
-// alternating Enter between two terminals could (and did) capture a pose
-// before the move had actually finished, corrupting the dataset (two
-// captures found to be the *same* physical pose). A single program with a
-// synchronous move-then-capture loop can't race with itself that way.
-//
-// This file merges, largely verbatim:
-//   - cyton_pose_commander/src/pose_commander.cpp's CSV loading,
-//     MoveGroupInterface joint-space commanding, and START_STATE_INVALID
-//     recovery logic.
-//   - cyton_ndi_capture/src/ndi_measure.cpp's NdiTracker class and its
-//     direct dependencies (already hardware-validated NDI connect/BX-
-//     polling/averaging code).
-//
-// Tick<->radian conversion goes through robot_calibration.cpp's
-// ticksToRadians()/radiansToTicks() (compiled directly into this binary),
-// not reimplemented here.
+/**
+ * @file run_accuracy_check.cpp
+ * @brief Single combined program that both commands the arm via MoveIt
+ * and captures each pose's NDI measurement, in one synchronized loop:
+ * move, confirm success, settle, capture, log, repeat. Same shape as
+ * calibration/collection/ndi_capture_and_validate.cpp, but MoveIt does
+ * the moving instead of raw Dynamixel ticks.
+ *
+ * A single synchronous move-then-capture loop, rather than a two-terminal
+ * cyton_pose_commander + cyton_ndi_capture workflow, so a capture can
+ * never happen before the corresponding move has actually finished.
+ *
+ * This file merges, largely verbatim:
+ *  - cyton_pose_commander/src/pose_commander.cpp's CSV loading,
+ *    MoveGroupInterface joint-space commanding, and START_STATE_INVALID
+ *    recovery logic.
+ *  - cyton_ndi_capture/src/ndi_measure.cpp's NdiTracker class and its
+ *    direct dependencies (already hardware-validated NDI
+ *    connect/BX-polling/averaging code).
+ *
+ * Tick-to-radian conversion goes through robot_calibration.cpp's
+ * ticksToRadians()/radiansToTicks() (compiled directly into this binary),
+ * not reimplemented here.
+ */
 
 #include <algorithm>
 #include <array>

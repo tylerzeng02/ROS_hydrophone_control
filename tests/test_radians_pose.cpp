@@ -1,3 +1,10 @@
+/**
+ * @file test_radians_pose.cpp
+ * @brief Converts a hardcoded raw-tick pose to radians and back, printing
+ * both, to sanity-check a full 7-joint radiansToTicks()/ticksToRadians()
+ * round trip before moving anything on real hardware.
+ */
+
 #include <iostream>
 #include <vector>
 #include <cstdint>
@@ -5,6 +12,14 @@
 #include "dynamixel_motor.h"
 #include "robot_calibration.h"
 
+/**
+ * @brief Converts a full 7-joint raw-tick pose to radians via
+ * jointCalibrations.
+ * @param rawPose Raw tick values, one per joint, in jointCalibrations
+ *        order.
+ * @return The corresponding radians, same order. Empty if `rawPose`'s
+ *         size does not match jointCalibrations.
+ */
 std::vector<double> rawPoseToRadians(const std::vector<uint16_t>& rawPose)
 {
     std::vector<double> radiansPose;
@@ -25,6 +40,11 @@ std::vector<double> rawPoseToRadians(const std::vector<uint16_t>& rawPose)
     return radiansPose;
 }
 
+/**
+ * @brief Converts each joint's radians back to a target tick via
+ * radiansToTicks() and prints motor ID, angle, and target tick.
+ * @param radiansPose Joint angles in radians, in jointCalibrations order.
+ */
 void printPoseTargets(const std::vector<double>& radiansPose)
 {
     std::cout << "\nRadians pose target conversion:" << std::endl;

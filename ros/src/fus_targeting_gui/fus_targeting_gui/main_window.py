@@ -150,18 +150,18 @@ class _CallThread(QThread):
 
 class MainWindow(QMainWindow):
     # Emitted from the search-area raycast worker thread (see
-    # _raycast_area_grid()) so the status label can show real progress
-    # instead of one static "may take a few seconds" message for the whole
-    # operation -- measured at ~35ms/raycast on the full-res skull mesh,
-    # so a large/fine area can genuinely take a minute or more, and with
-    # no progress indication that's indistinguishable from a hang. Signal
-    # emission from a worker thread is safe -- Qt auto-queues delivery to
-    # the receiving (GUI-thread) slot.
+    # _raycast_area_grid()) so the status label can show progress instead
+    # of one static "may take a few seconds" message for the whole
+    # operation. Measured at ~35ms/raycast on the full-res skull mesh, so
+    # a large or fine area can take a minute or more, and with no progress
+    # indication that is indistinguishable from a hang. Signal emission
+    # from a worker thread is safe: Qt auto-queues delivery to the
+    # receiving GUI-thread slot.
     area_progress = Signal(int, int)  # (current, total)
 
     # Emitted from the "Simulate All Targets" worker thread (see
-    # _simulate_all_targets()) so its progress reaches the log safely --
-    # that method must never touch Logger/QListWidget directly from a
+    # _simulate_all_targets()) so its progress reaches the log safely.
+    # That method must never touch Logger/QListWidget directly from a
     # worker thread.
     simulate_progress = Signal(int, int)  # (current, total)
 
@@ -189,6 +189,7 @@ class MainWindow(QMainWindow):
         self._registration_worker_thread = None
         self._collision_worker_thread = None
         self._simulate_worker_thread = None
+        self._simulate_poses = None  # set while a simulate run is active; used by "Try Again"
         self._fitted_rotation = None
         self._fitted_translation = None
 
@@ -219,10 +220,10 @@ class MainWindow(QMainWindow):
         log_layout.addWidget(self.logger)
         log_group.setLayout(log_layout)
 
-        # Motion's own controls are short (a couple labels + two buttons)
-        # -- stacking Log underneath in the same column, rather than
-        # giving each its own full-height column, uses width much more
-        # efficiently and leaves more of it for the 3D view.
+        # Motion's own controls are short (a couple labels + two buttons).
+        # Stacking Log underneath in the same column, rather than giving
+        # each its own full-height column, uses width more efficiently
+        # and leaves more of it for the 3D view.
         right_column = QWidget()
         right_column_layout = QVBoxLayout(right_column)
         right_column_layout.setContentsMargins(0, 0, 0, 0)
@@ -597,7 +598,7 @@ class MainWindow(QMainWindow):
     def _on_bridge_status(self, text: str):
         self.status_label.setText(text)
         self.logger.log(text, "info")
-        # Also mirror to stdout -- the GUI window can't always be brought to
+        # Also mirror to stdout. The GUI window can't always be brought to
         # front for a screenshot (no window-management tool available in
         # every environment this runs in), so this is what makes bridge
         # status visible via the process's own redirected log file too.
@@ -640,9 +641,10 @@ class MainWindow(QMainWindow):
 
         index = self.target_list.count()
         # point/normal are in the mesh's own local frame, already scaled to
-        # meters by MeshView.load_mesh -- *1000 here for a human-readable
-        # mm label; the underlying data stays in meters (see registration.py,
-        # which needs it in the same units as base_frame).
+        # meters by MeshView.load_mesh. The *1000 here is only for a
+        # human-readable mm label; the underlying data stays in meters
+        # (see registration.py, which needs it in the same units as
+        # base_frame).
         item = QListWidgetItem(
             f"#{index} [{source}]: "
             f"({point[0]*1000:.1f}, {point[1]*1000:.1f}, {point[2]*1000:.1f}) mm"
@@ -792,8 +794,8 @@ class MainWindow(QMainWindow):
 
         # Raycasting every grid point against the mesh (mesh.ray_trace())
         # can take long enough on a large/fine area to freeze the GUI if
-        # done synchronously here -- run it on a worker thread instead,
-        # same pattern already used for plan()/execute(). A separate
+        # done synchronously here, so it runs on a worker thread instead,
+        # the same pattern already used for plan()/execute(). A separate
         # _area_worker_thread attribute (not self._worker_thread) so this
         # can't collide with a Plan/Execute click landing mid-computation.
         self._pending_area_spacing_mm = spacing_mm
@@ -801,9 +803,9 @@ class MainWindow(QMainWindow):
         self.finish_area_button.setEnabled(False)
         self.cancel_area_button.setEnabled(False)
         self.undo_area_point_button.setEnabled(False)
-        # ~35ms/raycast measured directly against the real full-res skull
-        # mesh -- gives an honest estimate instead of a vague "a few
-        # seconds" that's wrong by over a minute on a large/fine area.
+        # ~35ms/raycast measured directly against the full-res skull mesh,
+        # giving an estimate instead of a vague "a few seconds" that can
+        # be wrong by over a minute on a large or fine area.
         estimated_s = len(grid_points) * 0.035
         self.area_status_label.setText(
             f"Raycasting {len(grid_points)} candidate point(s) onto the surface "
@@ -1066,7 +1068,7 @@ class MainWindow(QMainWindow):
         self.logger.log(f"Loaded mesh: {path}", "info")
         self.target_list.clear()
         self._refresh_target_markers()
-        # load_mesh() already reset clip fractions internally -- keep the
+        # load_mesh() already reset clip fractions internally. Keep the
         # slider widgets themselves in sync so they don't show a stale
         # position for the new mesh.
         for axis, slider in self.clip_sliders.items():
@@ -1183,35 +1185,51 @@ class MainWindow(QMainWindow):
             self, "Simulate all targets",
             f"Plan and execute all {count} target(s) in sequence?\n\n"
             "Watch the arm move through each one in RViz's MotionPlanning display. "
-            "Stops immediately if any target fails to plan or execute."
+            "Stops if any target fails to plan or execute, with a Try Again option "
+            "to retry just that target."
         )
         if confirm != QMessageBox.Yes:
             return
 
         # Capture plain pose data on the GUI thread BEFORE starting the
-        # worker -- _simulate_all_targets() must never touch QListWidget
-        # (or Logger/any other Qt widget) directly from a worker thread.
+        # worker. _simulate_all_targets() must never touch QListWidget
+        # (or Logger, or any other Qt widget) directly from a worker
+        # thread. Kept on self so a later "Try Again" click can resume
+        # from the same poses without re-reading the list.
         poses = [self.target_list.item(i).data(_TARGET_DATA_ROLE)["pose"] for i in range(count)]
+        self._simulate_poses = poses
+        self._start_simulate_worker(poses, start_index=0)
 
+    def _start_simulate_worker(self, poses, start_index):
         self.simulate_all_button.setEnabled(False)
         self.plan_button.setEnabled(False)
         self.execute_button.setEnabled(False)
-        self.logger.log(f"Simulating {count} target(s) in sequence...", "info")
-        self._simulate_worker_thread = _CallThread(self._simulate_all_targets, poses)
+        if start_index == 0:
+            self.logger.log(f"Simulating {len(poses)} target(s) in sequence...", "info")
+        else:
+            self.logger.log(f"Retrying from target #{start_index}...", "info")
+        self._simulate_worker_thread = _CallThread(
+            self._simulate_all_targets, poses, start_index
+        )
         self._simulate_worker_thread.result.connect(self._on_simulate_all_finished)
         self._simulate_worker_thread.start()
 
-    def _simulate_all_targets(self, poses):
-        """Runs on a worker thread -- plans then immediately executes each
-        pose in turn (mock hardware), stopping at the first failure.
+    def _simulate_all_targets(self, poses, start_index=0):
+        """Runs on a worker thread. Plans then immediately executes each
+        pose from start_index onward (mock hardware), stopping at the
+        first failure. start_index lets a "Try Again" click resume at the
+        target that failed instead of restarting the whole sequence.
         Progress goes out via simulate_progress (a Signal, safe to emit
         from a worker thread); self._bridge's own plan_to_pose()/execute()
-        already report their own status the same safe way. Returns
-        (targets_completed, final_status)."""
+        already report their own status the same safe way.
+
+        Returns:
+            (targets_completed, final_status).
+        """
         total = len(poses)
-        for i, pose in enumerate(poses):
+        for i in range(start_index, total):
             self.simulate_progress.emit(i, total)
-            trajectory = self._bridge.plan_to_pose(pose)
+            trajectory = self._bridge.plan_to_pose(poses[i])
             if trajectory is None:
                 return i, "plan_failed"
             success = self._bridge.execute(trajectory)
@@ -1232,16 +1250,31 @@ class MainWindow(QMainWindow):
                 self, "Simulation complete",
                 f"Successfully planned and executed all {completed} target(s)."
             )
+            self._simulate_poses = None
+            return
+
+        reason = "planning" if status == "plan_failed" else "execution"
+        self.logger.log(
+            f"Simulation stopped at target #{completed} ({reason} failed).", "error"
+        )
+        # A plain QMessageBox.critical() only offers Ok. Building the box
+        # directly adds a Try Again button that resumes from this exact
+        # target, and pops the same dialog again on a repeat failure, so
+        # the user can retry as many times as they want.
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Critical)
+        box.setWindowTitle("Simulation stopped")
+        box.setText(
+            f"Stopped at target #{completed}: {reason} failed. "
+            f"{completed} target(s) completed successfully before this."
+        )
+        try_again_button = box.addButton("Try Again", QMessageBox.AcceptRole)
+        box.addButton("Stop", QMessageBox.RejectRole)
+        box.exec()
+        if box.clickedButton() is try_again_button:
+            self._start_simulate_worker(self._simulate_poses, start_index=completed)
         else:
-            reason = "planning" if status == "plan_failed" else "execution"
-            self.logger.log(
-                f"Simulation stopped at target #{completed} ({reason} failed).", "error"
-            )
-            QMessageBox.critical(
-                self, "Simulation stopped",
-                f"Stopped at target #{completed}: {reason} failed. "
-                f"{completed} target(s) completed successfully before this."
-            )
+            self._simulate_poses = None
 
     def closeEvent(self, event):
         if self._csv_file is not None:

@@ -3,53 +3,53 @@ spawners + move_group + RViz (MotionPlanning plugin). Modeled directly on
 moveit_resources_panda_moveit_config's own demo.launch.py (installed at
 /opt/ros/jazzy/share/moveit_resources_panda_moveit_config/launch/
 demo.launch.py), trimmed to this robot's single "arm" group (no gripper
-group -- motor 7 is excluded from the URDF's IK chain) and one controller.
+group; motor 7 is excluded from the URDF's IK chain) and one controller.
 
 Usage:
     ros2 launch cyton_moveit_config demo.launch.py
     ros2 launch cyton_moveit_config demo.launch.py hardware_type:=real serial_port:=/dev/ttyUSB0
 
 hardware_type defaults to "mock_components" (ros2_control's built-in
-mock_components/GenericSystem -- no real servo involved, safe for
+mock_components/GenericSystem, no physical servo involved, safe for
 exercising the whole pipeline). Only pass hardware_type:=real with the
 physical arm connected, powered, and clear to move.
 
-urdf_variant (added 2026-08-12) defaults to "calibrated" (the real,
-deployed cyton_gamma_1500.urdf.xacro). Pass urdf_variant:=uncalibrated to
-instead load cyton_gamma_1500_uncalibrated.urdf.xacro -- same robot, same
-ros2_control/hardware plugin, but MoveIt plans against the ORIGINAL,
+urdf_variant (added 2026-08-12) defaults to "calibrated", the deployed
+cyton_gamma_1500.urdf.xacro. Pass urdf_variant:=uncalibrated to instead
+load cyton_gamma_1500_uncalibrated.urdf.xacro: same robot, same
+ros2_control/hardware plugin, but MoveIt plans against the original,
 uncorrected joint geometry (see that file's own header) instead of this
 project's fitted kinematic calibration. Built specifically to A/B compare
-real-world positioning accuracy with vs. without the geometry correction,
-using the exact same accuracy-check tools either way. Does NOT affect
-robot_calibration.cpp's separate real-servo tick<->radian calibration --
+real-world positioning accuracy with and without the geometry correction,
+using the same accuracy-check tools either way. Does not affect
+robot_calibration.cpp's separate real-servo tick-to-radian calibration,
 only what MoveIt's planner believes the robot's geometry is.
 
 urdf_variant:=sim_7dof (added 2026-08-24) loads
-cyton_gamma_1500_sim7dof.urdf.xacro -- identical to the calibrated variant
+cyton_gamma_1500_sim7dof.urdf.xacro: identical to the calibrated variant
 except elbow_yaw_joint's <limit> is widened back to its full mechanical
-range instead of the ~4-degree production lock, restoring genuine 7-DOF
-motion for planning/simulation. ONLY valid with hardware_type:=mock_components
--- combining it with hardware_type:=real raises an error (see
-launch_setup() below and cyton_gamma_1500_robot_sim7dof.xacro's own header
-for why).
+range instead of the ~4-degree production lock, restoring full 7-DOF
+motion for planning and simulation. Only valid with
+hardware_type:=mock_components; combining it with hardware_type:=real
+raises an error (see launch_setup() below and
+cyton_gamma_1500_robot_sim7dof.xacro's own header for why).
 
 compensate_backlash (added 2026-08-13) defaults to "false". Pass
 compensate_backlash:=true (only meaningful with hardware_type:=real) to
-enable cyton_hardware's new streaming-compatible backlash compensator --
-see CytonSystemHardware's own header comment for exactly what this does
-and its (not yet real-hardware-validated) status. Unrelated to
+enable cyton_hardware's streaming-compatible backlash compensator. See
+CytonSystemHardware's own header comment for what this does and its
+not-yet-real-hardware-validated status. Unrelated to
 dynamixel_motor.cpp's separate, already-validated blocking-move fix, which
 this pipeline never uses.
 
 Implementation note: which URDF file to load has to be resolved to a plain
-Python string BEFORE MoveItConfigsBuilder runs (moveit_configs_utils joins
+Python string before MoveItConfigsBuilder runs (moveit_configs_utils joins
 file_path with a pathlib.Path internally, which can't accept a launch
-Substitution object) -- so, unlike every other argument here, urdf_variant
+Substitution object). So, unlike every other argument here, urdf_variant
 can't just be threaded through as a LaunchConfiguration passed to
 .robot_description(). Everything that depends on it is built inside an
-OpaqueFunction instead, which runs at launch time with a real LaunchContext
-that LaunchConfiguration.perform(context) can resolve to an actual string.
+OpaqueFunction instead, which runs at launch time with a live LaunchContext
+that LaunchConfiguration.perform(context) can resolve to a plain string.
 """
 
 import os
@@ -73,10 +73,10 @@ def launch_setup(context, *args, **kwargs):
     hardware_type = LaunchConfiguration("hardware_type").perform(context)
     if urdf_variant == "sim_7dof" and hardware_type == "real":
         # sim_7dof widens elbow_yaw_joint's <limit> back to the full
-        # mechanical range instead of the production ~4-degree lock -- see
-        # cyton_gamma_1500_robot_sim7dof.xacro's own header for why that's
-        # only safe on mock_components (which never invokes
-        # robot_calibration.cpp's hardware-level safety clamp at all).
+        # mechanical range instead of the production ~4-degree lock. See
+        # cyton_gamma_1500_robot_sim7dof.xacro's own header for why this
+        # is only safe on mock_components, which never invokes
+        # robot_calibration.cpp's hardware-level safety clamp at all.
         # Real hardware must never plan against this widened range.
         raise ValueError(
             "urdf_variant=sim_7dof cannot be combined with hardware_type=real -- "

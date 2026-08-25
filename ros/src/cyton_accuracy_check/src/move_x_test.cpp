@@ -1,25 +1,26 @@
-// move_x_test: commands the arm through MoveIt to move a fixed Cartesian
-// distance (default 5cm) along X from wherever it currently is, and uses
-// the NDI Polaris tracker to check how far it actually moved.
-//
-// Deliberately simpler than a full calibration-accuracy test: this is a
-// relative move (current pose + delta), not an absolute-position test, so
-// it sidesteps the base-frame and tool-frame fitting problem entirely.
-// NDI measures the moving marker relative to the fixed marker both before
-// and after the move, and the only thing compared is the distance between
-// those two NDI readings versus the commanded 5cm. No knowledge of how the
-// NDI frame relates to base_link is needed, since both readings are
-// already in the same (NDI) frame.
-//
-// This does exercise real IK (via MoveGroupInterface::setPoseTarget(),
-// unlike every joint-space-driven MoveIt tool built earlier this project)
-// and the real ros2_control execution path.
-//
-// NdiTracker and its dependencies are copied verbatim from
-// cyton_accuracy_check/src/run_accuracy_check.cpp (itself copied verbatim
-// from cyton_ndi_capture/src/ndi_measure.cpp). This is already
-// hardware-validated NDI connect/BX-polling/averaging code, not
-// reimplemented here.
+/**
+ * @file move_x_test.cpp
+ * @brief Commands the arm through MoveIt to move a fixed Cartesian
+ * distance (default 5cm) along X from wherever it currently is, and uses
+ * the NDI Polaris tracker to check how far it moved.
+ *
+ * Deliberately simpler than a full calibration-accuracy test: this is a
+ * relative move (current pose + delta), not an absolute-position test,
+ * so it sidesteps the base-frame and tool-frame fitting problem
+ * entirely. NDI measures the moving marker relative to the fixed marker
+ * both before and after the move, and the only thing compared is the
+ * distance between those two NDI readings versus the commanded 5cm. No
+ * knowledge of how the NDI frame relates to base_link is needed, since
+ * both readings are already in the same (NDI) frame.
+ *
+ * This exercises real IK, via MoveGroupInterface::setPoseTarget(), and
+ * the real ros2_control execution path.
+ *
+ * NdiTracker and its dependencies are copied verbatim from
+ * cyton_accuracy_check/src/run_accuracy_check.cpp (itself copied from
+ * cyton_ndi_capture/src/ndi_measure.cpp), already hardware-validated NDI
+ * connect/BX-polling/averaging code.
+ */
 
 #include <array>
 #include <cctype>

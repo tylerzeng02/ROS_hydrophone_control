@@ -52,8 +52,8 @@ def test_azimuth_rotates_around_base_axis():
     # Same tilt angle off the axis at every azimuth...
     for d in (d0, d90, d180):
         assert math.isclose(np.dot(d, base), math.cos(math.radians(45.0)), abs_tol=1e-9)
-    # ...but genuinely different directions, and opposite azimuths land on
-    # opposite sides of the base axis.
+    # ...but different directions, and opposite azimuths land on opposite
+    # sides of the base axis.
     assert not np.allclose(d0, d90, atol=1e-6)
     assert np.allclose(d0 - np.dot(d0, base) * np.asarray(base), -(d180 - np.dot(d180, base) * np.asarray(base)), atol=1e-9)
 

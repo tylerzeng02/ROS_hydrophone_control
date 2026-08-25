@@ -1,9 +1,14 @@
-// disable_torque_prompt: waits for Enter, then disables torque on all 7
-// joints and disconnects. Meant to be run once, as the LAST step after a
-// sequence of other tools (e.g. a sweep script running --validate
-// repeatedly across many I-gain candidates) that deliberately leave torque
-// enabled across their own process exits, so the arm stays supported for
-// the whole sequence and only gets released here, on explicit confirmation.
+/**
+ * @file disable_torque_prompt.cpp
+ * @brief Waits for Enter, then disables torque on all 7 joints and
+ * disconnects.
+ *
+ * Meant to be run once, as the last step after a sequence of other tools
+ * (e.g. a sweep script running --validate repeatedly across many I-gain
+ * candidates) that deliberately leave torque enabled across their own
+ * process exits, so the arm stays supported for the whole sequence and
+ * only gets released here, on explicit confirmation.
+ */
 #include <iostream>
 #include <string>
 

@@ -1,14 +1,18 @@
-// ndi_status_monitor: minimal marker-visibility check. Connects to the NDI
-// tracker, loads both tool ROMs, then polls forever and prints each tool's
-// status only when it changes. Purely a "can the tracker currently see
-// my markers" diagnostic, with no capture, no CSV, no ROS dependency (it
-// does not need joint states, so it is plain C++ against ndicapi only).
-// Ctrl+C to quit.
-//
-// Deliberately a separate, smaller program from ndi_measure rather than a
-// mode flag on it. This one never blocks waiting for visibility, since
-// the whole point is watching the status become visible, and it never
-// averages or logs a capture.
+/**
+ * @file ndi_status_monitor.cpp
+ * @brief Minimal marker-visibility check. Connects to the NDI tracker,
+ * loads both tool ROMs, then polls forever and prints each tool's status
+ * only when it changes.
+ *
+ * Purely a "can the tracker currently see my markers" diagnostic, with no
+ * capture, no CSV, and no ROS dependency (it does not need joint states,
+ * so it is plain C++ against ndicapi only). Ctrl+C to quit.
+ *
+ * Deliberately a separate, smaller program from ndi_measure rather than a
+ * mode flag on it: this one never blocks waiting for visibility, since
+ * the whole point is watching the status become visible, and it never
+ * averages or logs a capture.
+ */
 
 #include <chrono>
 #include <cmath>

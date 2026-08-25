@@ -1,20 +1,23 @@
-// replay_ndi_capture_sim: automatic-animation version of
-// replay_ndi_capture.cpp. Visits every pose in a cyton_ndi_capture/
-// ndi_measure output CSV in order via MoveIt, pausing
-// PAUSE_AFTER_POSE_MS between each, with no per-pose Enter confirmation.
-// Built for demo/simulation: showing the arm sweep through a real
-// recorded set of points as a hands-off animation.
-//
-// Safety note: unlike replay_ndi_capture.cpp (which pauses for Enter
-// before every execute, so you can sanity-check each move first), this
-// tool moves through the whole list automatically once started. Fine for
-// hardware_type:=mock_components (nothing physically moves). If pointed
-// at a real-hardware launch, this will physically drive the arm through
-// every recorded pose unsupervised. Only do that deliberately.
-//
-// CSV parsing, JOINT_NAMES, safeBoundsRadians()/sendCorrectiveTrajectory()/
-// ensureCurrentStateWithinBounds() are carried over from
-// replay_ndi_capture.cpp verbatim: already-validated recovery logic.
+/**
+ * @file replay_ndi_capture_sim.cpp
+ * @brief Automatic-animation version of replay_ndi_capture.cpp. Visits
+ * every pose in a cyton_ndi_capture/ndi_measure output CSV in order via
+ * MoveIt, pausing PAUSE_AFTER_POSE_MS between each, with no per-pose
+ * Enter confirmation. Built for demo/simulation: showing the arm sweep
+ * through a real recorded set of points as a hands-off animation.
+ *
+ * @warning Unlike replay_ndi_capture.cpp, which pauses for Enter before
+ * every execute so each move can be sanity-checked first, this tool moves
+ * through the whole list automatically once started. Fine for
+ * hardware_type:=mock_components. If pointed at a real-hardware launch,
+ * this drives the arm through every recorded pose unsupervised; only do
+ * that deliberately.
+ *
+ * CSV parsing, JOINT_NAMES, and
+ * safeBoundsRadians()/sendCorrectiveTrajectory()/
+ * ensureCurrentStateWithinBounds() are carried over from
+ * replay_ndi_capture.cpp verbatim.
+ */
 
 #include <algorithm>
 #include <array>

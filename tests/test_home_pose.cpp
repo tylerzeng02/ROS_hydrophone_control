@@ -1,3 +1,11 @@
+/**
+ * @file test_home_pose.cpp
+ * @brief Interactive hardware-in-the-loop test: seeds each motor's goal
+ * to its own current position before enabling torque (so nothing jumps),
+ * verifies both the current and requested home positions are within
+ * range, then moves to a hardcoded home pose on confirmation.
+ */
+
 #include <iostream>
 #include <vector>
 #include "dynamixel_motor.h"

@@ -1,3 +1,12 @@
+/**
+ * @file record_hand_poses.cpp
+ * @brief Records hand-posed joint configurations to CSV for kinematic
+ * calibration. Locks elbow_yaw at its calibrated range's midpoint (see
+ * LOCKED_JOINT_ID below); the other 6 joints are freely hand-posed with
+ * torque off. On each Enter press, reads and appends the current 7-joint
+ * tick pose. Resumable: appends to OUTPUT_CSV if it already has rows.
+ */
+
 #include <array>
 #include <fstream>
 #include <iostream>
@@ -49,14 +58,21 @@ constexpr uint16_t FULL_RANGE_CCW_LIMIT = 4095;
 
 constexpr const char* OUTPUT_CSV = "i_gain_final_sweep_45pose_hand_posed_dataset.csv";
 
+/**
+ * @brief Prints `message` and blocks until Enter is pressed.
+ * @param message Prompt text to print before waiting.
+ */
 void waitForEnter(const std::string& message) {
     std::cout << message << std::flush;
     std::string line;
     std::getline(std::cin, line);
 }
 
-// Returns true and fills `line` with the raw input if the user just
-// pressed Enter (record a pose); returns false if the user typed 'q' (done).
+/**
+ * @brief Prompts whether to record another pose or finish.
+ * @return True if the user pressed Enter (record a pose). False if the
+ *         user typed 'q' (finish recording).
+ */
 bool promptForNextAction() {
     std::cout
         << "\nPress Enter to record a pose, or type 'q' then Enter to "
@@ -69,6 +85,13 @@ bool promptForNextAction() {
     return true;
 }
 
+/**
+ * @brief Counts existing data rows in a CSV, for resuming a previous
+ * session.
+ * @param path CSV path to check.
+ * @return Number of non-empty rows after the header, or 0 if the file
+ *         does not exist.
+ */
 std::size_t loadExistingPoseCount(const std::string& path) {
     std::ifstream in(path);
     if (!in) {

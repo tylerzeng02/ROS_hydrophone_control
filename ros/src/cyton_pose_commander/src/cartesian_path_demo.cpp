@@ -1,20 +1,22 @@
-// cartesian_path_demo: reads a CSV of Cartesian waypoints (x,y,z,roll,
-// pitch,yaw per row, meters/radians), computes one continuous Cartesian
-// path through all of them via MoveGroupInterface::computeCartesianPath(),
-// previews it in RViz (published automatically, same as a normal plan),
-// waits for Enter, then executes it, driving the arm smoothly through
-// every waypoint in sequence in one motion, rather than planning/executing
-// each point separately.
-//
-// Built for demo purposes: default usage is against mock_components
-// (hardware_type:=mock_components), so this is a safe, repeatable,
-// simulated animation of the arm sweeping through a sequence of points.
-// No real hardware is required. Works identically against real hardware
-// too if that is ever wanted (same command, real launch instead of mock).
-//
-// eef_step (the Cartesian interpolation resolution) is deliberately modest
-// (1cm): fine enough for a smooth-looking path, coarse enough that
-// computing the path over 20 widely-spaced points does not take long.
+/**
+ * @file cartesian_path_demo.cpp
+ * @brief Reads a CSV of Cartesian waypoints (x,y,z,roll,pitch,yaw per
+ * row, meters/radians), computes one continuous Cartesian path through
+ * all of them via MoveGroupInterface::computeCartesianPath(), previews
+ * it in RViz, waits for Enter, then executes it, driving the arm
+ * smoothly through every waypoint in one motion rather than
+ * planning/executing each point separately.
+ *
+ * Built for demo purposes: default usage is against mock_components
+ * (hardware_type:=mock_components), a safe, repeatable, simulated
+ * animation of the arm sweeping through a sequence of points. No real
+ * hardware is required, though it works identically against real
+ * hardware too (same command, real launch instead of mock).
+ *
+ * eef_step, the Cartesian interpolation resolution, is deliberately
+ * modest (1cm): fine enough for a smooth-looking path, coarse enough that
+ * computing the path over 20 widely-spaced points does not take long.
+ */
 
 #include <array>
 #include <fstream>

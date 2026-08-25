@@ -1,21 +1,24 @@
-// constrained_pose_ik_test: deliberately replicates the harder-than-
-// necessary IK scenario move_between_points.cpp used before switching to
-// seeded setJointValueTarget(). setPoseTarget() with orientation held
-// fixed hands a full 6-DOF Cartesian constraint to OMPL's random-seeded
-// goal sampling. That is what produced real 30-second RRTConnect timeouts
-// against elbow_yaw's razor-thin locked window.
-//
-// Purpose: isolate whether a different IK plugin (TRAC-IK vs. KDL) would
-// handle this harder, random-seeded case any better. Run once against
-// ik_solver:=kdl and once against ik_solver:=trac_ik and compare success
-// rate and timing directly.
-//
-// No NDI dependency; pure MoveIt planning/execution stress test. Reads
-// a small Cartesian offset (meters, position-only) per CSV line; for each,
-// reads the arm's live current pose, builds an absolute target = current
-// position + offset (orientation held at whatever it currently is), calls
-// setPoseTarget() + move(), and reports success/failure and timing.
-// Continues on failure rather than aborting the run.
+/**
+ * @file constrained_pose_ik_test.cpp
+ * @brief Deliberately replicates the harder-than-necessary IK scenario
+ * move_between_points.cpp used before switching to seeded
+ * setJointValueTarget(): setPoseTarget() with orientation held fixed
+ * hands a full 6-DOF Cartesian constraint to OMPL's random-seeded goal
+ * sampling, which can produce long RRTConnect timeouts against
+ * elbow_yaw's razor-thin locked window.
+ *
+ * Purpose: isolate whether a different IK plugin (TRAC-IK vs. KDL)
+ * handles this harder, random-seeded case any better. Run once against
+ * ik_solver:=kdl and once against ik_solver:=trac_ik and compare success
+ * rate and timing directly.
+ *
+ * No NDI dependency; pure MoveIt planning/execution stress test. Reads a
+ * small Cartesian offset (meters, position-only) per CSV line; for each,
+ * reads the arm's live current pose, builds an absolute target = current
+ * position + offset (orientation held at whatever it currently is), calls
+ * setPoseTarget() + move(), and reports success/failure and timing.
+ * Continues on failure rather than aborting the run.
+ */
 
 #include <array>
 #include <chrono>

@@ -85,6 +85,16 @@ DEPLOYED_TOOL_ORIGIN_M = ck.TOOL_ORIGIN_NOMINAL_M.copy()
 
 
 def ticks_to_deployed_radians(ticks):
+    """Converts raw tick values to joint angles using the deployed
+    zeroTick/direction/scale, matching ticksToRadians() in
+    src/robot_calibration.cpp exactly.
+
+    Args:
+        ticks: (7,) raw tick values, one per joint.
+
+    Returns:
+        (7,) joint angles, radians.
+    """
     ticks = np.array(ticks, dtype=float)
     zero = np.array(DEPLOYED_ZERO_TICKS, dtype=float)
     direction = np.array(DEPLOYED_DIRECTION, dtype=float)
@@ -93,6 +103,15 @@ def ticks_to_deployed_radians(ticks):
 
 
 def forward_kinematics_deployed(joint_angles_rad):
+    """Computes base_link -> virtual_endeffector using the deployed
+    axis/origin geometry (DEPLOYED_AXES, DEPLOYED_ORIGINS_M).
+
+    Args:
+        joint_angles_rad: (7,) corrected joint angles, radians.
+
+    Returns:
+        (4, 4) transform.
+    """
     T = np.eye(4)
     for i in range(ck.N_JOINTS):
         R = Rotation.from_rotvec(DEPLOYED_AXES[i] * joint_angles_rad[i]).as_matrix()
@@ -105,14 +124,33 @@ def forward_kinematics_deployed(joint_angles_rad):
 # reasoning as calibrate_kinematics.py).
 
 def unpack(x):
+    """Splits the 12-param frame vector into named tool/base components.
+
+    Args:
+        x: (12,) flat parameter vector.
+
+    Returns:
+        Dict with keys tool_xyz, tool_rpy, base_xyz, base_rpy, each (3,).
+    """
     return dict(tool_xyz=x[0:3], tool_rpy=x[3:6], base_xyz=x[6:9], base_rpy=x[9:12])
 
 
 def pack(tool_xyz, tool_rpy, base_xyz, base_rpy):
+    """Concatenates tool/base components into the flat 12-param vector."""
     return np.concatenate([tool_xyz, tool_rpy, base_xyz, base_rpy])
 
 
 def predict_relative_pose_deployed(angles_rad, p):
+    """Predicts the fixed-marker-to-moving-marker pose for one joint-angle
+    set, using the deployed joint-level model plus the fitted frame.
+
+    Args:
+        angles_rad: (7,) corrected joint angles, radians.
+        p: Dict from unpack(), the fitted tool/base frame.
+
+    Returns:
+        (4, 4) predicted transform.
+    """
     T_fk = forward_kinematics_deployed(angles_rad)
     T_tool = ck.build_tool_transform(p["tool_xyz"], p["tool_rpy"])
     T_base = ck.build_base_transform(p["base_xyz"], p["base_rpy"])
@@ -120,6 +158,18 @@ def predict_relative_pose_deployed(angles_rad, p):
 
 
 def residual(x, angles, pos_mm, quat_xyzw):
+    """Least-squares residual: position + orientation error plus tool_xyz
+    regularization, for one dataset.
+
+    Args:
+        x: (12,) flat frame parameter vector.
+        angles: (N, 7) joint angles, radians.
+        pos_mm: (N, 3) measured positions, millimeters.
+        quat_xyzw: (N, 4) measured orientations, scipy order.
+
+    Returns:
+        Concatenated position, orientation, and regularization residuals.
+    """
     p = unpack(x)
     n = len(angles)
     pos_res = np.zeros((n, 3))
@@ -146,6 +196,14 @@ TOOL_XYZ_BOUND_M = 0.10  # matches gen_validation_predictions.py's widened tool 
 
 
 def bounds():
+    """Builds the (lower, upper) bound arrays for least_squares().
+
+    tool_xyz is bounded at +-10cm; tool_rpy, base_xyz, and base_rpy are
+    left unbounded (see the module docstring for why).
+
+    Returns:
+        Tuple of (lower, upper), each (12,).
+    """
     lo = np.concatenate([
         -TOOL_XYZ_BOUND_M * np.ones(3), [-np.inf] * 3,
         [-np.inf] * 3, [-np.inf] * 3,
@@ -155,8 +213,17 @@ def bounds():
 
 
 def x0(angles, pos_mm, quat_xyzw):
-    # Closed-form base guess (assuming nominal tool), used as the optimizer's
-    # starting point instead of identity.
+    """Builds the initial parameter guess: zero tool correction, and a
+    closed-form base-frame guess derived from the first pose.
+
+    Args:
+        angles: (N, 7) joint angles, radians.
+        pos_mm: (N, 3) measured positions, millimeters.
+        quat_xyzw: (N, 4) measured orientations, scipy order.
+
+    Returns:
+        (12,) initial parameter vector.
+    """
     T_fk = forward_kinematics_deployed(angles[0])
     T_tool_nominal = ck.build_tool_transform(np.zeros(3), np.zeros(3))
     T_partial = T_fk @ T_tool_nominal
@@ -170,6 +237,16 @@ def x0(angles, pos_mm, quat_xyzw):
 
 
 def fit(angles, pos_mm, quat_xyzw):
+    """Runs the bounded least-squares fit of the 12-param tool/base frame.
+
+    Args:
+        angles: (N, 7) joint angles, radians.
+        pos_mm: (N, 3) measured positions, millimeters.
+        quat_xyzw: (N, 4) measured orientations, scipy order.
+
+    Returns:
+        scipy.optimize.OptimizeResult from least_squares().
+    """
     lo, up = bounds()
     guess = x0(angles, pos_mm, quat_xyzw)
     lo = np.minimum(lo, guess - 1e-6)
@@ -204,6 +281,8 @@ def load_poses_deployed_angles(csv_path):
 
 
 def main():
+    """Fits the tool/base frame on --fit-csv, then writes predicted
+    end-effector positions for every tick target in --points to --out."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--fit-csv", required=True, help="Comma-separated CSVs to fit base/tool frame on.")
     parser.add_argument("--points", required=True, help="Input CSV of tick_0..tick_6 test points.")

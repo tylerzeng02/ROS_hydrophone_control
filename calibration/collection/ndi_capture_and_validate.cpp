@@ -26,6 +26,29 @@
 #include "robot_calibration.h"
 #include "ndicapi.h"
 
+/**
+ * @file ndi_capture_and_validate.cpp
+ * @brief Main hardware-in-the-loop data collection and validation tool
+ * for this project's kinematic calibration: drives the arm through a
+ * table of target poses (TARGET_POSES) and captures each one's NDI
+ * Polaris tracked pose.
+ *
+ * Three modes, selected by command-line flag (see main()):
+ *  - `--quick-test`: captures a configurable subset of TARGET_POSES
+ *    (QUICK_TEST_POSE_INDICES) to a CSV, resumable across runs.
+ *  - `--validate`: given known joint-tick targets and predicted
+ *    positions, moves to each and measures deviation from the
+ *    prediction.
+ *  - `--settling-diagnostic`: logs raw BX samples right after each move
+ *    to inspect settling behavior, instead of the normal averaged
+ *    capture.
+ *
+ * Tracking uses the binary BX command (not ASCII TX; see NdiTracker
+ * below). Supports interactive pause ('p'), skip ('s'), and manual-mode
+ * toggle (space) hotkeys during data collection, non-blocking on both
+ * Windows (<conio.h>) and Linux (LinuxRawStdin, _kbhit()/_getch() below).
+ */
+
 namespace {
 
 #ifndef _WIN32
@@ -63,6 +86,11 @@ private:
 bool g_hasPendingChar = false;
 unsigned char g_pendingChar = 0;
 
+/**
+ * @brief Linux equivalent of Windows' conio.h _kbhit(): non-blocking
+ * check for a pending keypress, without consuming it.
+ * @return Nonzero if a character is available.
+ */
 int _kbhit() {
     if (g_hasPendingChar) {
         return 1;
@@ -77,6 +105,11 @@ int _kbhit() {
     return 0;
 }
 
+/**
+ * @brief Linux equivalent of Windows' conio.h _getch(): reads and
+ * consumes one character, non-blocking.
+ * @return The character read, or -1 if none is available.
+ */
 int _getch() {
     if (g_hasPendingChar) {
         g_hasPendingChar = false;
@@ -88,8 +121,11 @@ int _getch() {
 }
 #endif  // !_WIN32
 
-// Thrown when the user presses the skip key while waiting on NDI tracking;
-// caught in main()'s per-pose loop so one bad pose doesn't abort the run.
+/**
+ * @brief Thrown when the user presses the skip key while waiting on NDI
+ * tracking; caught in main()'s per-pose loop so one bad pose does not
+ * abort the run.
+ */
 struct PoseSkippedByUser {};
 
 enum class NdiToolStatus {
@@ -100,6 +136,12 @@ enum class NdiToolStatus {
     LowQuality
 };
 
+/**
+ * @brief Converts an NdiToolStatus to its display label.
+ * @param status Status to convert.
+ * @return e.g. "DETECTED", "MISSING", "OUT_OF_VOLUME", "DISABLED",
+ *         "LOW_QUALITY", or "UNKNOWN".
+ */
 const char* toolStatusLabel(NdiToolStatus status) {
     switch (status) {
         case NdiToolStatus::Detected:    return "DETECTED";
@@ -111,9 +153,16 @@ const char* toolStatusLabel(NdiToolStatus status) {
     return "UNKNOWN";
 }
 
-// Prints "<toolName> tool: <STATUS>" only the first time it's called and
-// whenever the status differs from the last printed value, so a steady
-// status doesn't spam the console.
+/**
+ * @brief Prints "<toolName> tool: <STATUS>" only the first time it is
+ * called and whenever the status differs from the last printed value, so
+ * a steady status does not spam the console.
+ * @param toolName Name to print (e.g. "Fixed", "Moving").
+ * @param current Current status.
+ * @param[in,out] lastPrinted Last status actually printed; updated here.
+ * @param[in,out] everPrinted Whether this has been called before; set to
+ *        true here.
+ */
 void printToolStatusIfChanged(
     const char* toolName,
     NdiToolStatus current,
@@ -128,7 +177,10 @@ void printToolStatusIfChanged(
     everPrinted = true;
 }
 
-// Prints the manual/auto mode banner after a spacebar toggle.
+/**
+ * @brief Prints the manual/auto mode banner after a spacebar toggle.
+ * @param manualModeEnabled New mode state to announce.
+ */
 void printModeToggle(bool manualModeEnabled) {
     std::cout
         << (manualModeEnabled
@@ -138,9 +190,12 @@ void printModeToggle(bool manualModeEnabled) {
                   "again.\n");
 }
 
-// Non-blocking check for the mode-toggle spacebar. Usable at points where
-// pause or skip would not make sense, for example between poses before a
-// new one has started. Does nothing for any other key.
+/**
+ * @brief Non-blocking check for the mode-toggle spacebar. Usable at
+ * points where pause or skip would not make sense, for example between
+ * poses before a new one has started. Does nothing for any other key.
+ * @param[in,out] manualModeEnabled Toggled if space was pressed.
+ */
 void checkForModeToggle(bool& manualModeEnabled) {
     if (!_kbhit()) {
         return;
@@ -151,11 +206,16 @@ void checkForModeToggle(bool& manualModeEnabled) {
     }
 }
 
-// Non-blocking check for the pause ('p') / skip ('s') / manual-mode-toggle
-// (' ') hotkeys. Call once per polling iteration. Throws PoseSkippedByUser
-// if skip is pressed (either directly or while paused). Returns how long
-// this call spent paused, so callers can shift their own elapsed-time
-// budgets forward by that amount.
+/**
+ * @brief Non-blocking check for the pause ('p') / skip ('s') /
+ * manual-mode-toggle (' ') hotkeys. Call once per polling iteration.
+ * @param[in,out] manualModeEnabled Toggled if space was pressed.
+ * @throws PoseSkippedByUser if skip is pressed, either directly or while
+ *         paused.
+ * @return How long this call spent paused, so callers can shift their
+ *         own elapsed-time budgets forward by that amount. Zero if not
+ *         paused.
+ */
 std::chrono::milliseconds handleUserControls(bool& manualModeEnabled) {
     if (!_kbhit()) {
         return std::chrono::milliseconds(0);
@@ -623,9 +683,9 @@ const std::array<std::array<uint16_t, JOINT_COUNT>, POSE_COUNT> TARGET_POSES = {
     // Poses 304-307: backlash test for wrist_pitch (motor 5), other 6
     // joints locked during recording. Must be visited in order (below
     // target, at target from below <- COMPARE, above target, at target
-    // from above <- COMPARE) so the arm actually approaches from each
-    // direction. Compare 305 vs 307's NDI position; gap beyond the ~0.5mm
-    // repeatability floor = real backlash.
+    // from above <- COMPARE) so the arm approaches from each direction.
+    // Compare 305 vs 307's NDI position; gap beyond the ~0.5mm
+    // repeatability floor is backlash.
     {{1024, 2072, 2096, 2112, 2049, 840, 3020}},
     {{1026, 2077, 2096, 2112, 2049, 2058, 3020}},
     {{1026, 2079, 2096, 2116, 2051, 3345, 3022}},
@@ -1786,8 +1846,8 @@ const std::array<std::array<uint16_t, JOINT_COUNT>, POSE_COUNT> TARGET_POSES = {
     {{3005, 1868, 2224, 828, 2083, 1420, 1206}},
     // 221 poses, index 1398-1618: third batch of the reduced-DOF
     // (elbow_yaw locked near 2095) hand-posing session, rows 34-254 of
-    // recorded_hand_poses_fixed_elbow_yaw(3).csv. Rows 1-33 are a
-    // genuinely unrelated earlier session and stay excluded.
+    // recorded_hand_poses_fixed_elbow_yaw(3).csv. Rows 1-33 are an
+    // unrelated earlier session and stay excluded.
     {{3122, 1886, 2117, 828, 2093, 1379, 1169}},
     {{3122, 1887, 2117, 828, 2094, 1285, 1167}},
     {{3111, 1884, 2220, 828, 2085, 1269, 1132}},
@@ -2011,6 +2071,11 @@ const std::array<std::array<uint16_t, JOINT_COUNT>, POSE_COUNT> TARGET_POSES = {
     {{3097, 2193, 2096, 829, 2092, 1133, 1123}},
 }};
 
+/**
+ * @brief One NDI BX transform sample: orientation (q0=scalar/w, qx, qy,
+ * qz), translation in mm, tracker-reported error, frame number, and
+ * visible marker count.
+ */
 struct NdiPoseSample {
     double q0 = 0.0;
     double qx = 0.0;
@@ -2024,21 +2089,35 @@ struct NdiPoseSample {
     int visibleMarkerCount = 0;
 };
 
+/**
+ * @brief An NdiPoseSample averaged over multiple accepted BX samples, plus
+ * how many samples went into it.
+ */
 struct AveragedNdiPose {
     NdiPoseSample pose;
     int acceptedSamples = 0;
 };
 
+/**
+ * @brief One full capture at a pose: the moving and fixed tools' averaged
+ * poses in the tracker's own camera frame, plus the moving tool's pose
+ * relative to the fixed tool (the quantity actually used for
+ * calibration, since it cancels the tracker's own arbitrary reference
+ * frame).
+ */
 struct DualToolCapture {
     AveragedNdiPose movingInCamera;
     AveragedNdiPose fixedInCamera;
     NdiPoseSample movingRelativeToFixed;
 };
 
-// One instantaneous, non-averaged moving-relative-to-fixed sample, tagged
-// with elapsed time since collectRawSettlingSeries() started. Used only
-// by the --settling-diagnostic mode to see how the pose changes right
-// after a move, before the real capture loop's 30-sample average begins.
+/**
+ * @brief One instantaneous, non-averaged moving-relative-to-fixed sample,
+ * tagged with elapsed time since collectRawSettlingSeries() started. Used
+ * only by the --settling-diagnostic mode to see how the pose changes
+ * right after a move, before the real capture loop's 30-sample average
+ * begins.
+ */
 struct SettlingSample {
     int poseIndex = 0;
     long elapsedMs = 0;
@@ -2049,18 +2128,33 @@ struct SettlingSample {
     double error = 0.0;
 };
 
+/**
+ * @brief Prints `message` and blocks until Enter is pressed.
+ * @param message Prompt text to print before waiting.
+ */
 void waitForEnter(const std::string& message) {
     std::cout << message << std::flush;
     std::string line;
     std::getline(std::cin, line);
 }
 
+/**
+ * @brief Disables torque on every motor in `motorIds`.
+ * @param motor Connected motor driver.
+ * @param motorIds Motor IDs to disable.
+ */
 void disableAll(DynamixelMotor& motor, const std::vector<int>& motorIds) {
     for (int id : motorIds) {
         motor.disableTorque(id);
     }
 }
 
+/**
+ * @brief Reads each listed motor's present position.
+ * @param motor Connected motor driver.
+ * @param motorIds Motor IDs to read.
+ * @return One tick value per motor, same order as `motorIds`.
+ */
 std::vector<uint16_t> readActualTicks(
     DynamixelMotor& motor,
     const std::vector<int>& motorIds
@@ -2106,6 +2200,11 @@ std::vector<double> ticksToRadiansVector(
     return radians;
 }
 
+/**
+ * @brief Normalizes an NdiPoseSample's quaternion (q0, qx, qy, qz) to
+ * unit length in place.
+ * @param[in,out] pose Pose whose quaternion is normalized.
+ */
 void normalizeQuaternion(NdiPoseSample& pose) {
     const double norm = std::sqrt(
         pose.q0 * pose.q0 +
@@ -2900,6 +2999,12 @@ private:
     bool tracking_ = false;
 };
 
+/**
+ * @brief Writes one NdiPoseSample's column headers, prefixed with
+ * `prefix`, e.g. "moving_camera_q0", "moving_camera_tx_mm", etc.
+ * @param csv Output stream to write to.
+ * @param prefix Column name prefix.
+ */
 void writePoseFields(
     std::ofstream& csv,
     const std::string& prefix
@@ -2917,6 +3022,11 @@ void writePoseFields(
         << ',' << prefix << "_visible_markers";
 }
 
+/**
+ * @brief Writes the full CSV header row (pose ID, timestamp, target and
+ * actual ticks, actual radians, and moving/fixed/relative pose fields).
+ * @param csv Output stream to write to.
+ */
 void writeCsvHeader(std::ofstream& csv) {
     csv << "pose_id,timestamp_ms";
 
@@ -3045,12 +3155,16 @@ void printCapturedPose(
     );
 }
 
-// Checks OUTPUT_CSV (if it already exists from a previous, interrupted
-// run) for poses already captured, so a fresh run continues from the next
-// pose instead of overwriting earlier data. Also sanity-checks that
-// TARGET_POSES hasn't changed underneath the already-captured rows.
-// Returns the 0-based index of the next pose to attempt (0 if the file
-// doesn't exist yet or has no data rows).
+/**
+ * @brief Checks OUTPUT_CSV (if it already exists from a previous,
+ * interrupted run) for poses already captured, so a fresh run continues
+ * from the next pose instead of overwriting earlier data. Also
+ * sanity-checks that TARGET_POSES has not changed underneath the
+ * already-captured rows.
+ * @param csvPath CSV path to check.
+ * @return The 0-based index of the next pose to attempt (0 if the file
+ *         does not exist yet or has no data rows).
+ */
 std::size_t findResumeStartIndex(const std::string& csvPath) {
     std::ifstream in(csvPath);
     if (!in) {
@@ -3107,12 +3221,15 @@ std::size_t findResumeStartIndex(const std::string& csvPath) {
     return maxPoseId;
 }
 
-// --settling-diagnostic mode moves through the first
-// SETTLING_DIAGNOSTIC_POSE_COUNT poses of TARGET_POSES and, instead of
-// the normal settle-then-average, logs every raw BX poll for
-// SETTLING_DIAGNOSTIC_DURATION_MS right after each move. This shows
-// whether the tracked pose is still settling in the window the real
-// capture loop would otherwise silently average over.
+/**
+ * @brief --settling-diagnostic mode: moves through the first
+ * SETTLING_DIAGNOSTIC_POSE_COUNT poses of TARGET_POSES and, instead of
+ * the normal settle-then-average, logs every raw BX poll for
+ * SETTLING_DIAGNOSTIC_DURATION_MS right after each move. Shows whether
+ * the tracked pose is still settling in the window the real capture loop
+ * would otherwise average over.
+ * @return Process exit code (0 on success).
+ */
 int runSettlingDiagnostic() {
     const std::vector<int> motorIds = {0, 1, 2, 3, 4, 5, 6};
 
@@ -3244,12 +3361,16 @@ int runSettlingDiagnostic() {
     }
 }
 
-// Real (30-sample-averaged) capture over QUICK_TEST_POSE_INDICES, written
-// to QUICK_TEST_CSV.
-// resumeFromSequenceIndex: 0-based position in QUICK_TEST_POSE_INDICES to
-// start from. 0 (default) truncates/overwrites QUICK_TEST_CSV; nonzero
-// opens it in append mode instead. Deliberately manual (not auto-detected)
-// since Ctrl+C gives no chance to run detection logic anyway.
+/**
+ * @brief --quick-test mode: 30-sample-averaged capture over
+ * QUICK_TEST_POSE_INDICES, written to QUICK_TEST_CSV.
+ * @param resumeFromSequenceIndex 0-based position in
+ *        QUICK_TEST_POSE_INDICES to start from. 0 (default) truncates and
+ *        overwrites QUICK_TEST_CSV; nonzero opens it in append mode
+ *        instead. Deliberately manual, not auto-detected, since Ctrl+C
+ *        gives no chance to run detection logic anyway.
+ * @return Process exit code (0 on success).
+ */
 int runQuickCalibrationTest(std::size_t resumeFromSequenceIndex = 0) {
     const std::vector<int> motorIds = {0, 1, 2, 3, 4, 5, 6};
 
@@ -3437,15 +3558,18 @@ int runQuickCalibrationTest(std::size_t resumeFromSequenceIndex = 0) {
     }
 }
 
-// --validate mode: moves the arm to a caller-supplied list of joint-tick
-// test points and reports how far the NDI-measured actual position
-// deviates from a precomputed predicted position. Predictions must be
-// computed offline (see calibration/current/deployed_model_predictions.py,
-// which uses the actual deployed 48-param model) and supplied via
-// VALIDATION_INPUT_CSV, format:
-//   tick_0,tick_1,tick_2,tick_3,tick_4,tick_5,tick_6,predicted_x_mm,predicted_y_mm,predicted_z_mm
-// For a meaningful test, ticks should be points NOT already in whatever
-// dataset the model was fit on.
+/**
+ * @brief One --validate mode test point: a joint-tick target plus the
+ * offline-computed predicted position to compare the NDI-measured actual
+ * position against.
+ *
+ * Predictions must be computed offline (see
+ * calibration/current/deployed_model_predictions.py, which uses the
+ * deployed 48-param model) and supplied via VALIDATION_INPUT_CSV, format:
+ *   tick_0,tick_1,tick_2,tick_3,tick_4,tick_5,tick_6,predicted_x_mm,predicted_y_mm,predicted_z_mm
+ * For a meaningful test, ticks should be points not already in whatever
+ * dataset the model was fit on.
+ */
 struct ValidationPoint {
     std::array<uint16_t, JOINT_COUNT> ticks{};
     double predictedXMm = 0.0;
@@ -3453,6 +3577,12 @@ struct ValidationPoint {
     double predictedZMm = 0.0;
 };
 
+/**
+ * @brief Loads ValidationPoint rows from a CSV.
+ * @param csvPath Path to a CSV in the format ValidationPoint documents.
+ * @return The loaded points.
+ * @throws std::runtime_error if `csvPath` cannot be opened.
+ */
 std::vector<ValidationPoint> loadValidationPoints(const std::string& csvPath) {
     std::ifstream in(csvPath);
     if (!in) {
@@ -3533,6 +3663,14 @@ constexpr uint16_t LOCKED_VALIDATION_JOINT_TICK = 2095;
 // 2079-2104, and that was fine.
 constexpr int LOCKED_VALIDATION_JOINT_TOLERANCE_TICKS = 15;
 
+/**
+ * @brief --validate mode entry point: moves to each ValidationPoint in
+ * `inputCsvPath` and reports how far the NDI-measured actual position
+ * deviates from its predicted position.
+ * @param inputCsvPath Path to a CSV in the format ValidationPoint
+ *        documents.
+ * @return Process exit code (0 on success).
+ */
 int runValidationTest(const std::string& inputCsvPath) {
     const std::vector<ValidationPoint> points = loadValidationPoints(inputCsvPath);
     if (points.empty()) {
@@ -3784,6 +3922,16 @@ int runValidationTest(const std::string& inputCsvPath) {
 
 }  // namespace
 
+/**
+ * @brief Dispatches to one of this file's three modes based on the first
+ * command-line argument (--settling-diagnostic, --quick-test, or
+ * --validate). With no arguments, runs the default full-capture mode over
+ * every pose in TARGET_POSES.
+ * @param argc Argument count.
+ * @param argv Argument values; see this file's own @file comment and each
+ *        mode's own function for the accepted flags.
+ * @return Process exit code (0 on success).
+ */
 int main(int argc, char** argv) {
 #ifndef _WIN32
 

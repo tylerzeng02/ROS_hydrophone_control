@@ -215,8 +215,7 @@ hardware_interface::return_type CytonSystemHardware::read(
     {
       // Transient comm hiccup: log and keep the last known position rather
       // than erroring the whole hardware interface out over one dropped
-      // packet. hw_positions_ simply doesn't advance for this joint this
-      // cycle.
+      // packet. hw_positions_ does not advance for this joint this cycle.
       RCLCPP_ERROR(
         logger(), "read() failed on motor %d (%s), keeping last known position", calibration.id,
         kJointNames[i]);
@@ -266,22 +265,8 @@ hardware_interface::return_type CytonSystemHardware::write(
   return hardware_interface::return_type::OK;
 }
 
-// Reversal-triggered hold-point backlash compensator (see this class's
-// header for why not a per-cycle port of dynamixel_motor.cpp's
-// blocking-move overshoot fix). Per joint, per write() cycle:
-//   1. Compare this cycle's raw tick against last cycle's to determine
-//      the raw target's direction (+1/-1), ignoring moves smaller than
-//      kDirectionDeadbandTicks (ordinary trajectory-interpolation jitter).
-//   2. On a genuine reversal (an established direction flips), pin a hold
-//      point at raw_tick +/- getBacklashOvershootTicks(jointIndex) in the
-//      new direction, clamped to this joint's safety range.
-//   3. While a hold is active, clamp the tick sent to the servo to be at
-//      least as far along as the hold point (max()/min() depending on
-//      direction) until the raw trajectory naturally reaches/passes it,
-//      at which point the hold releases and 1:1 tracking resumes.
-//
-// Engages once per genuine reversal, not every cycle of a monotonic
-// segment, unlike a naive per-cycle port.
+// See this method's Doxygen comment in cyton_system_hardware.hpp for the
+// full per-cycle algorithm and design rationale.
 int CytonSystemHardware::applyBacklashCompensation(int jointIndex, int rawTick)
 {
   const size_t idx = static_cast<size_t>(jointIndex);

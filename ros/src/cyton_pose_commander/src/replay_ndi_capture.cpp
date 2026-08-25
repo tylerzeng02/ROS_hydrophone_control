@@ -1,18 +1,21 @@
-// replay_ndi_capture: drives the arm through the poses recorded in a
-// cyton_ndi_capture/ndi_measure output CSV via MoveIt, so you can re-visit
-// exactly the poses captured earlier instead of jogging back by hand.
-//
-// Unlike pose_commander.cpp (which reads tick targets and converts them
-// via ticksToRadians()), this file's input already has the 7 joint angles
-// in radians as named columns. No conversion is needed, just direct
-// setJointValueTarget() per joint by name. Columns are resolved by header
-// name (not fixed position), same pattern move_between_points.cpp uses.
-//
-// Everything else (plan-preview-then-confirm workflow, the
-// ensureCurrentStateWithinBounds()/sendCorrectiveTrajectory() out-of-bounds
-// recovery for elbow_pitch/elbow_yaw's razor-thin locked windows) is
-// carried over from pose_commander.cpp verbatim, already hardware-
-// validated there, not reimplemented differently here.
+/**
+ * @file replay_ndi_capture.cpp
+ * @brief Drives the arm through the poses recorded in a
+ * cyton_ndi_capture/ndi_measure output CSV via MoveIt, to re-visit
+ * exactly the poses captured earlier instead of jogging back by hand.
+ *
+ * Unlike pose_commander.cpp, which reads tick targets and converts them
+ * via ticksToRadians(), this file's input already has the 7 joint angles
+ * in radians as named columns, so no conversion is needed, just direct
+ * setJointValueTarget() per joint by name. Columns are resolved by
+ * header name, not fixed position, same pattern move_between_points.cpp
+ * uses.
+ *
+ * The plan-preview-then-confirm workflow and the
+ * ensureCurrentStateWithinBounds()/sendCorrectiveTrajectory()
+ * out-of-bounds recovery for elbow_pitch/elbow_yaw's razor-thin locked
+ * windows are carried over from pose_commander.cpp verbatim.
+ */
 
 #include <algorithm>
 #include <array>

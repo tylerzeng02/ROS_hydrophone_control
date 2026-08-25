@@ -42,12 +42,12 @@ from .config import RobotConfig, TargetingConfig
 _SKULL_COLLISION_OBJECT_ID = "skull_mesh"
 
 # Safety margin subtracted from each joint's URDF limit before treating the
-# current state as "in bounds" -- matches cyton_pose_commander/src/
+# current state as "in bounds". Matches cyton_pose_commander/src/
 # pose_commander.cpp's RECOVERY_BUFFER_RAD exactly. Without this, a joint
-# sitting precisely on its limit (not past it) can still trip MoveIt's
+# sitting precisely on its limit, not past it, can still trip MoveIt's
 # CheckStartStateBounds and get an instant, generic FAILURE rejection
-# before planning even starts -- the bug this whole mechanism exists to
-# work around (see ensure_current_state_within_bounds()'s docstring).
+# before planning even starts. This is the bug this whole mechanism exists
+# to work around (see ensure_current_state_within_bounds()'s docstring).
 _RECOVERY_BUFFER_RAD = 0.01
 
 
@@ -83,8 +83,8 @@ class MoveItBridge(QObject):
         self._joint_names = list(robot.joint_names)
 
         # For get_current_end_effector_pose() (the Registration panel's
-        # "Add Point" workflow) -- a plain TF lookup rather than guessing
-        # at a pymoveit2-specific FK method name, since robot_state_publisher
+        # "Add Point" workflow): a plain TF lookup rather than guessing at
+        # a pymoveit2-specific FK method name, since robot_state_publisher
         # already publishes exactly this transform continuously.
         self._tf_buffer = tf2_ros.Buffer()
         self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, node)
@@ -100,20 +100,17 @@ class MoveItBridge(QObject):
         )
         # Without these, MoveIt's 5s/1-attempt defaults are nowhere near
         # enough to randomly sample a valid goal state through elbow_yaw's
-        # locked ~4-degree window -- RRTConnect fails with "Unable to
-        # sample any valid states for goal tree" almost every time, not
-        # because the pose is unreachable but because the search budget is
-        # too small. Same fix cyton_pose_commander/src/pose_commander.cpp
+        # locked ~4-degree window. RRTConnect fails with "Unable to sample
+        # any valid states for goal tree" almost every time, not because
+        # the pose is unreachable but because the search budget is too
+        # small. Same fix cyton_pose_commander/src/pose_commander.cpp
         # already needed for this arm (see config/default_config.yaml's
         # own comment on these two values).
         #
-        # NOTE: the real property is `allowed_planning_time`, not
-        # `planning_time` -- an earlier version of this line used the wrong
-        # name, which silently created an unused attribute instead of
-        # raising, leaving the real value stuck at pymoveit2's internal
-        # 0.5s default. Confirmed directly against the installed pymoveit2
-        # (planning always failed in ~0.5s regardless of this setting)
-        # before/after fixing it -- don't reintroduce the typo'd name.
+        # NOTE: the property is `allowed_planning_time`, not
+        # `planning_time`. Python does not raise on assigning an unknown
+        # attribute, so a typo here silently no-ops instead of erroring,
+        # leaving planning stuck at pymoveit2's internal 0.5s default.
         self._moveit2.allowed_planning_time = targeting.planning_time_s
         self._moveit2.num_planning_attempts = targeting.num_planning_attempts
         self._moveit2.planner_id = "RRTConnectkConfigDefault"
@@ -123,26 +120,26 @@ class MoveItBridge(QObject):
         self._executor_thread = _ExecutorThread(self._executor)
         self._executor_thread.start()
 
-        # For set_skull_collision_object() -- registering the skull as a
-        # real obstacle the planner avoids, not just something drawn in
-        # the GUI's own 3D view (that gap was the whole point of adding
-        # this).
+        # For set_skull_collision_object(): registers the skull with
+        # MoveIt's planning scene, so the planner avoids it. Distinct from
+        # rendering it in the GUI's own 3D view, which the planner has no
+        # knowledge of.
         self._apply_planning_scene_client = node.create_client(
             ApplyPlanningScene, "/apply_planning_scene"
         )
 
-        # For ensure_current_state_within_bounds() -- reads each joint's
-        # real <limit lower/upper> from the currently-loaded robot_description
-        # (not hardcoded, so this stays correct across URDF variants, e.g.
-        # elbow_yaw's range differs a lot between the production-locked and
-        # sim_7dof variants) and sends a corrective trajectory directly to
-        # the controller when needed, bypassing MoveIt's planning pipeline
-        # (which refuses to plan from an out-of-bounds start state, so it
-        # can't fix this itself) -- same mechanism as
+        # For ensure_current_state_within_bounds(): reads each joint's
+        # <limit lower/upper> from the currently-loaded robot_description,
+        # not hardcoded, so this stays correct across URDF variants (e.g.
+        # elbow_yaw's range differs a lot between the production-locked
+        # and sim_7dof variants), and sends a corrective trajectory
+        # directly to the controller when needed, bypassing MoveIt's
+        # planning pipeline, which refuses to plan from an out-of-bounds
+        # start state and so cannot fix this itself. Same mechanism as
         # cyton_pose_commander/src/pose_commander.cpp's
-        # ensureCurrentStateWithinBounds()/sendCorrectiveTrajectory(), ported
-        # to a native rclpy action client instead of shelling out to `ros2
-        # action send_goal`.
+        # ensureCurrentStateWithinBounds()/sendCorrectiveTrajectory(),
+        # ported to a native rclpy action client instead of shelling out
+        # to `ros2 action send_goal`.
         self._joint_limits = self._fetch_joint_limits()
         self._trajectory_action_client = ActionClient(
             node, FollowJointTrajectory, robot.controller_action_name
@@ -153,14 +150,18 @@ class MoveItBridge(QObject):
         self._executor_thread.wait()
 
     def get_current_end_effector_pose(self):
-        """Blocking (call from a worker thread) -- looks up the end
-        effector's CURRENT live position in base_frame via TF, in meters.
-        Used by the Registration panel: physically position the arm's
-        probe against a real landmark (e.g. via RViz), then call this to
-        record where it actually is, paired with the mesh point you
-        clicked for the same landmark. Returns (x, y, z), or None if the
-        transform isn't available yet (e.g. robot_state_publisher not up)
-        -- reported via the `status` signal either way, never raises."""
+        """Blocking (call from a worker thread). Looks up the end
+        effector's current position in base_frame via TF, in meters. Used
+        by the Registration panel: physically position the arm's probe
+        against a landmark (e.g. via RViz), then call this to record
+        where it is, paired with the mesh point clicked for the same
+        landmark.
+
+        Returns:
+            (x, y, z) tuple, or None if the transform isn't available yet
+            (e.g. robot_state_publisher not up). Reported via the
+            `status` signal either way; never raises.
+        """
         try:
             transform = self._tf_buffer.lookup_transform(
                 self._base_frame, self._end_effector_frame, rclpy.time.Time()
@@ -173,13 +174,17 @@ class MoveItBridge(QObject):
 
     def _fetch_joint_limits(self):
         """Blocking (call only from __init__, before the executor thread's
-        spin is doing anything else useful yet) -- reads one message from
-        the transient-local /robot_description topic and parses each of
-        self._joint_names' <limit lower="..." upper="..."/> out of the URDF
-        XML. Returns {name: (lower, upper)}; a joint missing a <limit> (a
-        continuous/fixed joint, shouldn't happen for this arm's revolute
-        joints) is simply omitted, and ensure_current_state_within_bounds()
-        skips checking any joint not in this dict."""
+        spin does anything else useful). Reads one message from the
+        transient-local /robot_description topic and parses each of
+        self._joint_names' <limit lower="..." upper="..."/> out of the
+        URDF XML.
+
+        Returns:
+            {name: (lower, upper)}. A joint missing a <limit> (a
+            continuous/fixed joint, not expected for this arm's revolute
+            joints) is omitted; ensure_current_state_within_bounds() skips
+            checking any joint not in this dict.
+        """
         qos = QoSProfile(
             depth=1,
             durability=DurabilityPolicy.TRANSIENT_LOCAL,
@@ -231,28 +236,29 @@ class MoveItBridge(QObject):
         return limits
 
     def ensure_current_state_within_bounds(self) -> bool:
-        """Blocking (call from a worker thread, before every plan attempt)
-        -- reads the arm's current joint state and, if any joint is at or
+        """Blocking (call from a worker thread, before every plan attempt).
+        Reads the arm's current joint state and, if any joint is at or
         beyond (limit +/- _RECOVERY_BUFFER_RAD), sends a corrective
         trajectory to pull it back inside before returning.
 
         Why this exists: MoveIt's CheckStartStateBounds rejects planning
-        outright (an immediate, generic FAILURE error code, not a real
-        search timeout) if the CURRENT state has any joint sitting exactly
-        on or past its limit -- confirmed directly (2026-08-25): after a
-        sequence of moves, elbow_yaw_joint was found parked at exactly
-        1.790156 rad, bit-for-bit its own sim_7dof URDF upper limit, and
-        every subsequent plan attempt failed in under ~1 second (not the
-        full ~30s planning budget) until this was manually corrected. Same
-        bug class already fixed once in
-        cyton_pose_commander/src/pose_commander.cpp; this ports the same
-        fix here so "Simulate All Targets" can recover on its own instead
-        of just failing.
+        outright, with an immediate, generic FAILURE error code rather
+        than a search timeout, if the current state has any joint sitting
+        exactly on or past its limit. A joint can end up exactly on its
+        limit after a sequence of moves (e.g. elbow_yaw_joint parked at
+        its own sim_7dof URDF upper limit), and every subsequent plan
+        attempt then fails fast until the joint is nudged back inside.
+        Same mechanism as
+        cyton_pose_commander/src/pose_commander.cpp's
+        ensureCurrentStateWithinBounds(), so "Simulate All Targets" can
+        recover on its own instead of failing outright.
 
-        Returns True if the state was already fine, or was successfully
-        corrected. Returns False if a correction was needed but failed (the
-        caller should skip this target rather than plan from a
-        possibly-still-invalid state)."""
+        Returns:
+            True if the state was already within bounds, or was corrected.
+            False if a correction was needed but failed; the caller should
+            skip this target rather than plan from a possibly still
+            invalid state.
+        """
         joint_state = self._moveit2.joint_state
         if joint_state is None:
             self.status.emit(
@@ -267,9 +273,10 @@ class MoveItBridge(QObject):
         for name in self._joint_names:
             value = current.get(name)
             if value is None or name not in self._joint_limits:
-                # Can't check this joint (not reported, or no <limit> found)
-                # -- pass its current value through unchanged if we have
-                # one, matching the "proceed without this check" fallback.
+                # Can't check this joint (not reported, or no <limit>
+                # found). Pass its current value through unchanged if we
+                # have one, matching the "proceed without this check"
+                # fallback.
                 corrected.append(value if value is not None else 0.0)
                 continue
             lower, upper = self._joint_limits[name]
@@ -303,13 +310,21 @@ class MoveItBridge(QObject):
         return self._send_corrective_trajectory(corrected)
 
     def _send_corrective_trajectory(self, positions) -> bool:
-        """Blocking -- sends a single-point trajectory with ALL joints'
-        positions (not just the corrected one(s)), bypassing MoveIt's
-        planning pipeline entirely via a direct FollowJointTrajectory action
-        goal to the real-time controller. Same call_async()+threading.Event
-        pattern as set_skull_collision_object() -- this node's executor is
-        already spinning on _ExecutorThread, so this thread just waits for
-        the response rather than spinning itself."""
+        """Blocking. Sends a single-point trajectory with all joints'
+        positions, not just the corrected one(s), bypassing MoveIt's
+        planning pipeline entirely via a direct FollowJointTrajectory
+        action goal to the controller. Same call_async()+threading.Event
+        pattern as set_skull_collision_object(): this node's executor is
+        already spinning on _ExecutorThread, so this thread waits for the
+        response rather than spinning itself.
+
+        Args:
+            positions: Full-length joint position list, in
+                self._joint_names order.
+
+        Returns:
+            True on success.
+        """
         if not self._trajectory_action_client.wait_for_server(timeout_sec=5.0):
             self.status.emit("Could not reach the trajectory controller action server.")
             return False
@@ -361,14 +376,16 @@ class MoveItBridge(QObject):
         return success
 
     def plan_to_pose(self, pose: Pose):
-        """Blocking (called from a worker thread, not the GUI thread -- see
-        main_window.py) -- returns a planned trajectory, or None if
-        planning failed.
+        """Blocking (called from a worker thread, not the GUI thread; see
+        main_window.py). Calls ensure_current_state_within_bounds()
+        proactively before planning (see that method's docstring), and
+        once more if the first plan attempt fails, in case the state only
+        became invalid partway through (mirrors pose_commander.cpp's
+        retry-once behavior).
 
-        Calls ensure_current_state_within_bounds() proactively before
-        planning (see that method's docstring), and once more if the first
-        plan attempt fails, in case the state only became invalid partway
-        through (mirrors pose_commander.cpp's retry-once behavior)."""
+        Returns:
+            The planned trajectory, or None if planning failed.
+        """
         self.ensure_current_state_within_bounds()
 
         self.status.emit("Planning...")
@@ -380,7 +397,7 @@ class MoveItBridge(QObject):
             ]
         try:
             trajectory = self._moveit2.plan(**plan_kwargs)
-        except Exception as e:  # noqa: BLE001 -- report to the GUI, don't crash it
+        except Exception as e:  # noqa: BLE001, reported to the GUI instead of crashing it
             self.status.emit(f"Planning FAILED: {e}")
             self.plan_ready.emit(None)
             return None
@@ -422,24 +439,27 @@ class MoveItBridge(QObject):
         return success
 
     def set_skull_collision_object(self, vertices_base_frame, triangles):
-        """Blocking (call from a worker thread) -- publishes (ADD, which
-        also replaces any existing object with the same id) a real MoveIt
+        """Blocking (call from a worker thread). Publishes (ADD, which
+        also replaces any existing object with the same id) a MoveIt
         collision object named "skull_mesh" via /apply_planning_scene, so
-        the planner genuinely avoids it -- not just something drawn in the
-        GUI's own PyVista view, which move_group has no knowledge of at
-        all otherwise (confirmed directly: this codebase never touched
-        PlanningScene/CollisionObject before this method existed).
+        the planner avoids it, not just something drawn in the GUI's own
+        PyVista view, which move_group has no knowledge of otherwise.
 
-        vertices_base_frame: (N, 3) already in base_frame (see
-        Registration.transform_points_to_base_frame()). triangles: (M, 3)
-        int indices into vertices. Returns True on success.
-
-        Uses call_async() + a threading.Event, not
-        rclpy.spin_until_future_complete() -- this node's executor is
+        Uses call_async() plus a threading.Event, not
+        rclpy.spin_until_future_complete(): this node's executor is
         already spinning on _ExecutorThread (see __init__), and spinning
-        the same node from a second thread concurrently would be unsafe;
-        the already-running executor services this call's response, this
-        thread just waits for it."""
+        the same node from a second thread concurrently would be unsafe.
+        The already-running executor services this call's response; this
+        thread only waits for it.
+
+        Args:
+            vertices_base_frame: (N, 3) points, already in base_frame (see
+                Registration.transform_points_to_base_frame()).
+            triangles: (M, 3) int indices into vertices.
+
+        Returns:
+            True on success.
+        """
         if not self._apply_planning_scene_client.wait_for_service(timeout_sec=5.0):
             self.status.emit("Could not reach /apply_planning_scene service.")
             return False
@@ -491,9 +511,8 @@ class MoveItBridge(QObject):
         return success
 
     def clear_skull_collision_object(self):
-        """Removes the skull collision object (e.g. before publishing an
-        updated one for a newly-loaded mesh -- ADD already replaces by id,
-        so this is mainly for an explicit "no skull" state)."""
+        """Removes the skull collision object. ADD already replaces by id,
+        so this is mainly for an explicit "no skull" state."""
         if not self._apply_planning_scene_client.wait_for_service(timeout_sec=5.0):
             return False
 

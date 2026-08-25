@@ -14,7 +14,7 @@ from scipy.spatial.transform import Rotation
 import calibrate_kinematics as ck
 
 CSV_PATHS = [
-    'C:/Users/ConformalUser/Desktop/cyton_setup/calibration/data/deployed_model_training_dataset_374pose.csv',
+    '../data/deployed_model_training_dataset_374pose.csv',
 ]
 angles_list, pos_list, quat_list = [], [], []
 for p in CSV_PATHS:

@@ -27,12 +27,12 @@ class TargetingConfig:
     # 2026-08-25: disabled by default. A scan of 15 random skull-surface
     # points found only 3/15 reachable with the probe's approach angle
     # constrained to ~0.057deg of exact-perpendicular, vs. 10/15 reachable
-    # with no orientation constraint at all -- the tight angle requirement,
+    # with no orientation constraint at all. The tight angle requirement,
     # not the skull obstacle or general arm reachability, was the dominant
     # cause of planning failures. User-chosen tradeoff: maximize
     # reachability for now; the probe's angle on arrival is unconstrained
     # until this is revisited (e.g. a looser but nonzero tolerance) once
-    # real hydrophone coupling accuracy needs are known.
+    # hydrophone coupling accuracy needs are known.
     enforce_orientation: bool = False
 
 
@@ -42,14 +42,21 @@ def _euler_to_matrix(rpy_rad):
 
 
 def rotation_matrix_to_rpy(R):
-    """Inverse of _euler_to_matrix()'s rotation part -- given a 3x3
-    rotation matrix (e.g. from point_registration.fit_rigid_transform()),
-    returns (roll, pitch, yaw) radians in the exact same convention, so a
-    fitted registration round-trips correctly into config.yaml's
+    """Inverse of _euler_to_matrix()'s rotation part. Given a 3x3 rotation
+    matrix (e.g. from point_registration.fit_rigid_transform()), returns
+    (roll, pitch, yaw) radians in the exact same convention, so a fitted
+    registration round-trips correctly into config.yaml's
     registration.rpy_rad field. Deliberately goes through
-    tf_transformations.euler_from_matrix() (the real inverse of
-    euler_matrix()) rather than a hand-derived formula -- guarantees
-    convention consistency instead of risking a subtly-wrong axis order."""
+    tf_transformations.euler_from_matrix(), the true inverse of
+    euler_matrix(), rather than a hand-derived formula. This guarantees
+    convention consistency instead of risking a subtly wrong axis order.
+
+    Args:
+        R: (3, 3) rotation matrix.
+
+    Returns:
+        (roll, pitch, yaw) radians.
+    """
     matrix4 = np.eye(4)
     matrix4[0:3, 0:3] = R
     roll, pitch, yaw = tf_transformations.euler_from_matrix(matrix4)
@@ -58,16 +65,24 @@ def rotation_matrix_to_rpy(R):
 
 def quaternion_looking_along(direction, up_hint=(0.0, 0.0, 1.0), roll_deg=0.0):
     """Quaternion (x, y, z, w) whose local +Z axis points along `direction`.
-    `up_hint` only resolves the otherwise-free rotation about that axis;
-    `roll_deg` is the knob that actually controls hydrophone roll, rotating
-    further about the approach axis on top of whatever `up_hint` picked --
-    up_hint's own zero point isn't physically meaningful, just consistent.
+    `up_hint` only resolves the otherwise-free rotation about that axis.
+    `roll_deg` is the knob that controls hydrophone roll, rotating further
+    about the approach axis on top of whatever `up_hint` picked; up_hint's
+    own zero point isn't physically meaningful, just consistent.
 
     Important: which local axis of `end_effector_frame` should point along
     the approach direction is a property of how the probe is physically
     mounted, and could not be verified from this repo alone. +Z is the
-    assumption below -- confirm against the real mount before trusting a
+    assumption below; confirm against the physical mount before trusting a
     computed orientation on real hardware.
+
+    Args:
+        direction: (3,) approach direction, any frame.
+        up_hint: (3,) reference direction resolving roll about `direction`.
+        roll_deg: Additional rotation about `direction`, in degrees.
+
+    Returns:
+        (x, y, z, w) quaternion.
     """
     x, y, z = look_at_basis(direction, up_hint=up_hint, roll_deg=roll_deg)
     rot = np.eye(4)
@@ -93,16 +108,16 @@ class Registration(ABC):
         (0-360, rotating around the normal). `roll_deg` additionally
         rotates the probe about its own final approach axis. The probe
         stops `standoff_mm` short of the picked point, measured back along
-        that same (possibly tilted) approach axis -- not simply along the
-        surface normal -- so it always ends up exactly standoff_mm from the
+        that same, possibly tilted, approach axis, not simply along the
+        surface normal, so it always ends up exactly standoff_mm from the
         target point regardless of tilt/azimuth.
         """
         raise NotImplementedError
 
     @abstractmethod
     def transform_points_to_base_frame(self, points_local):
-        """Batch version of the position half of mesh_point_to_target_pose()
-        -- transforms an (N, 3) array of mesh-local points into base_frame,
+        """Batch version of the position half of mesh_point_to_target_pose().
+        Transforms an (N, 3) array of mesh-local points into base_frame,
         with no standoff/tilt/orientation math. Used to move a whole mesh
         (e.g. for a MoveIt collision object, see
         MoveItBridge.set_skull_collision_object()) into base_frame at once,
@@ -140,10 +155,10 @@ class FixedPoseRegistration(Registration):
         # Tilt is applied here in the robot frame (post-registration).
         # mesh_view's live preview applies the same tilt/azimuth in the
         # mesh's local frame instead, for simplicity, which can pick a
-        # differently-oriented (but equally arbitrary) azimuth=0 reference
-        # -- harmless, since azimuth's zero point isn't physically
+        # differently oriented but equally arbitrary azimuth=0 reference.
+        # This is harmless, since azimuth's zero point isn't physically
         # meaningful either way, but means the preview's exact rotation
-        # won't always match this actual computed pose bit-for-bit.
+        # won't always match this computed pose bit-for-bit.
         approach_dir = tilt_direction(-normal_robot, tilt_deg, azimuth_deg)
 
         standoff_m = standoff_mm / 1000.0

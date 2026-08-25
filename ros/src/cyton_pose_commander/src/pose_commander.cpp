@@ -1,30 +1,29 @@
-// pose_commander: drives the arm through a CSV list of tick-domain joint
-// targets via MoveIt's MoveGroupInterface (collision-aware planning)
-// instead of commanding raw ticks directly.
-//
-// Plan-preview-then-confirm workflow: for each pose, this program PLANS
-// the move (moveGroup.plan(), not move()) and stops. MoveIt automatically
-// publishes the planned trajectory to /display_planned_path, which
-// RViz's MotionPlanning display shows with no extra code here. It waits
-// for Enter before calling execute() on that plan, so you get a visual
-// preview before committing. Ctrl+C at any point quits early.
-//
-// Originally the "move" half of a two-terminal MoveIt-driven NDI accuracy
-// check, superseded for that purpose by cyton_accuracy_check's single
-// combined program (a two-terminal handoff had a real timing race). Still
-// useful on its own for visually sanity-checking a batch of joint
-// configurations via RViz preview before trusting them.
-//
-// Default input is build/repeatability_test_8points_labeled.csv (only the
-// first 8 columns used; deviation columns printed for reference).
-// Deliberately not validation_ticks.csv. That dataset predates the
-// elbow_yaw permanent lock and targets tick_4 values outside its current
-// range.
-//
-// Tick to radian conversion goes through robot_calibration.cpp's
-// ticksToRadians() (compiled directly into this binary), not
-// reimplemented, per this project's rule that every jointCalibrations
-// consumer shares one calibrated conversion.
+/**
+ * @file pose_commander.cpp
+ * @brief Drives the arm through a CSV list of tick-domain joint targets
+ * via MoveIt's MoveGroupInterface (collision-aware planning), instead of
+ * commanding raw ticks directly.
+ *
+ * Plan-preview-then-confirm workflow: for each pose, plans the move
+ * (moveGroup.plan(), not move()) and stops. MoveIt automatically
+ * publishes the planned trajectory to /display_planned_path, which
+ * RViz's MotionPlanning display shows with no extra code here. Waits for
+ * Enter before calling execute() on that plan, so a visual preview
+ * happens before committing. Ctrl+C at any point quits early.
+ *
+ * Useful for visually sanity-checking a batch of joint configurations via
+ * RViz preview before trusting them; cyton_accuracy_check's combined
+ * program covers the synchronized move-then-NDI-capture case this does
+ * not.
+ *
+ * Default input is build/repeatability_test_8points_labeled.csv (only the
+ * first 8 columns used; deviation columns printed for reference).
+ *
+ * Tick-to-radian conversion goes through robot_calibration.cpp's
+ * ticksToRadians() (compiled directly into this binary), not
+ * reimplemented, per this project's rule that every jointCalibrations
+ * consumer shares one calibrated conversion.
+ */
 
 #include <algorithm>
 #include <array>
@@ -67,6 +66,11 @@ constexpr std::array<const char*, 7> JOINT_NAMES = {
     "wrist_roll_joint",
 };
 
+/**
+ * @brief One target pose read from the input CSV: its raw ticks and the
+ * corresponding radians (via ticksToRadians()), plus optional historical
+ * deviation figures carried through for reference only.
+ */
 struct TestPoint {
     int pointId = 0;
     std::array<int, 7> ticks{};
@@ -76,6 +80,11 @@ struct TestPoint {
     double gpCorrectedDeviationMm = 0.0;
 };
 
+/**
+ * @brief Splits one CSV line on commas.
+ * @param line Line to split.
+ * @return The comma-separated fields, in order.
+ */
 std::vector<std::string> splitCsvLine(const std::string& line) {
     std::vector<std::string> fields;
     std::stringstream ss(line);
@@ -86,6 +95,14 @@ std::vector<std::string> splitCsvLine(const std::string& line) {
     return fields;
 }
 
+/**
+ * @brief Loads TestPoint rows from a CSV (point_id, tick_0..tick_6[,
+ * physical_only_deviation_mm, gp_corrected_deviation_mm]).
+ * @param path CSV path to load.
+ * @return The loaded points, with radians already computed via
+ *         ticksToRadians().
+ * @throws std::runtime_error if `path` cannot be opened.
+ */
 std::vector<TestPoint> loadTestPoints(const std::string& path) {
     std::ifstream file(path);
     if (!file) {
@@ -140,16 +157,26 @@ std::vector<TestPoint> loadTestPoints(const std::string& path) {
     return points;
 }
 
+/**
+ * @brief Prints `message` and blocks until Enter is pressed.
+ * @param message Prompt text to print before waiting.
+ */
 void waitForEnter(const std::string& message) {
     std::cout << message << std::flush;
     std::string line;
     std::getline(std::cin, line);
 }
 
-// Returns [min, max] radian bounds for a joint from jointCalibrations,
-// pulled in by RECOVERY_BUFFER_RAD. Takes min/max of both endpoints'
-// converted values rather than assuming minTick maps to the lower bound,
-// in case direction is ever -1 for a future joint (it's always +1 today).
+/**
+ * @brief Computes [min, max] radian bounds for a joint from
+ * jointCalibrations, pulled in by RECOVERY_BUFFER_RAD. Takes min/max of
+ * both endpoints' converted values rather than assuming minTick maps to
+ * the lower bound, in case `direction` is ever -1 for a future joint (it
+ * is always +1 today).
+ * @param calibration Joint calibration to compute bounds for.
+ * @return (lower, upper) radian bounds, each pulled in from the raw
+ *         min/maxTick by RECOVERY_BUFFER_RAD.
+ */
 std::pair<double, double> safeBoundsRadians(const JointCalibration& calibration) {
     const double a = ticksToRadians(calibration, calibration.minTick);
     const double b = ticksToRadians(calibration, calibration.maxTick);
@@ -158,14 +185,20 @@ std::pair<double, double> safeBoundsRadians(const JointCalibration& calibration)
     return {lo + RECOVERY_BUFFER_RAD, hi - RECOVERY_BUFFER_RAD};
 }
 
-// Sends a one-off corrective trajectory directly to the arm_controller,
-// bypassing MoveIt's planning pipeline entirely. This is deliberate:
-// move_group refuses to plan anything while the current state is out of
-// bounds (START_STATE_INVALID), so MoveGroupInterface cannot fix it
-// itself. Shells out to the same `ros2 action send_goal` mechanism
-// already proven reliable for this exact recovery by hand, which is
-// simpler and lower-risk than a hand-rolled action client sharing this
-// node with MoveGroupInterface's own internal spinning behavior.
+/**
+ * @brief Sends a one-off corrective trajectory directly to the
+ * arm_controller, bypassing MoveIt's planning pipeline entirely.
+ *
+ * Deliberate: move_group refuses to plan anything while the current
+ * state is out of bounds (START_STATE_INVALID), so MoveGroupInterface
+ * cannot fix it itself. Shells out to `ros2 action send_goal` rather than
+ * a hand-rolled action client, avoiding any interaction with
+ * MoveGroupInterface's own internal spinning on this node.
+ *
+ * @param radians Target position, one value per joint in JOINT_NAMES
+ *        order.
+ * @return True if the action reported SUCCEEDED.
+ */
 bool sendCorrectiveTrajectory(const std::array<double, 7>& radians) {
     const std::string logPath = "/tmp/pose_commander_recovery.log";
 
@@ -193,18 +226,23 @@ bool sendCorrectiveTrajectory(const std::array<double, 7>& radians) {
     return content.find("SUCCEEDED") != std::string::npos;
 }
 
-// Checks the arm's live current state against jointCalibrations' safe
-// bounds (ordinary servo settling noise crossing a locked joint's
-// razor-thin URDF window is the recurring cause) and sends a corrective
-// trajectory if any joint is out. Returns true if already fine or
-// correction succeeded.
-//
-// Called proactively before every plan attempt, not just reactively after
-// a START_STATE_INVALID failure. The same problem can also surface
-// through move_group's CheckStartStateBounds adapter, which aborts before
-// assigning a specific error code (the client just sees a generic
-// FAILURE), which the old reactive-only version did not recognize as
-// recoverable.
+/**
+ * @brief Checks the arm's live current state against jointCalibrations'
+ * safe bounds and sends a corrective trajectory if any joint is out.
+ *
+ * Ordinary servo settling noise crossing a locked joint's razor-thin
+ * URDF window is the recurring cause. Called proactively before every
+ * plan attempt, not just reactively after a START_STATE_INVALID failure,
+ * since the same problem can also surface through move_group's
+ * CheckStartStateBounds adapter, which aborts before assigning a specific
+ * error code (the client just sees a generic FAILURE) and so cannot be
+ * distinguished from other failures after the fact.
+ *
+ * @param moveGroup Interface to read the current state from and, if
+ *        needed, correct.
+ * @return True if the state was already within bounds, or the correction
+ *         succeeded.
+ */
 bool ensureCurrentStateWithinBounds(moveit::planning_interface::MoveGroupInterface& moveGroup) {
     auto currentState = moveGroup.getCurrentState(2.0);
     if (!currentState) {
@@ -255,10 +293,9 @@ int main(int argc, char** argv) {
 
     // getCurrentState() (used by the recovery path) depends on this node's
     // CurrentStateMonitor subscription to /joint_states, which needs the
-    // node to actually be spinning. Without it, getCurrentState() times
-    // out ("latest received state has time 0.000000"). This is a
-    // standard, supported pattern alongside MoveGroupInterface's own
-    // internal handling.
+    // node spinning. Without it, getCurrentState() times out ("latest
+    // received state has time 0.000000"). This is a standard, supported
+    // pattern alongside MoveGroupInterface's own internal handling.
     rclcpp::executors::SingleThreadedExecutor executor;
     executor.add_node(node);
     std::thread spinThread([&executor]() { executor.spin(); });

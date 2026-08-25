@@ -1,35 +1,38 @@
-// move_between_points: given a sequence of real, NDI-measured target points
-// (collected via cyton_ndi_capture's ndi_measure), commands the arm to
-// visit each one via a RELATIVE Cartesian move from its live current
-// position, and measures the real error at each stop.
-//
-// Rationale: a relative move and an absolute move are the same MoveIt
-// request under the hood. What matters is where the delta is anchored.
-// Anchoring to the arm's live current position each hop means each hop
-// only needs the arm's short-term repeatability, not full absolute
-// calibration accuracy, and self-corrects prior drift instead of
-// compounding it.
-//
-// Target points are recorded in the NDI tracker's frame, but MoveIt needs
-// the delta in its own base_link frame. These frames differ by a real,
-// substantial rotation (R_MOVEIT_TO_NDI below). Only the rotation matters
-// here, since translation cancels out for a delta vector, so this tool is
-// far less sensitive to base-frame translation uncertainty than
-// absolute-position tests elsewhere in this project.
-//
-// NdiTracker and its dependencies are copied verbatim from
-// run_accuracy_check.cpp and move_x_test.cpp, originally from
-// cyton_ndi_capture/src/ndi_measure.cpp, and are already hardware-validated.
-//
-// Orientation-target fix: targetPose's orientation used to be copied from
-// getCurrentPose() every hop, preserving the current orientation instead
-// of the originally-recorded target, so small per-hop drift accumulated
-// uncorrected. This was confirmed on a real run that ended up visibly
-// bent. The fix reads the orientation already recorded per point in any
-// ndi_measure or record_waypoints CSV: moveit_pose_qw/qx/qy/qz for the IK
-// target, and moving_relative_fixed_q0/qx/qy/qz for measuring error
-// against the NDI-measured result. It falls back to the old behavior
-// with a warning if a CSV lacks these columns.
+/**
+ * @file move_between_points.cpp
+ * @brief Given a sequence of NDI-measured target points (collected via
+ * cyton_ndi_capture's ndi_measure), commands the arm to visit each one
+ * via a relative Cartesian move from its live current position, and
+ * measures the real error at each stop.
+ *
+ * Rationale: a relative move and an absolute move are the same MoveIt
+ * request under the hood; what matters is where the delta is anchored.
+ * Anchoring to the arm's live current position each hop means each hop
+ * only needs the arm's short-term repeatability, not full absolute
+ * calibration accuracy, and self-corrects prior drift instead of
+ * compounding it.
+ *
+ * Target points are recorded in the NDI tracker's frame, but MoveIt
+ * needs the delta in its own base_link frame. These frames differ by a
+ * substantial rotation (R_MOVEIT_TO_NDI below). Only the rotation matters
+ * here, since translation cancels out for a delta vector, so this tool
+ * is far less sensitive to base-frame translation uncertainty than
+ * absolute-position tests elsewhere in this project.
+ *
+ * NdiTracker and its dependencies are copied verbatim from
+ * run_accuracy_check.cpp and move_x_test.cpp, originally from
+ * cyton_ndi_capture/src/ndi_measure.cpp, and are already
+ * hardware-validated.
+ *
+ * Each hop's target orientation is re-pinned to the originally recorded
+ * target every time, rather than inherited from the current live pose,
+ * so per-hop orientation error cannot accumulate across the sequence.
+ * Reads the orientation already recorded per point in any ndi_measure or
+ * record_waypoints CSV: moveit_pose_qw/qx/qy/qz for the IK target, and
+ * moving_relative_fixed_q0/qx/qy/qz for measuring error against the
+ * NDI-measured result. Falls back to inheriting the current orientation,
+ * with a warning, if a CSV lacks these columns.
+ */
 
 #include <algorithm>
 #include <array>

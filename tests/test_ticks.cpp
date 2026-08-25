@@ -1,9 +1,21 @@
+/**
+ * @file test_ticks.cpp
+ * @brief Interactive single-joint test: reads a motor's current position,
+ * checks a hardcoded target against jointCalibrations, then moves to it
+ * on confirmation via moveJointSafely(). Works directly in raw ticks, not
+ * radians; see test_radians.cpp for the angle-based equivalent.
+ */
+
 #include <iostream>
 #include <cstdint>
 #include <limits>
 
 #include "dynamixel_motor.h"
 
+/**
+ * @brief Prints `message` and blocks until Enter is pressed.
+ * @param message Prompt text to print before waiting.
+ */
 void waitForEnter(const std::string& message)
 {
     std::cout << message;

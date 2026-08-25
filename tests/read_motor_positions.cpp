@@ -1,3 +1,10 @@
+/**
+ * @file read_motor_positions.cpp
+ * @brief Connects to the arm and prints each of the 7 joints' present
+ * position in raw ticks. Read-only; does not enable torque or move
+ * anything.
+ */
+
 #include <cstdint>
 #include <iostream>
 #include <vector>

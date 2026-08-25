@@ -32,23 +32,23 @@ DESIGN PATTERN SUMMARIZED
 
 The window is split into three columns, each a self-contained panel:
 
-1. Targeting panel (left) -- everything about the mesh and target picking:
-   load mesh, pick/preview targets, predefined points, search-area grid
-   generation, alignment parameters (standoff, tilt, azimuth, roll).
+1. Targeting panel (left): everything about the mesh and target picking.
+   Load mesh, pick and preview targets, predefined points, search-area
+   grid generation, alignment parameters (standoff, tilt, azimuth, roll).
 
-2. Motion panel (middle) -- everything about the robot arm and planning:
-   connect to MoveIt, plan to target, preview trajectory, execute move,
+2. Motion panel (middle): everything about the robot arm and planning.
+   Connect to MoveIt, plan to target, preview trajectory, execute move,
    result details (actual vs. target, plan quality).
 
-3. Log panel (right) -- a single scrolling read-only text feed shared by
-   both panels, so the operator always has one place to look for status/
-   errors/warnings regardless of which panel raised them.
+3. Log panel (right): a single scrolling read-only text feed shared by
+   both panels, so the operator always has one place to look for status,
+   errors, and warnings regardless of which panel raised them.
 
-Within each panel, controls that only make sense once a device is connected
-start disabled -- this stops an operator from e.g. planning a trajectory
-when the robot isn't available. That's a small but important UX pattern
-worth copying: gate device-dependent controls behind the connection state,
-don't just let them throw errors when clicked.
+Within each panel, controls that only make sense once a device is
+connected start disabled. This stops an operator from, for example,
+planning a trajectory when the robot isn't available. That's a small but
+important UX pattern worth copying: gate device-dependent controls behind
+the connection state, don't just let them throw errors when clicked.
 
 Each target can have per-target alignment parameters (saved per pick), and
 a CSV log tracks the full history: mesh point, intended pose, planned
@@ -466,9 +466,9 @@ def build_log_panel() -> QGroupBox:
 class TargetingMockupWindow(QMainWindow):
     """Top-level window: three panels side by side.
 
-    Left (targeting): mesh + targeting controls -- fixed width.
-    Middle (motion): robot + planning controls -- fixed width.
-    Right (log): status/error log -- takes remaining space.
+    Left (targeting): mesh and targeting controls, fixed width.
+    Middle (motion): robot and planning controls, fixed width.
+    Right (log): status and error log, takes remaining space.
     """
 
     def __init__(self) -> None:

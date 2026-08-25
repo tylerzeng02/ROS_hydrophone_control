@@ -1,3 +1,20 @@
+/**
+ * @file test_ndi_single_tool.cpp
+ * @brief Connects to an NDI Polaris Spectra over serial, loads a single
+ * wireless passive-marker tool's .rom geometry, and polls its tracked
+ * pose via the binary BX command.
+ *
+ * Follows NDI's documented port-handle flow: INIT -> PHRQ -> PVWR ->
+ * PINIT -> PENA -> TSTART, then polls with BX (not the ASCII TX command,
+ * which never resolves markers on this hardware even when the port
+ * reports healthy). Also includes built-in diagnostics
+ * (freeAllExistingHandles(), sweepVolumes()) that run automatically when
+ * zero valid transforms are seen, to separate stale-port-handle causes
+ * from measurement-volume causes of a persistent missing-marker result.
+ * .rom file path and COM port are hardcoded, machine-specific absolute
+ * paths.
+ */
+
 #include <chrono>
 #include <cmath>
 #include <iomanip>

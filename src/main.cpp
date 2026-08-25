@@ -1,3 +1,16 @@
+/**
+ * @file main.cpp
+ * @brief Early standalone demo: enables torque, checks all 8 motors are
+ * within their safe range, then runs a hardcoded trajectory to a test
+ * pose and back to home, printing electrical status along the way.
+ *
+ * Hardcodes /dev/ttyUSB1, a Linux device path. Predates the Windows-
+ * targeted tests/*.cpp programs (which use COM4) and is not kept in sync
+ * with them. Treat this as a reference and demo, not the project's
+ * current entry point; see tests/ for the actively maintained
+ * hardware-in-the-loop programs.
+ */
+
 #include <iostream>
 #include <vector>
 #include <string>

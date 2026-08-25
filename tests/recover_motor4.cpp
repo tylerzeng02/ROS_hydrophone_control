@@ -1,12 +1,16 @@
-// One-off recovery utility (2026-08-07): drives motor 4 (elbow_yaw) back to
-// its locked validation tick (2095) when it is physically outside the safe
-// range jointCalibrations enforces. moveJointSafely()'s pre-move check
-// requires the current position to already be in-range, not just the
-// target, so it refuses to fix an out-of-range starting position itself.
-// Uses setGoalPosition() directly (still safety-checks the target position,
-// just not the current one), same pattern as record_hand_poses.cpp's
-// auto-drive-to-tick polling loop. Not meant to be a general-purpose tool;
-// delete once the immediate recovery is done.
+/**
+ * @file recover_motor4.cpp
+ * @brief One-off recovery utility: drives motor 4 (elbow_yaw) back to its
+ * locked validation tick (2095) when it is physically outside the safe
+ * range jointCalibrations enforces.
+ *
+ * moveJointSafely()'s pre-move check requires the current position to
+ * already be in range, not just the target, so it refuses to fix an
+ * out-of-range starting position itself. Uses setGoalPosition() directly
+ * (still safety-checks the target position, just not the current one),
+ * the same pattern as record_hand_poses.cpp's auto-drive-to-tick polling
+ * loop. Not meant to be a general-purpose tool.
+ */
 #include <chrono>
 #include <cmath>
 #include <cstdint>

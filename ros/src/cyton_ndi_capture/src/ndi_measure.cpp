@@ -1,38 +1,35 @@
-// ndi_measure: standalone NDI Polaris measurement tool for checking
-// MoveIt-commanded poses against independent NDI ground truth.
-//
-// Workflow: position the arm however you like via MoveIt/RViz (this tool
-// never commands the arm itself), then press Enter here to record one
-// measurement. It logs the live /joint_states and MoveGroupInterface's
-// own live getCurrentPose() (base_link frame) alongside the NDI-measured
-// moving-tool-relative-to-fixed-tool pose to CSV. Repeat for as many poses
-// as you want; Ctrl+C to quit.
-//
-// This is the NDI measurement half of
-// calibration/collection/ndi_capture_and_validate.cpp only. The
-// NdiTracker class and its direct dependencies (structs, quaternion math,
-// BX polling/averaging) are ported over close to verbatim, since that code
-// is already hardware-validated. Changes from the original:
-//   1. The Windows-only <conio.h> pause/skip/manual-mode hotkeys are
-//      stripped entirely (handleUserControls() is now a no-op). This tool
-//      does not drive the arm through a long unattended pose list the way
-//      the original did, so there is nothing long-running to pause or skip.
-//      If a tool loses tracking visibility, this just keeps retrying
-//      indefinitely (same "warn periodically, never abort" philosophy as
-//      the original) until you either fix visibility or Ctrl+C.
-//   2. Joint values come from live ROS /joint_states (whatever MoveIt/
-//      ros2_control last reported), not from directly reading Dynamixel
-//      ticks. This tool has no DynamixelMotor dependency at all.
-//   3. Each capture also logs MoveGroupInterface::getCurrentPose(). Pairing
-//      that MoveIt-frame pose with the same capture's NDI-frame pose is
-//      exactly the input a Kabsch/Procrustes fit needs to re-derive
-//      move_between_points.cpp's hardcoded NDI-to-MoveIt rotation, since
-//      the fixed marker's orientation can drift between sessions. Using
-//      MoveIt's own live pose here, rather than recomputing FK offline in
-//      Python from the joint angles, means this is exactly what MoveIt
-//      itself believes the pose is, with no risk of a subtle mismatch
-//      between an offline reimplementation and whatever the real
-//      URDF/robot_state is doing internally.
+/**
+ * @file ndi_measure.cpp
+ * @brief Standalone NDI Polaris measurement tool for checking
+ * MoveIt-commanded poses against independent NDI ground truth.
+ *
+ * Workflow: position the arm however you like via MoveIt/RViz (this tool
+ * never commands the arm itself), then press Enter here to record one
+ * measurement. Logs the live /joint_states and
+ * MoveGroupInterface::getCurrentPose() (base_link frame) alongside the
+ * NDI-measured moving-tool-relative-to-fixed-tool pose to CSV. Repeat for
+ * as many poses as needed; Ctrl+C to quit.
+ *
+ * This is the NDI measurement half of
+ * calibration/collection/ndi_capture_and_validate.cpp. The NdiTracker
+ * class and its direct dependencies (structs, quaternion math, BX
+ * polling/averaging) are ported close to verbatim, since that code is
+ * already hardware-validated. Differences from the original:
+ *  1. No pause/skip/manual-mode hotkeys (handleUserControls() is a
+ *     no-op): this tool has no long unattended pose list to pause or skip
+ *     through. A tool losing tracking visibility just keeps retrying
+ *     indefinitely until visibility returns or Ctrl+C.
+ *  2. Joint values come from live ROS /joint_states, not from reading
+ *     Dynamixel ticks directly; this tool has no DynamixelMotor
+ *     dependency.
+ *  3. Each capture also logs MoveGroupInterface::getCurrentPose().
+ *     Pairing that MoveIt-frame pose with the same capture's NDI-frame
+ *     pose is exactly the input a Kabsch/Procrustes fit needs to
+ *     re-derive move_between_points.cpp's NDI-to-MoveIt rotation, since
+ *     the fixed marker's orientation can drift between sessions. Using
+ *     MoveIt's own live pose, rather than recomputing FK offline, means
+ *     this is exactly what MoveIt itself believes the pose is.
+ */
 
 #include <algorithm>
 #include <array>

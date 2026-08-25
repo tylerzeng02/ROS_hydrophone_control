@@ -1,16 +1,19 @@
-// move_xyz_test: like move_x_test.cpp, but commands a Cartesian delta on
-// all three axes at once (dx, dy, dz all plugged in on the command line),
-// rather than one axis at a time. Otherwise identical mechanism: relative
-// move (current pose + delta) via real IK (MoveGroupInterface::
-// setPoseTarget()), verified against the NDI Polaris tracker's own
-// before/after measurement of the moving marker relative to the fixed
-// marker. See move_x_test.cpp for why this sidesteps the base-frame and
-// tool-frame fitting problem entirely.
-//
-// NdiTracker and its dependencies are copied verbatim from move_x_test.cpp
-// (itself copied verbatim from cyton_ndi_capture/src/ndi_measure.cpp).
-// This is already hardware-validated NDI connect/BX-polling/averaging
-// code, not reimplemented here.
+/**
+ * @file move_xyz_test.cpp
+ * @brief Like move_x_test.cpp, but commands a Cartesian delta on all
+ * three axes at once (dx, dy, dz all plugged in on the command line),
+ * rather than one axis at a time. Otherwise identical mechanism: a
+ * relative move (current pose + delta) via real IK
+ * (MoveGroupInterface::setPoseTarget()), verified against the NDI
+ * Polaris tracker's own before/after measurement of the moving marker
+ * relative to the fixed marker. See move_x_test.cpp for why this
+ * sidesteps the base-frame and tool-frame fitting problem entirely.
+ *
+ * NdiTracker and its dependencies are copied verbatim from
+ * move_x_test.cpp (itself copied from
+ * cyton_ndi_capture/src/ndi_measure.cpp), already hardware-validated NDI
+ * connect/BX-polling/averaging code.
+ */
 
 #include <array>
 #include <cmath>
