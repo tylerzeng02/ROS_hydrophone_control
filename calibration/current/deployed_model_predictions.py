@@ -1,38 +1,31 @@
-"""Validates the real-world accuracy of the calibration corrections actually
-DEPLOYED to src/robot_calibration.cpp and
-references/cyton_gamma_1500_trac_ik.urdf (as of 2026-08-06) -- distinct from
-every other script in this directory, which fits/tests a richer 60-param
-research model (offset+scale+tilt+origin+joint-coupling+gravity-deflection+
-shoulder_pitch-Fourier). Only the static subset (offset/scale/tilt/origin)
-was ever baked into the URDF -- the pose-dependent terms (coupling, gravity,
-Fourier) can't live in a static URDF and were never deployed. Testing
-against the full 60-param model (as gen_validation_predictions.py does)
-answers "how good is our best research model"; this script answers "how
-good is what's actually in the URDF right now."
+"""Computes predicted end-effector positions using the calibration model
+deployed to src/robot_calibration.cpp and
+references/cyton_gamma_1500_trac_ik.urdf (as of 2026-08-06), for comparison
+against NDI measurements taken by ndi_capture_and_validate.exe --validate.
 
-Joint-level parameters are HARDCODED here to their exact deployed values
-(copied directly from src/robot_calibration.cpp's jointCalibrations array
-and references/cyton_gamma_1500_trac_ik.urdf's <axis>/<origin>), not fit.
-The only thing fit is the base-frame/tool-frame transform (12 params)
-needed to translate a predicted end-effector pose into the NDI tracker's
-measurement frame (moving-marker-relative-to-fixed-marker) -- nothing in
-the deployed system relates base_link to that frame (deliberately: that
-transform is anchored to the calibration rig, not real deployment). This
-mirrors exactly how calibrate_kinematics.py treats
-base_xyz/base_rpy (unregularized, unknown rig geometry) and tool_xyz/
-tool_rpy (weakly regularized around nominal, since the marker mount is
-close to its designed position) -- just isolated here since joint offsets
-are not being fit.
+The deployed model has 48 parameters (offset/scale/tilt/origin). The full
+60-param model (adds joint-coupling, gravity-deflection, and a
+shoulder_pitch Fourier term) is archived at
+calibration/archive/60param_model/. Only offset/scale/tilt/origin were
+baked into the URDF; the other terms are pose-dependent and cannot be
+represented in a static URDF, so they were never deployed.
 
-IMPORTANT: angles are recomputed from each CSV row's actual_tick_* columns
-via this script's own ticks_to_deployed_radians(), NOT read from the CSV's
-actual_rad_* columns. Those columns are written by whatever version of
-ticksToRadians() was compiled into ndi_capture_and_validate.cpp at
-capture time -- the 374-pose deployed_model_training_dataset_374pose.csv (this
-dataset) was captured BEFORE the 2026-08-06 deployment (pre-correction angles), while
-the new batch2 data was captured with the current, already-corrected
-binary (post-correction angles). Recomputing from raw ticks with a single,
-explicit deployed formula sidesteps that inconsistency entirely.
+Joint-level parameters (zeroTick, direction, scale, axis, origin) are
+hardcoded here to their deployed values, copied directly from
+src/robot_calibration.cpp's jointCalibrations array and
+references/cyton_gamma_1500_trac_ik.urdf's <axis>/<origin>. They are not
+fit by this script.
+
+The only parameters fit here are the base-frame and tool-frame transform
+(12 params total), which map a predicted end-effector pose into the NDI
+tracker's measurement frame (moving-marker-relative-to-fixed-marker). This
+transform is not part of the deployed system: base_link's relationship to
+the tracker frame is specific to the calibration rig, not real deployment,
+so it must be fit separately here. base_xyz/base_rpy are left
+unregularized (rig geometry has no known nominal value); tool_xyz/tool_rpy
+are weakly regularized around zero (the marker mount is close to its
+designed position). This matches calibrate_kinematics.py's treatment of
+the same two frames.
 
 Usage:
     python deployed_model_predictions.py --fit-csv a.csv,b.csv --points ticks.csv --out predictions.csv
@@ -139,14 +132,12 @@ def residual(x, angles, pos_mm, quat_xyzw):
             Rotation.from_matrix(R_err).as_rotvec()
             * ck.ORIENTATION_SCALE_MM * ck.ORIENTATION_WEIGHT
         )
-    # Regularize tool_xyz toward zero only (a mild small-value prior on the
-    # marker-mount translation). tool_rpy/base_xyz/base_rpy are left
-    # unregularized, matching every "current best" script in this project.
-    # The core calibrate_kinematics.py's tight ±10mm/±10deg/±180deg
-    # bounds+regularization on these caused bound-pinning (confirmed
-    # directly: even the known-good 374-pose dataset blows up to ~70mm RMS
-    # under those tight bounds), so this script follows the wider, proven
-    # convention instead.
+    # Only tool_xyz is regularized toward zero. tool_rpy, base_xyz, and
+    # base_rpy are not. calibrate_kinematics.py bounds and regularizes all
+    # four tightly (tool ±10mm/±10deg, base ±180deg); with the 374-pose
+    # dataset, those bounds pin the fit at its boundary and produce ~70mm
+    # RMS. This script omits that regularization to avoid the same
+    # bound-pinning failure.
     reg = p["tool_xyz"] * (ck.TOOL_REG_WEIGHT / TOOL_XYZ_BOUND_M)
     return np.concatenate([pos_res.ravel(), orient_res.ravel(), reg])
 
@@ -164,8 +155,8 @@ def bounds():
 
 
 def x0(angles, pos_mm, quat_xyzw):
-    # Closed-form base guess (assuming nominal tool) so the optimizer starts
-    # near a sane answer rather than at identity.
+    # Closed-form base guess (assuming nominal tool), used as the optimizer's
+    # starting point instead of identity.
     T_fk = forward_kinematics_deployed(angles[0])
     T_tool_nominal = ck.build_tool_transform(np.zeros(3), np.zeros(3))
     T_partial = T_fk @ T_tool_nominal
@@ -281,7 +272,7 @@ def main():
                   f"({pred_mm[0]:.2f}, {pred_mm[1]:.2f}, {pred_mm[2]:.2f})")
 
     print(f"\nWrote {len(ticks_rows)} predicted test points (deployed model) to {args.out}")
-    print(f"Run on the arm with: ./ndi_capture_and_validate --validate {args.out}")
+    print(f"Run on the arm with: ndi_capture_and_validate.exe --validate {args.out}")
 
 
 if __name__ == "__main__":

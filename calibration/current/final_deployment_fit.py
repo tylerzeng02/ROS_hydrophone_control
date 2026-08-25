@@ -1,3 +1,14 @@
+"""Fits the full 60-param model (offset/scale/tilt/origin/coupling/gravity/
+Fourier) on the deployed dataset and prints every parameter. This is the
+script that produced the values hardcoded into src/robot_calibration.cpp
+and references/cyton_gamma_1500_trac_ik.urdf.
+
+Only offset/scale/tilt/origin (the static 48 params) were ever baked into
+those files. Coupling, gravity, and the Fourier term are pose-dependent
+and cannot be represented in a static URDF, so they are printed for
+reference but not deployed.
+"""
+
 import numpy as np
 from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
@@ -19,6 +30,9 @@ print(f'Total combined: {n_all} poses')
 
 SHOULDER_ROLL_IDX, SHOULDER_PITCH_IDX, SHOULDER_YAW_IDX = 0, 1, 2
 ELBOW_PITCH_IDX, ELBOW_YAW_IDX, WRIST_PITCH_IDX, WRIST_ROLL_IDX = 3, 4, 5, 6
+# These 3 pairs are the only ones that survived screening for real,
+# non-redundant coupling signal; each tuple is (joint_i, joint_j, target),
+# target being the joint whose correction absorbs the i*j product term.
 COUPLE_TERMS = [(SHOULDER_ROLL_IDX, SHOULDER_YAW_IDX, SHOULDER_YAW_IDX), (SHOULDER_YAW_IDX, ELBOW_YAW_IDX, ELBOW_YAW_IDX), (SHOULDER_PITCH_IDX, ELBOW_PITCH_IDX, ELBOW_PITCH_IDX)]
 N_COUPLE = len(COUPLE_TERMS); N_GRAVITY = 7
 PERP = []
@@ -98,6 +112,12 @@ def make_res(angles,pos,quat):
         reg=np.concatenate([params.joint_offsets*(8.0/np.radians(8.0)),params.tool_xyz*(1.0/0.01),params.tool_rpy*(1.0/np.radians(10.0)),tl.ravel()*(TW/TS),(js-1.0)*SW,fab*(FW/FS),cc*(CW/CS),gc*(GW/GS)])
         return np.concatenate([pr.ravel(),orr.ravel(),reg])
     return res
+# Bounds are physically-motivated per parameter type (e.g. 15deg max
+# tilt/joint-offset, 10cm max tool translation), wide enough to not clip
+# any value seen in prior fits. tool_rpy, base_xyz, and base_rpy are left
+# unbounded: base has no known nominal value (as in calibrate_kinematics.py),
+# and tool_rpy is deliberately widened here past calibrate_kinematics.py's
+# tight +-10deg, which caused bound-pinning on this dataset.
 def bounds():
     lo=np.concatenate([-np.radians(15.0)*np.ones(7),-0.10*np.ones(3),[-np.inf]*3,[-np.inf]*3,[-np.inf]*3,0.90*np.ones(N_SCALE),-np.radians(15.0)*np.ones(N_TILT),-0.05*np.ones(3),-0.05*np.ones(2),-0.05*np.ones(3),-np.radians(15.0)*np.ones(2),-CB*np.ones(N_COUPLE),-GB*np.ones(N_GRAVITY)])
     up=np.concatenate([np.radians(15.0)*np.ones(7),0.10*np.ones(3),[np.inf]*3,[np.inf]*3,[np.inf]*3,1.10*np.ones(N_SCALE),np.radians(15.0)*np.ones(N_TILT),0.05*np.ones(3),0.05*np.ones(2),0.05*np.ones(3),np.radians(15.0)*np.ones(2),CB*np.ones(N_COUPLE),GB*np.ones(N_GRAVITY)])
