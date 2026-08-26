@@ -18,6 +18,17 @@ CURRENT_R_MOVEIT_TO_NDI = np.array([
 
 
 def load_pairs(path):
+    """Loads paired MoveIt/NDI position readings from a capture CSV,
+    dropping rows where getCurrentPose() failed (a real, distinguishable
+    sentinel: exact zero position with identity orientation never occurs
+    from a real reading).
+
+    Args:
+        path: Path to the capture CSV.
+
+    Returns:
+        Tuple of (moveit_pts, ndi_pts), each (N, 3) arrays in millimeters.
+    """
     moveit_pts, ndi_pts = [], []
     skipped = 0
     with open(path, newline="") as f:
@@ -64,6 +75,8 @@ def rms_delta_error_mm(R, P, Q):
 
 
 def main():
+    """Fits R_MOVEIT_TO_NDI on the given capture CSV and prints it
+    alongside an RMS comparison against the currently deployed rotation."""
     if len(sys.argv) != 2:
         print(f"Usage: {sys.argv[0]} <input_csv>", file=sys.stderr)
         sys.exit(1)

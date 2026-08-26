@@ -1,1 +1,0 @@
-target_index,mesh_point_x_mm,mesh_point_y_mm,mesh_point_z_mm,mesh_normal_x,mesh_normal_y,mesh_normal_z,standoff_mm,tilt_deg,azimuth_deg,roll_deg,target_pose_x_m,target_pose_y_m,target_pose_z_m,target_pose_qx,target_pose_qy,target_pose_qz,target_pose_qw,plan_result,execute_result

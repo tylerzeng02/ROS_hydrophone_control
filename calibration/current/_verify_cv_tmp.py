@@ -1,9 +1,9 @@
-"""Validates the deployed 48-param model (offset/scale/tilt/origin) via
-blocked 8-fold cross-validation: folds are contiguous pose_id ranges, not
-a random shuffle. TARGET_POSES is a sequence of near-identical trajectory
-steps, so a random split puts each held-out pose's near-twin in the
-training set and reports an optimistic test RMS; blocked folds do not
-have that leak.
+"""Validates the deployed 48-param model (offset/scale/tilt/origin, no
+coupling/gravity/Fourier) via blocked 8-fold cross-validation: folds are
+contiguous pose_id ranges, not a random shuffle. TARGET_POSES is a
+sequence of near-identical trajectory steps, so a random split puts each
+held-out pose's near-twin in the training set and reports an optimistic
+test RMS; blocked folds do not have that leak.
 """
 
 import csv
@@ -15,7 +15,7 @@ from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
 import calibrate_kinematics as ck
 
-FIT_CSV = "C:/Users/ConformalUser/Desktop/cyton_setup/calibration/data/deployed_model_training_dataset_374pose.csv"
+FIT_CSV = "../data/deployed_model_training_dataset_374pose.csv"
 # Writes next to this script rather than a fixed external directory, so
 # the script runs regardless of which machine's calibration folder layout
 # is currently in use.

@@ -3,12 +3,10 @@ deployed to src/robot_calibration.cpp and
 references/cyton_gamma_1500_trac_ik.urdf (as of 2026-08-06), for comparison
 against NDI measurements taken by ndi_capture_and_validate.exe --validate.
 
-The deployed model has 48 parameters (offset/scale/tilt/origin). The full
-60-param model (adds joint-coupling, gravity-deflection, and a
-shoulder_pitch Fourier term) is archived at
-calibration/archive/60param_model/. Only offset/scale/tilt/origin were
-baked into the URDF; the other terms are pose-dependent and cannot be
-represented in a static URDF, so they were never deployed.
+The deployed model has 48 parameters (offset/scale/tilt/origin). A
+shoulder_pitch Fourier term was also fit but never baked into the URDF:
+it is pose-dependent and cannot be represented in a static URDF geometry
+file, so only offset/scale/tilt/origin were ever deployed.
 
 Joint-level parameters (zeroTick, direction, scale, axis, origin) are
 hardcoded here to their deployed values, copied directly from

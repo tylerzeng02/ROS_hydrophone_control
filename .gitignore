@@ -49,6 +49,12 @@ calibration/current/build/
 calibration/current/install/
 calibration/current/log/
 
+# Auto-generated per-session logs from fus_targeting_gui (one new file per
+# GUI launch, written by main_window.py's _start_csv_log()). These are a
+# running usage log, not curated test/calibration data, so new ones should
+# not be pushed by default.
+ros/fus_targeting_session_*.csv
+
 # Editor and OS files
 .vscode/
 .idea/

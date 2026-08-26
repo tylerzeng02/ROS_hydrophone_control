@@ -10,10 +10,9 @@ See `CLAUDE.md`'s kinematic-calibration history for the full story.
   model (in `src/robot_calibration.cpp` / `references/cyton_gamma_1500_trac_ik.urdf`)
   was actually fit on. Blocked-CV RMS 0.78mm — the best validated result in
   the project. Read by `calibration/current/final_deployment_fit.py`,
-  `validate_48param_model_blocked_cross_validation.py`,
-  `deployed_model_predictions.py`, and
-  `pid_tuning/scripts/fit_shoulder_pitch_i_gain_8_correction_term.py`. This
-  is the one file you need to reproduce the deployed model.
+  `validate_48param_model_blocked_cross_validation.py`, and
+  `deployed_model_predictions.py`. This is the one file you need to
+  reproduce the deployed model.
 
 `marker_drift_recheck_dataset_377pose.csv` (a from-scratch recollection of
 the same batch, done to verify a suspected NDI marker drift hadn't
