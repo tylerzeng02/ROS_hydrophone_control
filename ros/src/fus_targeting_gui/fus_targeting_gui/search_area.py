@@ -82,3 +82,68 @@ def generate_scan_grid(boundary_points_3d, boundary_normals_3d, spacing_mm):
                 grid_points_3d.append(tuple(point_3d.tolist()))
 
     return grid_points_3d, tuple(plane_normal.tolist())
+
+
+def generate_volume_probing_points(surface_results, centroid, height_fraction, depth_spacing_mm):
+    """Extends each already-raycast surface point into a column of points
+    running inward toward `centroid`, turning a flat surface scan into a
+    3D probing volume. Each column's own length is scaled to that point's
+    own distance to the centroid, not a single absolute depth: this is
+    what makes the volume automatically fit within the skull regardless of
+    its size, rather than needing a hardcoded depth that could overshoot a
+    smaller skull or undershoot a larger one. height_fraction=1.0 reaches
+    exactly the centroid; lower values stop short of it.
+
+    All points on a given column share the same normal (the column's own
+    direction, pointing from the centroid out through the surface point),
+    since every point on a straight line toward one center has the same
+    radially-outward direction -- the natural generalization of "surface
+    normal" to a point that is not on the surface.
+
+    Args:
+        surface_results: list of (surface_point, surface_normal) tuples,
+            already raycast onto the real mesh (see mesh_view.py's
+            raycast_onto_surface()). surface_normal is unused here (kept
+            in the signature only so the caller can pass its raycast
+            results through unchanged); the column direction is derived
+            from centroid instead, since that stays valid off the surface
+            where no true mesh normal exists.
+        centroid: (3,) mesh-local point the columns extend toward (see
+            MeshView.get_mesh_centroid()).
+        height_fraction: 0-1, how far each column reaches toward centroid,
+            as a fraction of that column's own surface-to-centroid distance.
+        depth_spacing_mm: spacing between points along each column, in mm.
+
+    Returns:
+        List of (point_3d, normal_3d) tuples, mesh-local frame, ready to
+        be fed through Registration.mesh_point_to_target_pose() exactly
+        like any other target.
+    """
+    if depth_spacing_mm <= 0:
+        raise ValueError("depth_spacing_mm must be positive.")
+    if not (0.0 <= height_fraction <= 1.0):
+        raise ValueError("height_fraction must be between 0 and 1.")
+
+    centroid = np.asarray(centroid, dtype=float)
+    depth_spacing_m = depth_spacing_mm / 1000.0
+
+    points = []
+    for surface_point, _surface_normal in surface_results:
+        surface_point = np.asarray(surface_point, dtype=float)
+        to_centroid = centroid - surface_point
+        distance = np.linalg.norm(to_centroid)
+        if distance < 1e-9:
+            continue  # a boundary point exactly at the centroid; degenerate, skip it
+        direction_inward = to_centroid / distance
+        direction_outward = -direction_inward  # column's shared "normal"
+
+        max_depth = distance * height_fraction
+        n_steps = max(int(np.floor(max_depth / depth_spacing_m)) + 1, 1)
+        for step in range(n_steps):
+            depth = min(step * depth_spacing_m, max_depth)
+            point = surface_point + direction_inward * depth
+            points.append((tuple(point.tolist()), tuple(direction_outward.tolist())))
+            if depth >= max_depth:
+                break
+
+    return points

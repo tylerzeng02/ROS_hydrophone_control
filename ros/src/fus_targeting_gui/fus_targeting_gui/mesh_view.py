@@ -141,6 +141,20 @@ class MeshView(QWidget):
         faces = mesh.faces.reshape(-1, 4)[:, 1:4]  # pyvista's flat [3, i, j, k, 3, i, j, k, ...]
         return vertices, np.asarray(faces, dtype=int)
 
+    def get_mesh_centroid(self):
+        """Vertex centroid of the full, unclipped original mesh, in the
+        mesh's own local (already-scaled) frame. Used by search_area.py's
+        volume-probing grid as the inner reference point a 3D probing
+        column extends toward, so it is always available from the same
+        mesh get_collision_mesh_data() already reads.
+
+        Returns:
+            (3,) numpy array, or None if no mesh is loaded.
+        """
+        if self._original_mesh is None:
+            return None
+        return np.asarray(self._original_mesh.points, dtype=float).mean(axis=0)
+
     def set_clip_fraction(self, axis: str, fraction: float):
         """Progressively clips away part of the mesh so obstructing
         geometry can be moved out of the way for picking. axis is "top"
