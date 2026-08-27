@@ -14,11 +14,26 @@ install with `colcon`.
 
 ## Quick setup
 
-With ROS 2 Jazzy already installed ([official install docs](https://docs.ros.org/en/jazzy/Installation.html)):
+Install ROS 2 Jazzy first ([official install docs](https://docs.ros.org/en/jazzy/Installation.html)), then:
 
 ```bash
+git clone --recurse-submodules <repo-url> cyton_setup
+cd cyton_setup
+
 ./setup_system.sh          # one-time, needs sudo; add --hardware if connecting the real arm
 ./setup.sh                 # everything else: submodules, pymoveit2, deps, both builds
+
+# If setup.sh had to fall back to a venv for the GUI's Python deps (it says so
+# at the end if it did), activate it before running the GUI:
+source ~/fus_gui_venv/bin/activate
+
+source ros/install/setup.bash
+
+# Verify: brings up the stack against mock hardware, nothing moves
+ros2 launch cyton_bringup bringup.launch.py
+
+# Verify: calibration self-test, synthetic data, no hardware needed
+uv run python calibration/current/calibrate_kinematics.py --selftest
 ```
 
 `setup.sh` needs no sudo and is safe to rerun (it skips work that's
