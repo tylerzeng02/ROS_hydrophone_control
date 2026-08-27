@@ -8,7 +8,7 @@ import sys
 
 import numpy as np
 
-# Currently deployed in move_between_points.cpp, refit 2026-08-13 from
+# Currently deployed in move_between_points.cpp, refit from
 # ndi_moveit_rotation_calibration_data.csv (13 valid pairs).
 CURRENT_R_MOVEIT_TO_NDI = np.array([
     [0.0033, 0.8971, 0.4418],

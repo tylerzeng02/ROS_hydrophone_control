@@ -11,7 +11,7 @@ Written against pymoveit2's documented plan()/execute() split
 (https://github.com/AndrejOrsula/pymoveit2), built via colcon per this
 package's own README.md "Setup" section (pymoveit2 is not a pip package
 -- see requirements.txt for why). Confirmed working against a live
-move_group (2026-08-24/25): real plan()/execute() calls, position-only
+move_group: real plan()/execute() calls, position-only
 and orientation-constrained targets, and the bounds-recovery mechanism
 below have all been run and verified, not just written.
 """
@@ -66,7 +66,7 @@ def _is_identity_pose(pose):
 # a genuinely hard or borderline-unreachable target can exhaust the full
 # 30s budget on every single attempt (confirmed directly: consecutive
 # attempts landing ~30s apart), making this count's real-world cost highly
-# target-dependent. Raised back to 5 (2026-08-26, user choice) once real
+# target-dependent. Raised back to 5 (user choice) once real
 # usage showed attempts are quick in practice; worst case for a genuinely
 # hard target is around 150s. A START_STATE_IN_COLLISION failure is
 # handled separately, through _retreat_to_last_safe_state(), since

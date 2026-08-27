@@ -44,7 +44,7 @@ ament_target_dependencies(run_accuracy_check
 
 target_link_libraries(run_accuracy_check ndicapi)
 
-# move_x_test (2026-08-07): commands a fixed Cartesian delta (default 5cm
+# move_x_test: commands a fixed Cartesian delta (default 5cm
 # +X) via MoveIt's setPoseTarget()/IK, checks the result with NDI -- see
 # the .cpp's own header comment for why this is a genuinely different test
 # from run_accuracy_check (relative move, real IK, no base/tool-frame fit
@@ -64,7 +64,7 @@ ament_target_dependencies(move_x_test
 
 target_link_libraries(move_x_test ndicapi)
 
-# move_xyz_test (2026-08-13): like move_x_test, but commands a delta on all
+# move_xyz_test: like move_x_test, but commands a delta on all
 # three axes at once (dx, dy, dz all plugged in on the command line)
 # instead of one axis at a time -- see the .cpp's own header comment.
 add_executable(move_xyz_test
@@ -82,7 +82,7 @@ ament_target_dependencies(move_xyz_test
 
 target_link_libraries(move_xyz_test ndicapi)
 
-# move_between_points (2026-08-07): visits a sequence of real, NDI-measured
+# move_between_points: visits a sequence of real, NDI-measured
 # target points (collected separately via cyton_ndi_capture's ndi_measure)
 # by commanding a relative Cartesian move from the arm's live current
 # position to each one in turn -- see the .cpp's own header comment for the

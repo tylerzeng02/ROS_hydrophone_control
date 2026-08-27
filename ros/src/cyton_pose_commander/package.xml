@@ -8,9 +8,8 @@
     MoveIt's MoveGroupInterface (plan+execute, collision-aware) instead of
     commanding raw ticks directly -- the "move" half of the MoveIt-driven
     NDI accuracy check, paired with cyton_ndi_capture's ndi_measure (the
-    "measure" half, run separately/manually per pose). See CLAUDE.md's
-    kinematic-calibration section for the origin of the tick data this
-    reads and why tick-to-radian conversion must go through
+    "measure" half, run separately/manually per pose). Tick-to-radian
+    conversion for the data this reads must go through
     robot_calibration.cpp, not a reimplementation.
   </description>
   <maintainer email="tonizengedu@gmail.com">tyler zeng</maintainer>

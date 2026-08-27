@@ -92,7 +92,7 @@ target_link_libraries(read_motor_positions
         dynamixel_sdk
 )
 
-# One-off recovery utility (2026-08-07, see the .cpp's own comment) --
+# One-off recovery utility (see the .cpp's own comment) --
 # not meant to be permanent, safe to remove once no longer needed.
 add_executable(recover_motor4
     tests/recover_motor4.cpp
@@ -179,7 +179,7 @@ target_link_libraries(record_hand_poses_multijoint_backlash_test
         dynamixel_sdk
 )
 
-# Renamed from record_hand_poses_fixed_elbow_yaw 2026-08-20, moved out of
+# Renamed from record_hand_poses_fixed_elbow_yaw, moved out of
 # tests/ into calibration/collection/ -- this is the general-purpose hand-
 # pose recorder (locks elbow_yaw, records the other 6 joints on Enter) that
 # produced the deployed model's training data; not to be confused with
@@ -204,7 +204,7 @@ target_link_libraries(record_hand_poses
 
 # TRAC-IK targets
 #
-# Archived 2026-08-20 (tests/archive/test_trac_ik.cpp, test_cyton_ik.cpp,
+# Archived (tests/archive/test_trac_ik.cpp, test_cyton_ik.cpp,
 # test_cyton_ik_move.cpp, test_cyton_ik_target.cpp,
 # test_cyton_ik_target_move.cpp) -- external/trac_ik was empty on this
 # checkout at the time and these 5 targets were silently skipped by the
@@ -226,7 +226,7 @@ if(EXISTS
         external/ndicapi_build
     )
 
-    # Renamed from test_five_pose_ndi_capture 2026-08-20, moved out of
+    # Renamed from test_five_pose_ndi_capture, moved out of
     # tests/ into calibration/collection/ -- the "five_pose" name was a
     # historical artifact (it started as a 5-pose demo and grew into the
     # project's main pose-list-driven NDI capture/validation tool, with

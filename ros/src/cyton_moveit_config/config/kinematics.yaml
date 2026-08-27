@@ -1,6 +1,6 @@
 # IK solver for the "arm" planning group -- this is the KDL variant (the
 # production default). See kinematics_trac_ik.yaml for the TRAC-IK variant
-# (cyton_trac_ik_kinematics_plugin, 2026-08-13, a fresh MoveIt2-native
+# (cyton_trac_ik_kinematics_plugin, a fresh MoveIt2-native
 # plugin wrapping external/trac_ik's core solver -- NOT the old ROS1
 # trac_ik_kinematics_plugin this comment used to reference, which can't
 # build in ROS2 at all). Select between them via demo.launch.py's

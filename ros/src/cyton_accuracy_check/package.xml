@@ -11,8 +11,7 @@
     but with MoveIt doing the moving instead of raw Dynamixel ticks. Built
     after cyton_pose_commander + cyton_ndi_capture's separate two-terminal
     workflow was found to be vulnerable to a real timing race (a capture
-    landing before the move had actually finished) -- see CLAUDE.md's
-    kinematic-calibration section.
+    landing before the move had actually finished).
   </description>
   <maintainer email="tonizengedu@gmail.com">tyler zeng</maintainer>
   <license>BSD</license>

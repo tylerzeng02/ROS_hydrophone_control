@@ -15,14 +15,13 @@
 
   DO NOT hand-edit the calibration numbers (joint <origin>/<axis>/<limit>
   values) here without also updating references/cyton_gamma_1500_trac_ik.urdf
-   -  that file is the one referenced throughout CLAUDE.md's kinematic-
-  calibration history and is meant to stay the source of truth for the
+   -  that file is meant to stay the source of truth for the
   fitted corrections; this file should be kept in sync with it by hand
   until/unless one is generated from the other.
 
-  Still NOT included here, per the same reference file and CLAUDE.md:
+  Still NOT included here, per the same reference file:
   - Collision geometry (only base_link has a <collision>; deferred
-    deliberately, see CLAUDE.md's ROS/MoveIt readiness section).
+    deliberately).
   - Inertial values are still placeholders (fine for pure kinematic
     planning; not meant for dynamics/Gazebo use as-is).
   - Pose-dependent corrections (joint coupling, gravity/elastostatic
@@ -97,7 +96,7 @@
       lower="-2.564816"
       upper="2.644583"
       velocity="1.0"/>
-    <!-- Axis tilt correction (2026-08-06 kinematic calibration fit).
+    <!-- Axis tilt correction (kinematic calibration fit).
          Original nominal axis: 0 0 1. Fitted zero-offset NOT applied
          (base-frame degeneracy)  -  axis tilt does not share that
          degeneracy and is safe to apply here. -->
@@ -136,7 +135,7 @@
       lower="-1.833107"
       upper="1.814699"
       velocity="1.0"/>
-    <!-- Axis tilt correction (2026-08-06 kinematic calibration fit).
+    <!-- Axis tilt correction (kinematic calibration fit).
          Original nominal axis: 1 0 0. -->
     <axis xyz="0.998997 -0.043573 -0.010357"/>
   </joint>
@@ -167,7 +166,7 @@
   <joint name="shoulder_yaw_joint" type="revolute">
     <parent link="shoulder_pitch"/>
     <child link="shoulder_yaw"/>
-    <!-- Origin and axis tilt corrections (2026-08-06 kinematic calibration
+    <!-- Origin and axis tilt corrections (kinematic calibration
          fit). Original nominal origin xyz: -0.0215 -0.0205 0.1255 (only
          x,z corrected; y untouched by the fit's parameterization).
          Original nominal axis: 0 -1 0. -->
@@ -206,11 +205,11 @@
   <joint name="elbow_pitch_joint" type="revolute">
     <parent link="shoulder_yaw"/>
     <child link="elbow_pitch"/>
-    <!-- Origin and axis tilt corrections (2026-08-06 kinematic calibration
+    <!-- Origin and axis tilt corrections (kinematic calibration
          fit). Original nominal origin xyz: 0.018 0.0206 0.1158.
          Original nominal axis: 1 0 0. -->
     <origin rpy="0 0 0" xyz="0.01656849 0.02722018 0.11356304"/>
-    <!-- Limit widened 2026-08-07 (was lower="-1.961961" upper="1.788622")
+    <!-- Limit widened (was lower="-1.961961" upper="1.788622")
          to add a 30-tick margin on each side of jointCalibrations[3]'s
          minTick/maxTick (robot_calibration.cpp)  -  real-hardware MoveIt
          sessions repeatedly showed the arm's actual settled position
@@ -254,22 +253,21 @@
   <joint name="elbow_yaw_joint" type="revolute">
     <parent link="elbow_pitch"/>
     <child link="elbow_yaw"/>
-    <!-- elbow_yaw_joint deliberately left UNCORRECTED (2026-08-06): this
+    <!-- elbow_yaw_joint deliberately left UNCORRECTED: this
          joint is locked near its calibrated midpoint in production (see
-         src/robot_calibration.cpp's jointCalibrations comment and
-         CLAUDE.md's kinematic-calibration section, "reduced-DOF
-         breakthrough") and barely moved in the dataset used to fit it, so
+         src/robot_calibration.cpp's jointCalibrations comment) and barely
+         moved in the dataset used to fit it, so
          its own tilt/scale/offset correction is poorly identified and not
          trustworthy  -  moot anyway since it's not meant to move in real
          use. -->
     <origin rpy="0 0 0" xyz="-0.0171 -0.018 0.09746"/>
-    <!-- Limit tightened 2026-08-06 to match this joint's hardware lock
+    <!-- Limit tightened to match this joint's hardware lock
          (jointCalibrations[4]'s minTick/maxTick, robot_calibration.cpp)
           -  MUST stay consistent with that C++ range, not the original
          wide mechanical limit, or MoveIt will plan trajectories the
          hardware safety clamp will reject. Original wide limit was
          lower="-1.727262" upper="1.790156".
-         Widened slightly again 2026-08-07 (was lower="-0.004602"
+         Widened slightly again (was lower="-0.004602"
          upper="0.056757")  -  15 ticks of margin added each side of
          jointCalibrations[4]'s range (now [2060, 2130]), same real-
          hardware-settling-noise reasoning as elbow_pitch_joint's limit
@@ -309,7 +307,7 @@
   <joint name="wrist_pitch_joint" type="revolute">
     <parent link="elbow_yaw"/>
     <child link="wrist_pitch"/>
-    <!-- Origin and axis tilt corrections (2026-08-06 kinematic calibration
+    <!-- Origin and axis tilt corrections (kinematic calibration
          fit). Original nominal origin xyz: 0.02626 0.018 0.0718.
          Original nominal axis: 1 0 0. -->
     <origin rpy="0 0 0" xyz="0.02765348 0.01273746 0.07244612"/>
@@ -353,7 +351,7 @@
       lower="-2.627709"
       upper="2.618505"
       velocity="1.0"/>
-    <!-- Axis tilt correction (2026-08-06 kinematic calibration fit).
+    <!-- Axis tilt correction (kinematic calibration fit).
          Original nominal axis: 0 0 1. Fitted zero-offset NOT applied
          (tool-frame degeneracy)  -  axis tilt does not share that
          degeneracy and is safe to apply here. -->
@@ -401,11 +399,11 @@
     </visual>
   </link>
 
-  <!-- Hydrophone probe rod (2026-08-11): a thin cylindrical rod attached
+  <!-- Hydrophone probe rod: a thin cylindrical rod attached
        rigidly to virtual_endeffector, representing the physical hydrophone
        probe used to measure ultrasound propagation at points on a skull
        phantom. Dimensions are nominal design values (15cm length, 4mm
-       diameter - lengthened from the original 10cm on 2026-08-25 to give
+       diameter - lengthened from the original 10cm to give
        more standoff/collision clearance against the skull mesh, paired
        with moving the skull's registration 10cm farther from base_link),
        not independently calibrated - verify against the
@@ -439,12 +437,12 @@
     </collision>
   </link>
 
-  <!-- Rod-tip reference frame (2026-08-24): a zero-size frame at the FAR
+  <!-- Rod-tip reference frame: a zero-size frame at the FAR
        end of the rod (z=0.15 relative to virtual_endeffector as of the
-       2026-08-25 rod lengthening, matching the cylinder's own far face).
+       rod lengthening, matching the cylinder's own far face).
        MoveIt's planning group tip_link now
        points HERE (see cyton_gamma_1500.srdf), not virtual_endeffector -
-       reversing the original 2026-08-11 decision. IK/Cartesian targets
+       reversing the original decision. IK/Cartesian targets
        now refer to the actual physical probe tip directly; no more manual
        10cm accounting when picking targets. This also fixes a real,
        observed problem with the old setup: standoff was being measured

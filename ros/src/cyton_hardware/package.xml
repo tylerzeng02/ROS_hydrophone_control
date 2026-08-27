@@ -9,7 +9,7 @@
     by directly compiling this repo's own src/dynamixel_motor.cpp and
     src/robot_calibration.cpp (not a reimplementation -- see this package's
     CMakeLists.txt). Requires external/DynamixelSDK to be populated at the
-    top-level repo root (see the top-level CLAUDE.md).
+    top-level repo root (run 'git submodule update --init --recursive').
   </description>
   <maintainer email="tonizengedu@gmail.com">tyler zeng</maintainer>
   <license>BSD</license>

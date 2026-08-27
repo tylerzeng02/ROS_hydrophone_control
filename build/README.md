@@ -4,11 +4,11 @@ This is the CMake build directory (`cmake -S . -B build -G "NMake Makefiles"`)
 — compiled `.exe`/`.pdb`/`.ilk` files and CMake's own cache/generated files
 live here, none of it tracked in git.
 
-**No calibration data is checked into this directory anymore** (as of
-2026-08-20). It used to hold the real, tracked CSVs behind the deployed
-48-param calibration model — those now live in `calibration/data/` instead,
-specifically so this directory can be what its name says: build output, not
-a home for real project data. See `calibration/data/README.md`.
+**No calibration data is checked into this directory anymore.** It used to
+hold the real, tracked CSVs behind the deployed 48-param calibration model —
+those now live in `calibration/data/` instead, specifically so this
+directory can be what its name says: build output, not a home for real
+project data. See `calibration/data/README.md`.
 
 ## A quirk worth knowing: hardware tools still *write* here by default
 

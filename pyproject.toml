@@ -1,9 +1,9 @@
 [project]
 name = "cyton-setup"
 version = "0.1.0"
-description = "Add your description here"
+description = "Kinematic calibration tooling for the Cyton Gamma 1500 arm (calibration/current/)"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
     "numpy>=2.5.1",
     "scipy>=1.18.0",

@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 
 <!--
-  SIMULATION-ONLY 7-DOF variant (2026-08-24). Identical to the real,
+  SIMULATION-ONLY 7-DOF variant. Identical to the real,
   deployed cyton_gamma_1500_robot.xacro (see that file's own header for
   everything else - geometry provenance, what's not included, etc.)
   except for ONE change: elbow_yaw_joint's <limit> is widened back to the
@@ -95,7 +95,7 @@
       lower="-2.564816"
       upper="2.644583"
       velocity="1.0"/>
-    <!-- Axis tilt correction (2026-08-06 kinematic calibration fit).
+    <!-- Axis tilt correction (kinematic calibration fit).
          Original nominal axis: 0 0 1. Fitted zero-offset NOT applied
          (base-frame degeneracy)  -  axis tilt does not share that
          degeneracy and is safe to apply here. -->
@@ -134,7 +134,7 @@
       lower="-1.833107"
       upper="1.814699"
       velocity="1.0"/>
-    <!-- Axis tilt correction (2026-08-06 kinematic calibration fit).
+    <!-- Axis tilt correction (kinematic calibration fit).
          Original nominal axis: 1 0 0. -->
     <axis xyz="0.998997 -0.043573 -0.010357"/>
   </joint>
@@ -165,7 +165,7 @@
   <joint name="shoulder_yaw_joint" type="revolute">
     <parent link="shoulder_pitch"/>
     <child link="shoulder_yaw"/>
-    <!-- Origin and axis tilt corrections (2026-08-06 kinematic calibration
+    <!-- Origin and axis tilt corrections (kinematic calibration
          fit). Original nominal origin xyz: -0.0215 -0.0205 0.1255 (only
          x,z corrected; y untouched by the fit's parameterization).
          Original nominal axis: 0 -1 0. -->
@@ -204,11 +204,11 @@
   <joint name="elbow_pitch_joint" type="revolute">
     <parent link="shoulder_yaw"/>
     <child link="elbow_pitch"/>
-    <!-- Origin and axis tilt corrections (2026-08-06 kinematic calibration
+    <!-- Origin and axis tilt corrections (kinematic calibration
          fit). Original nominal origin xyz: 0.018 0.0206 0.1158.
          Original nominal axis: 1 0 0. -->
     <origin rpy="0 0 0" xyz="0.01656849 0.02722018 0.11356304"/>
-    <!-- Limit widened 2026-08-07 (was lower="-1.961961" upper="1.788622")
+    <!-- Limit widened (was lower="-1.961961" upper="1.788622")
          to add a 30-tick margin on each side of jointCalibrations[3]'s
          minTick/maxTick (robot_calibration.cpp)  -  real-hardware MoveIt
          sessions repeatedly showed the arm's actual settled position
@@ -258,7 +258,7 @@
          <limit> below differs from that file, per this file's own header
          comment. -->
     <origin rpy="0 0 0" xyz="-0.0171 -0.018 0.09746"/>
-    <!-- SIM-ONLY WIDENING (2026-08-24): full original mechanical range,
+    <!-- SIM-ONLY WIDENING: full original mechanical range,
          not the production hardware lock - see this file's own header
          comment for why that's safe here (mock_components only) and
          nowhere else. The production-locked value (for reference, and
@@ -298,7 +298,7 @@
   <joint name="wrist_pitch_joint" type="revolute">
     <parent link="elbow_yaw"/>
     <child link="wrist_pitch"/>
-    <!-- Origin and axis tilt corrections (2026-08-06 kinematic calibration
+    <!-- Origin and axis tilt corrections (kinematic calibration
          fit). Original nominal origin xyz: 0.02626 0.018 0.0718.
          Original nominal axis: 1 0 0. -->
     <origin rpy="0 0 0" xyz="0.02765348 0.01273746 0.07244612"/>
@@ -342,7 +342,7 @@
       lower="-2.627709"
       upper="2.618505"
       velocity="1.0"/>
-    <!-- Axis tilt correction (2026-08-06 kinematic calibration fit).
+    <!-- Axis tilt correction (kinematic calibration fit).
          Original nominal axis: 0 0 1. Fitted zero-offset NOT applied
          (tool-frame degeneracy)  -  axis tilt does not share that
          degeneracy and is safe to apply here. -->
@@ -390,11 +390,11 @@
     </visual>
   </link>
 
-  <!-- Hydrophone probe rod (2026-08-11): a thin cylindrical rod attached
+  <!-- Hydrophone probe rod: a thin cylindrical rod attached
        rigidly to virtual_endeffector, representing the physical hydrophone
        probe used to measure ultrasound propagation at points on a skull
        phantom. Dimensions are nominal design values (15cm length, 4mm
-       diameter - lengthened from the original 10cm on 2026-08-25 to give
+       diameter - lengthened from the original 10cm to give
        more standoff/collision clearance against the skull mesh, paired
        with moving the skull's registration 10cm farther from base_link),
        not independently calibrated - verify against the
@@ -428,12 +428,12 @@
     </collision>
   </link>
 
-  <!-- Rod-tip reference frame (2026-08-24): a zero-size frame at the FAR
+  <!-- Rod-tip reference frame: a zero-size frame at the FAR
        end of the rod (z=0.15 relative to virtual_endeffector as of the
-       2026-08-25 rod lengthening, matching the cylinder's own far face).
+       rod lengthening, matching the cylinder's own far face).
        MoveIt's planning group tip_link now
        points HERE (see cyton_gamma_1500.srdf), not virtual_endeffector -
-       reversing the original 2026-08-11 decision. IK/Cartesian targets
+       reversing the original decision. IK/Cartesian targets
        now refer to the actual physical probe tip directly; no more manual
        10cm accounting when picking targets. This also fixes a real,
        observed problem with the old setup: standoff was being measured

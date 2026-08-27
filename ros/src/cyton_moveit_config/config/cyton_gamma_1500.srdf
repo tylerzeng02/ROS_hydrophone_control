@@ -10,7 +10,7 @@
   attach one to  -  "arm"'s own tip_link already serves as the end-effector
   frame for planning purposes.
 
-  tip_link changed to hydrophone_tip (2026-08-24), a zero-size frame at
+  tip_link changed to hydrophone_tip, a zero-size frame at
   the far end of the hydrophone probe rod attached to virtual_endeffector
   (see that link's own comment in cyton_gamma_1500_robot.xacro) -
   previously virtual_endeffector itself, which meant IK/Cartesian targets
@@ -21,9 +21,9 @@
   standoff was being measured from the wrong point on the arm). Now the
   literal physical tip is what's commanded and what standoff applies to.
 
-  elbow_yaw_joint marked <passive_joint> (2026-08-07): elbow_yaw (motor 4)
+  elbow_yaw_joint marked <passive_joint>: elbow_yaw (motor 4)
   is permanently locked in src/robot_calibration.cpp to a ~4-degree-wide
-  tick range (see CLAUDE.md's "elbow_yaw permanently locked" section), but
+  tick range, but
   a <chain>-based group still exposes every joint in the chain to IK as an
   equally-free variable  -  the random-seeded IK sampler used for Cartesian
   goals (setPoseTarget) has no awareness that this one joint has almost no
@@ -42,8 +42,8 @@
   (always expected to touch/overlap at their shared joint). It does NOT
   include a computed default collision matrix (Setup Assistant's usual
   sampling-based "Never"/"Default" pairs) because there is currently no
-  <collision> geometry on any link except base_link  -  see CLAUDE.md's
-  ROS/MoveIt readiness section. Revisit this file once collision geometry
+  <collision> geometry on any link except base_link.
+  Revisit this file once collision geometry
   is added; the adjacent-pair disables below will still be valid, they
   just won't be the complete picture.
 -->

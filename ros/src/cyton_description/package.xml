@@ -7,11 +7,11 @@
     URDF/xacro description, visual meshes, and ros2_control hardware block
     for the Cyton Gamma 1500 7-DOF arm. Kinematic geometry (per-joint axis
     tilt/origin/scale corrections) comes from this project's NDI-based
-    calibration -- see the top-level repo's CLAUDE.md. Visual meshes
+    calibration. Visual meshes
     (meshes/*.dae) are ported from the third-party ROS1 package
     cyton_gamma_1500_description by Gert Kanter (BSD-licensed,
     http://wiki.ros.org/cyton_gamma_1500_description); collision geometry
-    is intentionally not yet included (deferred, see README/CLAUDE.md).
+    is intentionally not yet included (deferred).
   </description>
   <maintainer email="tonizengedu@gmail.com">tyler zeng</maintainer>
   <license>BSD</license>
@@ -23,7 +23,7 @@
   <exec_depend>joint_state_publisher_gui</exec_depend>
   <exec_depend>rviz2</exec_depend>
   <exec_depend>ros2_control</exec_depend>
-  <exec_depend>mock_components</exec_depend>
+  <exec_depend>hardware_interface</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

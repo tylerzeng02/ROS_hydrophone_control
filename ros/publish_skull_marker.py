@@ -102,7 +102,7 @@ def main():
     )
     parser.add_argument(
         "--xyz", nargs=3, type=float, default=[0.02, 0.27, 0.15], metavar=("X", "Y", "Z"),
-        help="Position in meters. Rotated 90deg around Z on 2026-08-25 "
+        help="Position in meters. Rotated 90deg around Z "
              "(was [-0.27, 0.02, 0.15]) -- same radius/height from "
              "base_link, moved to an adjacent side -- keep in sync with "
              "fus_targeting_gui's default_config.yaml registration.xyz_m."

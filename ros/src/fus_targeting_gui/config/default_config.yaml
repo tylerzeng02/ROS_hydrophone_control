@@ -9,9 +9,9 @@
 robot:
   planning_group: arm
   base_frame: base_link
-  # hydrophone_tip (2026-08-24), not virtual_endeffector -- the actual
-  # physical tip of the 15cm hydrophone probe rod (lengthened from 10cm on
-  # 2026-08-25), matching the SRDF's "arm" group tip_link (see
+  # hydrophone_tip, not virtual_endeffector -- the actual
+  # physical tip of the 15cm hydrophone probe rod (lengthened from 10cm),
+  # matching the SRDF's "arm" group tip_link (see
   # cyton_gamma_1500.srdf's own comment on why). Picked targets now
   # correctly refer to the literal probe tip position.
   end_effector_frame: hydrophone_tip
@@ -64,14 +64,13 @@ mesh:
 # already-known-good placement relative to the robot) -- keep these two
 # files' values in sync if either is ever re-registered.
 #
-# x shifted -10cm on 2026-08-25 (from the original -0.17) after a scan of
+# x shifted -10cm (from the original -0.17) after a scan of
 # 15 random skull-surface points at 50mm standoff with the skull collision
 # object present found only 3/15 reachable at the original position. A
 # subsequent 90deg-around-Z rotation test (same radius/height, different
 # side) also came back 3/15 -- no better -- so skull position/rotation
-# alone isn't the fix; see CLAUDE.md for the fuller investigation
-# (orientation-tolerance tightness turned out to be the dominant factor,
-# not skull placement).
+# alone isn't the fix (orientation-tolerance tightness turned out to be
+# the dominant factor, not skull placement).
 registration:
   xyz_m: [0.02, 0.27, 0.15]
   rpy_rad: [3.14159, 0.0, 0.0]
@@ -91,7 +90,7 @@ targeting:
   # Starting value pre-filled into the "Search Area" grid-spacing control
   # -- editable per-area in the GUI itself before clicking "Finish Area".
   default_search_area_spacing_mm: 5.0
-  # false (2026-08-25, user choice): plan to POSITION only, ignore the
+  # false (user choice): plan to POSITION only, ignore the
   # computed probe approach angle entirely. A 15-point reachability scan
   # found the near-exact orientation requirement (~0.057deg tolerance),
   # not the skull obstacle or general arm reach, was the dominant cause of

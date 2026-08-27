@@ -14,7 +14,7 @@ mock_components/GenericSystem, no physical servo involved, safe for
 exercising the whole pipeline). Only pass hardware_type:=real with the
 physical arm connected, powered, and clear to move.
 
-urdf_variant (added 2026-08-12) defaults to "calibrated", the deployed
+urdf_variant defaults to "calibrated", the deployed
 cyton_gamma_1500.urdf.xacro. Pass urdf_variant:=uncalibrated to instead
 load cyton_gamma_1500_uncalibrated.urdf.xacro: same robot, same
 ros2_control/hardware plugin, but MoveIt plans against the original,
@@ -25,7 +25,7 @@ using the same accuracy-check tools either way. Does not affect
 robot_calibration.cpp's separate real-servo tick-to-radian calibration,
 only what MoveIt's planner believes the robot's geometry is.
 
-urdf_variant:=sim_7dof (added 2026-08-24) loads
+urdf_variant:=sim_7dof loads
 cyton_gamma_1500_sim7dof.urdf.xacro: identical to the calibrated variant
 except elbow_yaw_joint's <limit> is widened back to its full mechanical
 range instead of the ~4-degree production lock, restoring full 7-DOF
@@ -34,7 +34,7 @@ hardware_type:=mock_components; combining it with hardware_type:=real
 raises an error (see launch_setup() below and
 cyton_gamma_1500_robot_sim7dof.xacro's own header for why).
 
-compensate_backlash (added 2026-08-13) defaults to "false". Pass
+compensate_backlash defaults to "false". Pass
 compensate_backlash:=true (only meaningful with hardware_type:=real) to
 enable cyton_hardware's streaming-compatible backlash compensator. See
 CytonSystemHardware's own header comment for what this does and its

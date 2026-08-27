@@ -12,8 +12,22 @@ build with plain CMake and can run on the machine connected to the arm and
 tracker. The `ros/` workspace (ROS 2 + MoveIt 2) needs a Linux ROS 2
 install with `colcon`.
 
+## Quick setup
+
+With ROS 2 Jazzy already installed ([official install docs](https://docs.ros.org/en/jazzy/Installation.html)):
+
+```bash
+./setup_system.sh          # one-time, needs sudo; add --hardware if connecting the real arm
+./setup.sh                 # everything else: submodules, pymoveit2, deps, both builds
+```
+
+`setup.sh` needs no sudo and is safe to rerun (it skips work that's
+already done and leaves incremental rebuilds to `colcon`/`cmake`). See the
+sections below for what each step does and how to run them individually.
+
 ## Table of contents
 
+- [Quick setup](#quick-setup)
 - [Hardware](#hardware)
 - [Repository layout](#repository-layout)
 - [Software prerequisites](#software-prerequisites)
@@ -84,11 +98,11 @@ install with `colcon`.
     application. See its own `README.md` for setup and usage.
 
   Loose files at the top level of `ros/` are collected accuracy data.
-- **`external/`**: vendored dependencies as git submodules.
-  `DynamixelSDK` and `ndicapi` are populated; `trac_ik` is only needed if
-  you plan to build `cyton_trac_ik_kinematics_plugin` and is empty in many
-  checkouts, since a plain `git submodule update --init --recursive` does
-  not populate it (see [Software prerequisites](#software-prerequisites)).
+- **`external/`**: vendored dependencies as git submodules
+  (`DynamixelSDK`, `ndicapi`, `trac_ik`). `trac_ik` is only needed if you
+  plan to build `cyton_trac_ik_kinematics_plugin`; the other two are
+  needed for everything else (see
+  [Software prerequisites](#software-prerequisites)).
 - **`references/`**: the robot's URDF (`cyton_gamma_1500_trac_ik.urdf`)
   and the moving-marker mounting bracket CAD (`marker_mount.stl`).
 
@@ -106,16 +120,15 @@ install with `colcon`.
   or plain `pip` using `pyproject.toml`'s dependency list (`numpy`,
   `scipy`).
 
-**Submodules:** only `external/ndicapi` has a real `.gitmodules` entry.
-`external/DynamixelSDK` and `external/trac_ik` are submodule references
-with no `.gitmodules` entry, so `git submodule update --init --recursive`
-will not populate them on a fresh clone. If either is missing, populate it
-manually by cloning `ROBOTIS-GIT/DynamixelSDK` or `traclabs/trac_ik` into
-the corresponding `external/` directory at the commit this repo's git
-tree references. The root `CMakeLists.txt` and `ros/src/cyton_hardware`'s
-`CMakeLists.txt` both stop with a `FATAL_ERROR` if `external/DynamixelSDK`
-is missing. NDI and TRAC-IK targets are optional and are skipped if their
-`external/` directory is not populated.
+**Submodules:** clone with `--recurse-submodules`, or run
+`git submodule update --init --recursive` after a plain clone, to
+populate all three of `external/DynamixelSDK`, `external/ndicapi`, and
+`external/trac_ik`. The root `CMakeLists.txt` and
+`ros/src/cyton_hardware`'s `CMakeLists.txt` both stop with a
+`FATAL_ERROR` if `external/DynamixelSDK` is missing. NDI and TRAC-IK
+targets are optional and are skipped if their `external/` directory is
+not populated, so `trac_ik` can be left uninitialized if you don't need
+`cyton_trac_ik_kinematics_plugin`.
 
 ## Getting started: native C++ build
 
@@ -136,6 +149,13 @@ Enter-to-proceed prompts between motion steps.
 
 ## Getting started: ROS 2 / MoveIt workspace
 
+`fus_targeting_gui` depends on `pymoveit2`, which is not vendored in this
+repo and is not pip-installable. Clone it into `ros/src/` before building:
+
+```bash
+git clone https://github.com/AndrejOrsula/pymoveit2.git ros/src/pymoveit2
+```
+
 ```bash
 cd ros
 colcon build
@@ -149,6 +169,10 @@ this workspace and needs its own PyPI dependencies installed first, since
 ```bash
 pip install -r ros/src/fus_targeting_gui/requirements.txt
 ```
+
+See `ros/src/fus_targeting_gui/README.md`'s own "Setup" section for the
+full sequence (including `rosdep install` and the venv workaround needed
+on systems that block `pip install` outside a virtual environment).
 
 Bring the whole stack up with a safe, hardware-free default (nothing
 moves):
@@ -171,8 +195,13 @@ comparison, TRAC-IK vs. KDL).
 ## Getting started: Python calibration tooling
 
 ```bash
-uv run --with numpy --with scipy python calibration/current/calibrate_kinematics.py --selftest
+uv run python calibration/current/calibrate_kinematics.py --selftest
 ```
+
+`uv run` reads dependencies (`numpy`, `scipy`) straight from the root
+`pyproject.toml`/`uv.lock`, no manual `--with` flags or virtual
+environment setup needed. Without `uv`, `pip install numpy scipy` into
+any Python 3.12+ environment works the same way.
 
 `--selftest` runs against synthetic ground-truth data and needs no
 hardware. Run this before trusting the script on real data. To refit

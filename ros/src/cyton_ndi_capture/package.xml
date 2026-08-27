@@ -19,8 +19,6 @@
     &lt;conio.h&gt; interactive pause/skip controls are stripped, and it reads
     the robot's current joint state from live ROS /joint_states instead of
     driving the arm itself via DynamixelMotor -- MoveIt does the moving now.
-    See CLAUDE.md's kinematic-calibration section for the original
-    methodology this reuses.
   </description>
   <maintainer email="tonizengedu@gmail.com">tyler zeng</maintainer>
   <license>BSD</license>

@@ -1,9 +1,8 @@
 # calibration/data/
 
 The real, tracked NDI-capture dataset behind the deployed kinematic
-calibration model — moved out of `build/` on 2026-08-20 so real data isn't
+calibration model — moved out of `build/` so real data isn't
 sitting inside what's supposed to be a regenerable CMake build directory.
-See `CLAUDE.md`'s kinematic-calibration history for the full story.
 
 - **`deployed_model_training_dataset_374pose.csv`** — the 374-pose,
   elbow_yaw-locked NDI capture the currently-deployed 48-param calibration
@@ -17,7 +16,7 @@ See `CLAUDE.md`'s kinematic-calibration history for the full story.
 `marker_drift_recheck_dataset_377pose.csv` (a from-scratch recollection of
 the same batch, done to verify a suspected NDI marker drift hadn't
 corrupted the original data — it hadn't) was archived to
-`calibration/archive/` on 2026-08-20: it was never read by any fitting
+`calibration/archive/`. It was never read by any fitting
 script, and kept nothing live in `calibration/data/` needing it.
 
 `calibration/collection/ndi_capture_and_validate.cpp`'s `QUICK_TEST_CSV` constant still

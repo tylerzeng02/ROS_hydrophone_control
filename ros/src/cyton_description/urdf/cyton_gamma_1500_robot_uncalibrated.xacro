@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 
 <!--
-  UNCALIBRATED comparison variant (2026-08-12) - derived from
+  UNCALIBRATED comparison variant - derived from
   cyton_gamma_1500_robot.xacro (the real, deployed, calibrated fragment;
   see that file's own header for its full provenance) by reverting exactly
   the joint <origin>/<axis> values that carry a fitted kinematic-calibration
@@ -20,8 +20,7 @@
   - the real servos are still driven by the exact same calibrated
   tick<->radian conversion as every other launch of this robot, so this
   comparison changes only what MoveIt PLANS with, not what actually gets
-  sent to the hardware). See CLAUDE.md and the conversation that motivated
-  this file for the full reasoning behind that scope choice.
+  sent to the hardware).
 
   Reverted (6 joints): shoulder_roll (axis), shoulder_pitch (axis),
   shoulder_yaw (origin x,z + axis), elbow_pitch (origin + axis),
@@ -41,7 +40,7 @@
 
   Still NOT included here, per the same reasoning as the calibrated file:
   - Collision geometry (only base_link has a <collision>; deferred
-    deliberately, see CLAUDE.md's ROS/MoveIt readiness section).
+    deliberately).
   - Inertial values are still placeholders (fine for pure kinematic
     planning; not meant for dynamics/Gazebo use as-is).
   - Pose-dependent corrections (joint coupling, gravity/elastostatic
@@ -233,7 +232,7 @@
          Limit below is UNCHANGED (safety-margin widening, not a
          calibration correction - see this file's header). -->
     <origin rpy="0 0 0" xyz="0.018 0.0206 0.1158"/>
-    <!-- Limit widened 2026-08-07 (was lower="-1.961961" upper="1.788622")
+    <!-- Limit widened (was lower="-1.961961" upper="1.788622")
          to add a 30-tick margin on each side of jointCalibrations[3]'s
          minTick/maxTick (robot_calibration.cpp)  -  real-hardware MoveIt
          sessions repeatedly showed the arm's actual settled position
@@ -281,7 +280,7 @@
          offset applied - was never trusted, since this joint barely moved
          in the dataset it was fit on while locked). -->
     <origin rpy="0 0 0" xyz="-0.0171 -0.018 0.09746"/>
-    <!-- Limit UNLOCKED (2026-08-13, deliberate, user-confirmed): restored
+    <!-- Limit UNLOCKED (deliberate, user-confirmed): restored
          to the full original mechanical range, matching
          robot_calibration.cpp's jointCalibrations[4] now being widened to
          [944, 3245] for this same 7-DOF "original/raw" comparison test -
@@ -417,11 +416,11 @@
     </visual>
   </link>
 
-  <!-- Hydrophone probe rod (2026-08-11): a thin cylindrical rod attached
+  <!-- Hydrophone probe rod: a thin cylindrical rod attached
        rigidly to virtual_endeffector, representing the physical hydrophone
        probe used to measure ultrasound propagation at points on a skull
        phantom. Dimensions are nominal design values (15cm length, 4mm
-       diameter - lengthened from the original 10cm on 2026-08-25 to give
+       diameter - lengthened from the original 10cm to give
        more standoff/collision clearance against the skull mesh, paired
        with moving the skull's registration 10cm farther from base_link),
        not independently calibrated - verify against the
@@ -455,12 +454,12 @@
     </collision>
   </link>
 
-  <!-- Rod-tip reference frame (2026-08-24): a zero-size frame at the FAR
+  <!-- Rod-tip reference frame: a zero-size frame at the FAR
        end of the rod (z=0.15 relative to virtual_endeffector as of the
-       2026-08-25 rod lengthening, matching the cylinder's own far face).
+       rod lengthening, matching the cylinder's own far face).
        MoveIt's planning group tip_link now
        points HERE (see cyton_gamma_1500.srdf), not virtual_endeffector -
-       reversing the original 2026-08-11 decision. IK/Cartesian targets
+       reversing the original decision. IK/Cartesian targets
        now refer to the actual physical probe tip directly; no more manual
        10cm accounting when picking targets. -->
   <joint name="hydrophone_tip_joint" type="fixed">

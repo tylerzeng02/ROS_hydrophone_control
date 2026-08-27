@@ -8,8 +8,8 @@ cmake-build-*/
 
 # Archive/trash/reference folders -- historical or reference material kept
 # on disk for whoever's working locally, deliberately not tracked in git
-# (2026-08-19: previously build/archive/ was the one exception that WAS
-# tracked; now every archive/trash folder is treated the same way).
+# (previously build/archive/ was the one exception that was
+# tracked. Now every archive/trash folder is treated the same way).
 build/archive/
 calibration/archive/
 ros/archive/
@@ -38,10 +38,16 @@ ros/build/
 ros/install/
 ros/log/
 
+# pymoveit2 is a manually-cloned dependency (see ros/src/fus_targeting_gui/
+# README.md's Setup section), not vendored in this repo. Ignored so a
+# plain `git add .` after cloning it can't accidentally recreate the
+# dangling gitlink-with-no-.gitmodules-entry this project once had here.
+ros/src/pymoveit2/
+
 # Colcon build output accidentally left at repo root or inside
 # calibration/current/ from running colcon from the wrong directory --
 # these are pure regenerable artifacts, never meant to be tracked (one
-# instance found and removed 2026-08-19 still had a hardcoded path from a
+# instance found still had a hardcoded path from a
 # different machine baked into it).
 /install/
 /log/
@@ -60,3 +66,6 @@ ros/fus_targeting_session_*.csv
 .idea/
 .DS_Store
 *.swp
+
+# Local project history/notes, not meant to be published with the repo.
+CLAUDE.md

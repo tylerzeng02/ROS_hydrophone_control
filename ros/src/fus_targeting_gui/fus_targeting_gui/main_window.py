@@ -291,7 +291,7 @@ class MainWindow(QMainWindow):
         # initial split; the user can drag it to anything afterward.
         # 902/494 and the 1400x906 window size below match the layout the
         # user settled on as the preferred default (measured directly via
-        # xwininfo on 2026-08-26).
+        # xwininfo).
         splitter = QSplitter(Qt.Horizontal)
         splitter.addWidget(mesh_group)
         splitter.addWidget(self.side_tabs)

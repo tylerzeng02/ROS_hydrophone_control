@@ -1,5 +1,5 @@
 # IK solver for the "arm" planning group -- TRAC-IK variant, built
-# 2026-08-13 specifically to A/B compare against kinematics.yaml's KDL
+# specifically to A/B compare against kinematics.yaml's KDL
 # default. cyton_trac_ik_kinematics_plugin is a fresh MoveIt2-native
 # implementation (not a port of the old ROS1 trac_ik_kinematics_plugin,
 # which depends on roscpp/tf_conversions/the ROS1 parameter server and

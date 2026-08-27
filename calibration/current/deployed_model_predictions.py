@@ -1,6 +1,6 @@
 """Computes predicted end-effector positions using the calibration model
 deployed to src/robot_calibration.cpp and
-references/cyton_gamma_1500_trac_ik.urdf (as of 2026-08-06), for comparison
+references/cyton_gamma_1500_trac_ik.urdf, for comparison
 against NDI measurements taken by ndi_capture_and_validate.exe --validate.
 
 The deployed model has 48 parameters (offset/scale/tilt/origin). A

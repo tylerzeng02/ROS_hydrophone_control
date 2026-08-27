@@ -1085,7 +1085,7 @@ const std::array<std::array<uint16_t, JOINT_COUNT>, POSE_COUNT> TARGET_POSES = {
     {{289, 3226, 1074, 2455, 2601, 2606, 3192}},
     {{333, 3226, 1062, 2415, 2518, 2596, 3319}},
 
-    // recorded_hand_poses (3).csv batch (2026-07-31): 200 new hand-posed
+    // recorded_hand_poses (3).csv batch: 200 new hand-posed
     // configurations, collected after the joint 0/3/4/6 widening. All fall
     // within the current jointCalibrations bounds except joint 6's max,
     // which needed one more tick (3760 -> 3761) to fit this batch's max
@@ -3646,7 +3646,7 @@ std::vector<ValidationPoint> loadValidationPoints(const std::string& csvPath) {
 
 constexpr const char* VALIDATION_RESULTS_CSV = "validation_results.csv";
 
-// Reduced-DOF validation (2026-08-05): if set (>= 0), this joint is
+// Reduced-DOF validation: if set (>= 0), this joint is
 // explicitly moved to LOCKED_VALIDATION_JOINT_TICK and locked (torqued)
 // before any validation points run, rather than relying on every row of
 // the predictions CSV happening to already carry a tick value near that

@@ -16,14 +16,16 @@ find_package(rclcpp_lifecycle REQUIRED)
 # and src/robot_calibration.cpp directly (not a copy/reimplementation) so
 # the hardware interface always uses the exact same safety clamps, tick/
 # radian calibration, and backlash-overshoot table as every other
-# motor-facing program in this repo. See CLAUDE.md's kinematic-calibration
-# section, "the one non-obvious, easy-to-get-wrong integration requirement".
+# motor-facing program in this repo. Any consumer of jointCalibrations
+# (this one included) must go through radiansToTicks()/ticksToRadians()
+# for unit conversion rather than reimplementing it, or it will silently
+# diverge from the calibration this project has actually validated.
 get_filename_component(CYTON_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
 
 if(NOT EXISTS "${CYTON_REPO_ROOT}/external/DynamixelSDK/c++/CMakeLists.txt")
   message(FATAL_ERROR
     "DynamixelSDK not found at ${CYTON_REPO_ROOT}/external/DynamixelSDK -- "
-    "see the top-level repo's CLAUDE.md ('Dependencies' section)."
+    "run 'git submodule update --init --recursive' from the repo root."
   )
 endif()
 

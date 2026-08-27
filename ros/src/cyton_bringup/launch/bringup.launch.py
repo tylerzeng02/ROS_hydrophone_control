@@ -16,7 +16,7 @@ this project's fitted kinematic calibration, for example:
 See cyton_moveit_config/launch/demo.launch.py's own docstring for exactly
 what this does and does not change.
 
-Full 7-DOF simulation (2026-08-24): pass urdf_variant:=sim_7dof (mock_components
+Full 7-DOF simulation: pass urdf_variant:=sim_7dof (mock_components
 only -- rejected with hardware_type:=real) to restore elbow_yaw_joint's full
 mechanical range for planning/simulation instead of the production ~4-degree
 lock -- e.g.
@@ -24,7 +24,7 @@ lock -- e.g.
 See cyton_gamma_1500_robot_sim7dof.xacro's own header for why this is safe
 only in simulation.
 
-Streaming backlash compensation (2026-08-13): pass compensate_backlash:=true
+Streaming backlash compensation: pass compensate_backlash:=true
 (only meaningful with hardware_type:=real) to enable cyton_hardware's new
 reversal-triggered hold-point compensator -- NOT yet validated against real
 hardware. See CytonSystemHardware's own header comment.

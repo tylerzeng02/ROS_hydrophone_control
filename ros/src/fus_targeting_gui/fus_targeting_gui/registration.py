@@ -24,7 +24,7 @@ class TargetingConfig:
     planning_time_s: float
     num_planning_attempts: int
     default_search_area_spacing_mm: float = 5.0
-    # 2026-08-25: disabled by default. A scan of 15 random skull-surface
+    # Disabled by default. A scan of 15 random skull-surface
     # points found only 3/15 reachable with the probe's approach angle
     # constrained to ~0.057deg of exact-perpendicular, vs. 10/15 reachable
     # with no orientation constraint at all. The tight angle requirement,
