@@ -25,6 +25,13 @@ robot:
     - elbow_yaw_joint
     - wrist_pitch_joint
     - wrist_roll_joint
+  # Joint-space "reset" configuration (radians, same order as joint_names
+  # above), commanded before loading a new mesh. All-zero matches this
+  # robot's SRDF "home" group_state and ros2_control's own
+  # initial_positions.yaml, and is a safe in-range value for every joint,
+  # including the locked elbow_yaw_joint. Omit this key entirely to fall
+  # back to all-zero automatically.
+  home_joint_positions: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
 mesh:
   # Absolute path to the skull mesh (STL/PLY). Overridable from the GUI's
@@ -37,6 +44,13 @@ mesh:
   # Uniform scale applied after loading -- 0.001 for a mesh authored in mm
   # (matches publish_skull_marker.py's own default/warning about this).
   scale: 0.001
+  # Max triangle count for the MoveIt collision object built from this
+  # mesh. 0 publishes it at full resolution (matches whatever quality was
+  # loaded above). FCL collision-checks this geometry on every planner
+  # sample, so if planning becomes noticeably slower with the full mesh,
+  # set this to e.g. 2000 to decimate it down for collision-checking only
+  # (the picking view above is never affected either way).
+  collision_max_triangles: 0
   # Optional: CSV of pre-marked target points (e.g. exported from CAD),
   # selectable from the GUI's "Predefined Points" list instead of (or in
   # addition to) free-hand surface picking. Columns: label,x,y,z[,normal_x,

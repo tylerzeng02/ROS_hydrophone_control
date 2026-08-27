@@ -124,6 +124,18 @@ class Registration(ABC):
         rather than one point at a time."""
         raise NotImplementedError
 
+    @abstractmethod
+    def update_pose(self, xyz_m, rpy_rad):
+        """Replaces the mesh-local -> base_frame transform in place, so an
+        already-running GUI can pick up a newly fitted registration without
+        a restart. Existing targets' stored point/normal are unaffected
+        (still in the mesh's own local frame), but their cached `pose` was
+        computed under the old transform and goes stale the moment this is
+        called -- the caller is responsible for recomputing every existing
+        target's pose afterward (see main_window.py's
+        _reproject_all_targets())."""
+        raise NotImplementedError
+
 
 class FixedPoseRegistration(Registration):
     """Registers the mesh to base_frame using one fixed, hand-specified
@@ -136,6 +148,28 @@ class FixedPoseRegistration(Registration):
     def __init__(self, xyz_m, rpy_rad):
         self._matrix = _euler_to_matrix(rpy_rad)
         self._matrix[0:3, 3] = xyz_m
+
+    def update_pose(self, xyz_m, rpy_rad):
+        self._matrix = _euler_to_matrix(rpy_rad)
+        self._matrix[0:3, 3] = xyz_m
+
+    def compose_with_pose(self, xyz, quat_xyzw):
+        """Left-multiplies the current transform by an additional rigid
+        pose, folding it in permanently. Used to absorb a collision
+        object's pose offset picked up from the live planning scene (see
+        MoveItBridge.get_skull_collision_pose()) into this registration,
+        so the mesh-local -> base_frame transform this GUI uses for
+        picking and target poses matches wherever the object actually
+        ended up, rather than the two silently drifting apart.
+        """
+        offset = tf_transformations.quaternion_matrix(quat_xyzw)
+        offset[0:3, 3] = xyz
+        self._matrix = offset @ self._matrix
+
+    def current_pose(self):
+        """(xyz_m, rpy_rad) of the current transform, for display/logging."""
+        roll, pitch, yaw = rotation_matrix_to_rpy(self._matrix[0:3, 0:3])
+        return tuple(self._matrix[0:3, 3]), (roll, pitch, yaw)
 
     def transform_points_to_base_frame(self, points_local):
         points = np.asarray(points_local, dtype=float)

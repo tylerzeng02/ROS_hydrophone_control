@@ -26,8 +26,8 @@ from builtin_interfaces.msg import Duration
 from control_msgs.action import FollowJointTrajectory
 from PySide6.QtCore import QObject, QThread, Signal
 from geometry_msgs.msg import Point, Pose
-from moveit_msgs.msg import CollisionObject, MoveItErrorCodes, PlanningScene
-from moveit_msgs.srv import ApplyPlanningScene, GetStateValidity
+from moveit_msgs.msg import CollisionObject, MoveItErrorCodes, PlanningScene, PlanningSceneComponents
+from moveit_msgs.srv import ApplyPlanningScene, GetPlanningScene, GetStateValidity
 from pymoveit2 import MoveIt2, MoveIt2State
 from pymoveit2.utils import enum_to_str
 from rclpy.action import ActionClient
@@ -42,6 +42,21 @@ from trajectory_msgs.msg import JointTrajectoryPoint
 from .config import RobotConfig, TargetingConfig
 
 _SKULL_COLLISION_OBJECT_ID = "skull_mesh"
+
+
+def _is_identity_pose(pose):
+    """set_skull_collision_object() always publishes with an identity
+    pose (the registration transform is baked into the vertices instead),
+    so a non-identity pose on this object can only have come from
+    something else moving it afterward, e.g. RViz's Scene Objects panel.
+    Shared by get_skull_collision_pose() and the automatic
+    /monitored_planning_scene watcher below."""
+    p, q = pose.position, pose.orientation
+    return (
+        abs(p.x) < 1e-6 and abs(p.y) < 1e-6 and abs(p.z) < 1e-6
+        and abs(q.x) < 1e-6 and abs(q.y) < 1e-6 and abs(q.z) < 1e-6
+        and abs(q.w - 1.0) < 1e-6
+    )
 
 # Each single plan_async() call already runs MoveIt's own internal
 # num_planning_attempts (15, see config/default_config.yaml) random-seeded
@@ -132,6 +147,13 @@ class MoveItBridge(QObject):
     status = Signal(str)
     plan_ready = Signal(object)     # emits the planned trajectory (or None on failure)
     execute_finished = Signal(bool)  # True on success
+    # Emits (xyz, quat_xyzw) whenever /monitored_planning_scene reports the
+    # skull collision object at a non-identity pose, i.e. something moved
+    # it externally (RViz's Scene Objects panel drag + Publish). Lets
+    # main_window.py auto-sync without the user needing to click Sync From
+    # Scene Move -- see _on_monitored_planning_scene()'s own docstring for
+    # why this can't replace that button entirely.
+    scene_skull_moved = Signal(object)
 
     def __init__(self, node: Node, robot: RobotConfig, targeting: TargetingConfig, parent=None):
         super().__init__(parent)
@@ -141,6 +163,7 @@ class MoveItBridge(QObject):
         self._end_effector_frame = robot.end_effector_frame
         self._joint_names = list(robot.joint_names)
         self._planning_group = robot.planning_group
+        self._home_joint_positions = list(robot.home_joint_positions)
 
         # For get_current_end_effector_pose() (the Registration panel's
         # "Add Point" workflow): a plain TF lookup rather than guessing at
@@ -201,6 +224,26 @@ class MoveItBridge(QObject):
         # checks bounds directly rather than waiting for a plan to fail.
         self._state_validity_client = node.create_client(
             GetStateValidity, "/check_state_validity"
+        )
+
+        # For get_skull_collision_pose(): reads back the skull collision
+        # object's current pose from the live planning scene. Needed
+        # because RViz's Scene Objects panel can move that same object
+        # (drag + its own Publish action) independently of this GUI, and
+        # that pose offset otherwise has no way to reach the GUI's own
+        # registration transform or already-picked target poses.
+        self._get_planning_scene_client = node.create_client(
+            GetPlanningScene, "/get_planning_scene"
+        )
+
+        # For automatic scene-move detection (scene_skull_moved): MoveIt
+        # echoes every planning-scene change, including RViz's Scene
+        # Objects panel Publish action, on this topic -- subscribing here
+        # means main_window.py finds out as soon as it happens, instead of
+        # only when the user remembers to click Sync From Scene Move.
+        self._planning_scene_sub = node.create_subscription(
+            PlanningScene, "/monitored_planning_scene",
+            self._on_monitored_planning_scene, 10,
         )
 
         # For ensure_current_state_within_bounds(): reads each joint's
@@ -628,7 +671,8 @@ class MoveItBridge(QObject):
         tried once as a last resort: a small move in a different
         direction, in case the arm's own current configuration, not the
         target, is what makes a plan hard to find. If a nudge succeeds,
-        the original target is retried exactly once more.
+        the original target is retried up to _NUDGE_RETRY_ATTEMPTS times,
+        the same reasoning as _MAX_PLAN_ATTEMPTS above.
 
         Returns:
             The planned trajectory, or None if every attempt failed.
@@ -698,6 +742,55 @@ class MoveItBridge(QObject):
         )
         self.plan_ready.emit(None)
         return None
+
+    def plan_to_joint_positions(self, joint_positions, max_attempts=3):
+        """Plans a joint-space goal (e.g. the robot's configured home
+        configuration), as opposed to plan_to_pose()'s Cartesian goal.
+        Reuses the same proactive bounds/collision checks and RRTConnect-
+        retry reasoning as plan_to_pose() (an identical request can
+        succeed on a later attempt with no other change), but skips its
+        skull-specific nudge-recovery fallback: a joint-space goal like
+        home is not expected to sit near a collision boundary the way a
+        picked surface target can, so that complexity isn't needed here.
+
+        Returns:
+            The planned trajectory, or None if every attempt failed.
+        """
+        self.ensure_current_state_within_bounds()
+        self.ensure_current_state_not_in_collision()
+
+        plan_kwargs = {
+            "joint_positions": [float(p) for p in joint_positions],
+            "joint_names": list(self._joint_names),
+        }
+        for attempt in range(1, max_attempts + 1):
+            self.status.emit(f"Planning to home (attempt {attempt}/{max_attempts})...")
+            try:
+                trajectory, _error_code = self._plan_with_error_code(plan_kwargs)
+            except Exception as e:  # noqa: BLE001, reported to the GUI instead of crashing it
+                self.status.emit(f"Planning to home FAILED: {e}")
+                trajectory = None
+            if trajectory is not None:
+                return trajectory
+        self.status.emit(f"Planning to home FAILED after {max_attempts} attempt(s).")
+        return None
+
+    def reset_to_home(self):
+        """Blocking (call from a worker thread): plans and executes a move
+        to the robot's configured home_joint_positions. Used before
+        loading a new mesh, so the arm starts from a known, obstacle-
+        agnostic configuration instead of wherever a previous target
+        happened to leave it, before that mesh's own collision geometry
+        replaces whatever was there.
+
+        Returns:
+            True if the move succeeded, False if planning or execution
+            failed.
+        """
+        trajectory = self.plan_to_joint_positions(self._home_joint_positions)
+        if trajectory is None:
+            return False
+        return self.execute(trajectory)
 
     def _attempt_nudge_recovery(self) -> bool:
         """Called once, after plan_to_pose()'s normal retry attempts are
@@ -965,3 +1058,82 @@ class MoveItBridge(QObject):
         future.add_done_callback(lambda _f: done_event.set())
         done_event.wait(timeout=10.0)
         return True
+
+    def get_skull_collision_pose(self):
+        """Blocking (call from a worker thread). Reads the skull collision
+        object's current `pose` field from the live planning scene.
+
+        set_skull_collision_object() always publishes with an identity
+        pose (the registration transform is baked directly into the
+        vertex coordinates instead), so a non-identity pose here can only
+        have come from something else moving the object afterward, e.g. a
+        drag + Publish in RViz's Scene Objects panel. That offset is
+        otherwise invisible to this GUI: it changes what the planner
+        avoids without changing anything the GUI itself knows about,
+        which is what makes an already-picked target's pose go stale
+        relative to the true collision geometry (see main_window.py's
+        _on_sync_scene_pose_clicked()).
+
+        Returns:
+            (position_xyz, quaternion_xyzw) tuple, or None if the object
+            doesn't exist, the pose is identity (nothing to sync), or the
+            service could not be reached in time.
+        """
+        if not self._get_planning_scene_client.wait_for_service(timeout_sec=5.0):
+            self.status.emit("Could not reach /get_planning_scene service.")
+            return None
+
+        request = GetPlanningScene.Request()
+        request.components.components = (
+            PlanningSceneComponents.WORLD_OBJECT_NAMES
+            | PlanningSceneComponents.WORLD_OBJECT_GEOMETRY
+        )
+
+        done_event = threading.Event()
+        result_holder = {}
+
+        def _on_done(future):
+            result_holder["response"] = future.result()
+            done_event.set()
+
+        future = self._get_planning_scene_client.call_async(request)
+        future.add_done_callback(_on_done)
+        if not done_event.wait(timeout=10.0):
+            self.status.emit("Timed out waiting for /get_planning_scene response.")
+            return None
+
+        response = result_holder.get("response")
+        if response is None:
+            return None
+
+        for obj in response.scene.world.collision_objects:
+            if obj.id != _SKULL_COLLISION_OBJECT_ID:
+                continue
+            if _is_identity_pose(obj.pose):
+                return None
+            p, q = obj.pose.position, obj.pose.orientation
+            return (p.x, p.y, p.z), (q.x, q.y, q.z, q.w)
+        return None
+
+    def _on_monitored_planning_scene(self, msg: PlanningScene):
+        """Runs on the ROS executor thread for every /monitored_planning_scene
+        message. /monitored_planning_scene only carries diffs, not the full
+        scene on every message, so a change to some other part of the scene
+        will not mention skull_mesh at all -- this only reacts to messages
+        that actually include it.
+
+        Not a full replacement for get_skull_collision_pose()/the Sync From
+        Scene Move button: a late-joining subscriber (e.g. this GUI
+        restarting while the skull was already moved before it came back
+        up) will not see that pre-existing offset until another change
+        happens to publish it again. The button still exists for that case,
+        and as an explicit, on-demand fallback.
+        """
+        for obj in msg.world.collision_objects:
+            if obj.id != _SKULL_COLLISION_OBJECT_ID:
+                continue
+            if obj.operation == CollisionObject.REMOVE or _is_identity_pose(obj.pose):
+                return
+            p, q = obj.pose.position, obj.pose.orientation
+            self.scene_skull_moved.emit(((p.x, p.y, p.z), (q.x, q.y, q.z, q.w)))
+            return

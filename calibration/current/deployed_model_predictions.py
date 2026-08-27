@@ -41,15 +41,14 @@ from scipy.spatial.transform import Rotation
 import calibrate_kinematics as ck
 
 # Deployed joint-level calibration (src/robot_calibration.cpp jointCalibrations,
-# as of 2026-08-06). direction is +1 for every joint on this arm.
+# direction is +1 for every joint on this arm.
 # radians = direction * scale * (tick - zeroTick) / TICKS_PER_RADIAN,
 # exactly matching ticksToRadians() in src/robot_calibration.cpp.
 DEPLOYED_ZERO_TICKS = [2048, 2047, 2060, 2102, 2078, 2042, 2048]
 DEPLOYED_DIRECTION = [1, 1, 1, 1, 1, 1, 1]
 DEPLOYED_SCALE = [0.988203, 1.001931, 0.964711, 1.014467, 1.0, 1.006796, 1.002933]
 
-# Deployed geometry (references/cyton_gamma_1500_trac_ik.urdf, as of
-# 2026-08-06). Axis tilt applied to all 7 joints except elbow_yaw (index 4,
+# Deployed geometry (references/cyton_gamma_1500_trac_ik.urdf. Axis tilt applied to all 7 joints except elbow_yaw (index 4,
 # left at its nominal axis: a poorly identified fit, moot since the joint
 # is now permanently locked). Origin correction applied only to shoulder_yaw
 # (x,z), elbow_pitch (x,y,z), wrist_pitch (x,y,z); every other joint's

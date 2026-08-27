@@ -217,17 +217,36 @@ class MainWindow(QMainWindow):
         self._simulate_cancel_requested = threading.Event()
         self._fitted_rotation = None
         self._fitted_translation = None
+        # Guards _publish_skull_collision_object(), which is called from
+        # three independent places (mesh load, Sync From Scene Move,
+        # Registration Apply). Without this, two of those firing close
+        # together reassigns self._collision_worker_thread while the
+        # first one is still running, dropping Qt's last reference to a
+        # live QThread and aborting the whole process with "QThread:
+        # Destroyed while thread '' is still running" -- confirmed as the
+        # actual cause of a real crash during this feature's first use.
+        self._collision_publish_in_flight = False
 
         self._build_ui()
 
         self.area_progress.connect(self._on_area_progress)
         self.simulate_progress.connect(self._on_simulate_progress)
         self._bridge.status.connect(self._on_bridge_status)
+        # Automatic scene-move detection: fires the same handler Sync From
+        # Scene Move's button uses, without waiting for that click. See
+        # MoveItBridge._on_monitored_planning_scene()'s own docstring for
+        # why the button still exists too (a late-joining subscriber can
+        # miss a pre-existing offset).
+        self._bridge.scene_skull_moved.connect(self._on_scene_pose_read)
         self._start_csv_log()
-        self.mesh_view.load_mesh(config.mesh.default_path, scale=config.mesh.scale)
+        # No mesh is auto-loaded on startup -- use File > Load Mesh... to
+        # pick one. mesh.default_path in config.yaml is only a suggested
+        # starting point for that file dialog, not something loaded
+        # automatically. MeshView/get_collision_mesh_data()/
+        # _publish_skull_collision_object() all already handle "no mesh
+        # loaded yet" safely, so nothing else needs to change for this.
         self._load_predefined_points()
-        self.logger.log("MoveIt bridge initialized.", "info")
-        self._publish_skull_collision_object()
+        self.logger.log("MoveIt bridge initialized. Use File > Load Mesh... to load a skull.", "info")
 
     # ---- layout ----
 
@@ -399,11 +418,20 @@ class MainWindow(QMainWindow):
         self.show_matrix_button = QPushButton("Show matrix")
         self.show_matrix_button.setEnabled(False)
         self.show_matrix_button.clicked.connect(self._on_show_matrix_clicked)
+        self.apply_registration_button = QPushButton("Apply")
+        self.apply_registration_button.setEnabled(False)
+        self.apply_registration_button.setToolTip(
+            "Update the live mesh-to-robot registration from the fitted transform, "
+            "republish the skull collision object at the new position, and "
+            "reproject every existing target onto it."
+        )
+        self.apply_registration_button.clicked.connect(self._on_apply_registration_clicked)
         self.save_registration_button = QPushButton("Save")
         self.save_registration_button.setEnabled(False)
         self.save_registration_button.clicked.connect(self._on_save_registration_clicked)
         footer_row.addWidget(self.show_matrix_button)
         footer_row.addStretch()
+        footer_row.addWidget(self.apply_registration_button)
         footer_row.addWidget(self.save_registration_button)
         layout.addLayout(footer_row)
 
@@ -481,6 +509,17 @@ class MainWindow(QMainWindow):
         self.load_mesh_button = QPushButton("Load Mesh...")
         self.load_mesh_button.clicked.connect(self._on_load_mesh_clicked)
         layout.addWidget(self.load_mesh_button)
+
+        self.sync_scene_pose_button = QPushButton("Sync From Scene Move")
+        self.sync_scene_pose_button.setToolTip(
+            "If the skull was moved in RViz's Scene Objects panel (drag + "
+            "Publish), reads that new position back from the live planning "
+            "scene, folds it into this GUI's own registration, reprojects "
+            "every existing target onto it, and republishes the collision "
+            "object through this GUI's own pipeline so both stay consistent."
+        )
+        self.sync_scene_pose_button.clicked.connect(self._on_sync_scene_pose_clicked)
+        layout.addWidget(self.sync_scene_pose_button)
 
         layout.addWidget(self._build_clipping_group())
 
@@ -1196,6 +1235,7 @@ class MainWindow(QMainWindow):
         self._fitted_rotation = R
         self._fitted_translation = t
         self.save_registration_button.setEnabled(True)
+        self.apply_registration_button.setEnabled(True)
 
         roll, pitch, yaw = rotation_matrix_to_rpy(R)
         rmse_mm = rmse * 1000.0
@@ -1237,6 +1277,29 @@ class MainWindow(QMainWindow):
             f"Wrote fitted registration to {out_path}.\n\n"
             "Copy these values into config.yaml's registration: block to actually use them."
         )
+
+    def _on_apply_registration_clicked(self):
+        """Makes the fitted transform the live registration for the rest of
+        this session (it is NOT written to config.yaml -- Save handles the
+        permanent record), then republishes the skull collision object and
+        reprojects every existing target so both move together, onto the
+        same corrected registration, instead of drifting apart the way a
+        manually dragged RViz scene object does (see
+        _publish_skull_collision_object()'s and
+        _reproject_all_targets()'s docstrings)."""
+        if self._fitted_rotation is None:
+            QMessageBox.warning(self, "Nothing to apply", "Click “Show matrix” first.")
+            return
+        roll, pitch, yaw = rotation_matrix_to_rpy(self._fitted_rotation)
+        t = self._fitted_translation
+        self._config.registration.update_pose(t, (roll, pitch, yaw))
+        self.logger.log(
+            f"Applied fitted registration for this session: xyz_m=[{t[0]:.5f}, "
+            f"{t[1]:.5f}, {t[2]:.5f}], rpy_rad=[{roll:.5f}, {pitch:.5f}, {yaw:.5f}]. "
+            "Not saved to config.yaml -- click Save separately to keep it.", "info",
+        )
+        self._reproject_all_targets()
+        self._publish_skull_collision_object()
 
     # ---- alignment-parameter editing / selection sync ----
 
@@ -1280,6 +1343,31 @@ class MainWindow(QMainWindow):
         self._planned_trajectory = None
         self.execute_button.setEnabled(False)
 
+    def _reproject_all_targets(self):
+        """Recomputes every existing target's pose from its stored (mesh-
+        local, never-changing) point/normal/params, under whatever
+        registration transform is currently loaded in self._config.
+        registration. Needed because a target's pose is computed once, at
+        pick time, and then frozen in that target's own stored data (see
+        _add_target()'s docstring) -- if the mesh's registration is
+        refitted afterward (see _on_apply_registration_clicked()), every
+        already-picked target would otherwise keep pointing at the old,
+        stale position instead of moving along with the corrected
+        registration."""
+        count = self.target_list.count()
+        for i in range(count):
+            item = self.target_list.item(i)
+            data = item.data(_TARGET_DATA_ROLE)
+            data["pose"] = self._compute_pose(data["point"], data["normal"], data)
+            item.setData(_TARGET_DATA_ROLE, data)
+        self._refresh_target_markers()
+        # Every existing plan was computed against the old registration
+        # and no longer corresponds to any current target's pose.
+        self._planned_trajectory = None
+        self.execute_button.setEnabled(False)
+        if count:
+            self.logger.log(f"Reprojected {count} target(s) onto the updated registration.", "info")
+
     def _on_reset_alignment_clicked(self):
         self._set_params_silently(
             {"standoff_mm": self.standoff_spin.value(), "tilt_deg": 0.0,
@@ -1318,14 +1406,41 @@ class MainWindow(QMainWindow):
         self.status_label.setText(f"Logging to {self._csv_path}")
 
     def _on_load_mesh_clicked(self):
+        # Starts the dialog in mesh.default_path's own directory, purely as
+        # a convenience -- no mesh is auto-loaded at startup, so this is
+        # the first place a user actually picks a file.
+        start_dir = str(Path(self._config.mesh.default_path).parent)
         path, _ = QFileDialog.getOpenFileName(
-            self, "Open skull mesh", "", "Mesh files (*.stl *.ply *.obj);;All files (*)"
+            self, "Open skull mesh", start_dir, "Mesh files (*.stl *.ply *.obj);;All files (*)"
         )
         if not path:
             return
+        # Reset the arm to its home configuration before swapping in a new
+        # mesh's collision geometry, so it starts from a known, obstacle-
+        # agnostic pose rather than wherever a previous target left it, and
+        # is never mid-motion when the old collision object is replaced.
+        # Runs on a worker thread since plan+execute both block. Disabled
+        # for the whole reset+load+publish chain so a second click can't
+        # overwrite self._reset_home_thread mid-flight (see
+        # _collision_publish_in_flight's comment in __init__).
+        self.load_mesh_button.setEnabled(False)
+        self.status_label.setText("Resetting arm to home before loading mesh...")
+        self.logger.log("Resetting arm to home before loading new mesh...", "info")
+        self._reset_home_thread = _CallThread(self._bridge.reset_to_home)
+        self._reset_home_thread.result.connect(
+            lambda success, path=path: self._on_home_reset_before_load(success, path)
+        )
+        self._reset_home_thread.start()
+
+    def _on_home_reset_before_load(self, success, path):
+        if not success:
+            self.logger.log(
+                "Reset to home failed -- loading the mesh anyway.", "warning"
+            )
         try:
             self.mesh_view.load_mesh(path, scale=self._config.mesh.scale)
         except Exception as e:  # noqa: BLE001 -- report to the GUI, don't crash it
+            self.load_mesh_button.setEnabled(True)
             self.logger.log(f"Failed to load mesh: {e}", "error")
             QMessageBox.critical(self, "Load failed", f"Could not load mesh: {e}")
             return
@@ -1341,7 +1456,69 @@ class MainWindow(QMainWindow):
             slider.setValue(0)
             slider.blockSignals(False)
             self.clip_value_labels[axis].setText("0%")
-        self._publish_skull_collision_object()
+        if not self._publish_skull_collision_object():
+            # No _on_skull_collision_published() will fire to re-enable
+            # this -- do it here instead (see that method's own docstring).
+            self.load_mesh_button.setEnabled(True)
+
+    def _on_sync_scene_pose_clicked(self):
+        """Reads the skull collision object's live pose from the planning
+        scene, and if it differs from identity (i.e. something moved it
+        after this GUI last published it, e.g. a drag + Publish in RViz's
+        Scene Objects panel), folds that offset into the GUI's own
+        registration, reprojects every existing target onto it, and
+        republishes the collision object through this GUI's own pipeline
+        (identity pose again, offset baked into the vertices) so nothing
+        drifts back out of sync on the next reload. Runs the blocking
+        planning-scene query on a worker thread so it can't freeze the GUI.
+        Disables its own button until _on_scene_pose_read() re-enables it,
+        so a second click can't overwrite self._sync_scene_pose_thread
+        while the first is still running (see _collision_publish_in_flight's
+        comment in __init__ for what that class of bug causes)."""
+        self.sync_scene_pose_button.setEnabled(False)
+        self.status_label.setText("Checking for a scene move...")
+        self._sync_scene_pose_thread = _CallThread(self._bridge.get_skull_collision_pose)
+        self._sync_scene_pose_thread.result.connect(self._on_scene_pose_read)
+        self._sync_scene_pose_thread.start()
+
+    def _on_scene_pose_read(self, pose):
+        if pose is None:
+            self.sync_scene_pose_button.setEnabled(True)
+            self.status_label.setText("No scene move detected (or nothing to sync).")
+            self.logger.log(
+                "Sync From Scene Move: skull collision object is already at "
+                "the GUI's own registered position. Nothing to do.", "info",
+            )
+            return
+        if self._collision_publish_in_flight:
+            # This handler can now fire automatically (scene_skull_moved),
+            # not just from the button. If a second report of the same
+            # still-uncorrected external move arrives before our own
+            # corrective republish has completed and echoed back with an
+            # identity pose, applying it again would compose the same
+            # offset twice. Safe to just drop it: once the in-flight
+            # publish finishes, the object is back at identity, so a
+            # genuinely new external move afterward gets its own report.
+            self.logger.log(
+                "Sync From Scene Move: a correction is already in progress -- "
+                "ignoring this duplicate report.", "info",
+            )
+            return
+        xyz, quat_xyzw = pose
+        self._config.registration.compose_with_pose(xyz, quat_xyzw)
+        new_xyz, new_rpy = self._config.registration.current_pose()
+        self.logger.log(
+            f"Sync From Scene Move: folded in offset xyz={tuple(round(v, 5) for v in xyz)}, "
+            f"quat_xyzw={tuple(round(v, 5) for v in quat_xyzw)}. New registration: "
+            f"xyz_m={tuple(round(v, 5) for v in new_xyz)}, "
+            f"rpy_rad={tuple(round(v, 5) for v in new_rpy)}.", "info",
+        )
+        self._reproject_all_targets()
+        if not self._publish_skull_collision_object():
+            # No _on_skull_collision_published() will fire to re-enable
+            # this -- do it here instead (see that method's own docstring).
+            self.sync_scene_pose_button.setEnabled(True)
+        self.status_label.setText("Synced registration and targets to the scene move.")
 
     def _publish_skull_collision_object(self):
         """Registers the currently-loaded mesh as a real MoveIt collision
@@ -1355,21 +1532,57 @@ class MainWindow(QMainWindow):
         reads the FULL, UNCLIPPED original mesh -- clipping sliders are a
         picking/viewing convenience, not a claim the physical skull has
         less material there, so collision awareness must not follow them.
-        Runs on a worker thread (the publish is a blocking service call)."""
-        vertices_local, triangles = self.mesh_view.get_collision_mesh_data()
+        Decimation (if any) is controlled by config.yaml's
+        mesh.collision_max_triangles, not hardcoded here. Runs on a worker
+        thread (the publish is a blocking service call).
+
+        Guarded by _collision_publish_in_flight against three independent
+        callers (mesh load, Sync From Scene Move, Registration Apply)
+        overlapping and overwriting self._collision_worker_thread while a
+        previous publish is still running -- see that flag's own comment
+        in __init__ for what that caused.
+
+        Returns:
+            True if a publish was actually started (self._collision_worker_
+            thread now running, _on_skull_collision_published() will fire
+            once it completes). False if it returned early instead (already
+            in flight, or no mesh loaded) -- callers that disabled their
+            own button expecting _on_skull_collision_published() to
+            re-enable it must re-enable it themselves in that case, since
+            that handler will never run."""
+        if self._collision_publish_in_flight:
+            self.logger.log(
+                "A skull collision publish is already in progress -- ignoring "
+                "this request until it finishes.", "warning",
+            )
+            return False
+        vertices_local, triangles = self.mesh_view.get_collision_mesh_data(
+            max_triangles=self._config.mesh.collision_max_triangles
+        )
         if vertices_local is None:
-            return
+            return False
         vertices_base = self._config.registration.transform_points_to_base_frame(vertices_local)
         self.logger.log(
             f"Publishing skull collision object ({len(triangles)} triangles)...", "info"
         )
+        self._collision_publish_in_flight = True
+        self.load_mesh_button.setEnabled(False)
+        self.sync_scene_pose_button.setEnabled(False)
+        self.apply_registration_button.setEnabled(False)
         self._collision_worker_thread = _CallThread(
             self._bridge.set_skull_collision_object, vertices_base, triangles
         )
         self._collision_worker_thread.result.connect(self._on_skull_collision_published)
         self._collision_worker_thread.start()
+        return True
 
     def _on_skull_collision_published(self, success):
+        self._collision_publish_in_flight = False
+        self.load_mesh_button.setEnabled(True)
+        self.sync_scene_pose_button.setEnabled(True)
+        # apply_registration_button stays disabled unless a fit exists to
+        # apply -- matches _on_show_matrix_clicked()'s own gating.
+        self.apply_registration_button.setEnabled(self._fitted_rotation is not None)
         self.logger.log(
             "Skull collision object active -- planning will avoid it." if success
             else "Failed to publish skull collision object -- see status above.",

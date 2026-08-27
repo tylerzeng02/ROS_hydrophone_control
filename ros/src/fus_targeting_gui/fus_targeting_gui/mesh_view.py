@@ -97,30 +97,33 @@ class MeshView(QWidget):
         self.interactor.disable_picking()
         self.interactor.enable_surface_point_picking(
             callback=self._on_pick,
-            show_message="Click a point on the mesh to select a target.",
+            show_message=False,  # no on-screen instruction overlay
             color="red",
             point_size=14,
             show_point=True,
             pickable_window=False,
             left_clicking=True,  # a plain left-click picks; PyVista's default
-            # requires pressing 'P' while hovering instead, which doesn't
-            # match this GUI's own on-screen instruction text.
+            # requires pressing 'P' while hovering instead.
         )
 
-    def get_collision_mesh_data(self, max_triangles=2000):
-        """Decimated (vertices, triangles) of the full, unclipped original
-        mesh, for publishing as a MoveIt collision object (see
+    def get_collision_mesh_data(self, max_triangles=0):
+        """(vertices, triangles) of the full, unclipped original mesh, for
+        publishing as a MoveIt collision object (see
         MoveItBridge.set_skull_collision_object()). Deliberately always
         uses self._original_mesh, not the possibly-clipped self._mesh:
         clipping is a picking and visualization convenience (see
         set_clip_fraction()'s own docstring), not a claim that the
         physical object has less material there. The planner should stay
         aware of the whole skull regardless of what's currently clipped
-        away for viewing. Decimated because FCL collision checking against
-        the full ~200k-triangle mesh would be too slow for interactive
-        planning; ~2000 triangles is enough to represent gross shape for
-        avoidance purposes (verified directly: bounds stay accurate to
-        <1mm after decimating this mesh to 2000 triangles).
+        away for viewing.
+
+        max_triangles: 0 or None publishes the mesh at full resolution.
+        A positive value decimates down to roughly that many triangles
+        first, trading geometric fidelity for collision-check speed (FCL
+        checks this geometry on every planner sample, so a very high
+        triangle count can slow planning down). Verified directly: this
+        mesh's bounds stay accurate to <1mm even decimated to 2000
+        triangles, if that tradeoff is ever needed again.
 
         Returns:
             (vertices, triangles) as plain numpy arrays: vertices (N, 3)
@@ -134,7 +137,7 @@ class MeshView(QWidget):
         if self._original_mesh is None:
             return None, None
         mesh = self._original_mesh.triangulate()
-        if mesh.n_cells > max_triangles:
+        if max_triangles and mesh.n_cells > max_triangles:
             target_reduction = 1.0 - (max_triangles / mesh.n_cells)
             mesh = mesh.decimate(target_reduction)
         vertices = np.asarray(mesh.points, dtype=float)
