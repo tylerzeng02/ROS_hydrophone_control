@@ -34,13 +34,18 @@ robot:
   home_joint_positions: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
 mesh:
-  # Absolute path to the skull mesh (STL/PLY). Overridable from the GUI's
-  # File > Open Mesh... menu at runtime; this is just the startup default.
-  # The full-resolution mesh (206,983 triangles), not the "_decimated" one
-  # (20,697) -- confirmed same anatomy/frame (bounds/center match to
-  # <0.1mm), just more detail. Keep in sync with publish_skull_marker.py's
-  # own --mesh default if either is ever changed.
-  default_path: /home/temp/CT5_DICOM_skull_mesh.stl
+  # Path to the skull mesh (STL/PLY). Overridable from the GUI's File >
+  # Open Mesh... menu at runtime; this is just the startup default. A
+  # relative path (like this one) is resolved against this config file's
+  # own directory (see config.py's _resolve_path()), not the process's
+  # working directory, so this points at meshes/CT5_DICOM_skull_mesh.stl,
+  # installed into this same package's share/ directory alongside this
+  # file -- works out of the box on a fresh clone, no per-machine path
+  # needed. The full-resolution mesh (206,983 triangles), not a decimated
+  # one. Keep in sync with publish_skull_marker.py's own --mesh default
+  # if either is ever changed. Point this at an absolute path instead if
+  # you want a different mesh to load by default.
+  default_path: ../meshes/CT5_DICOM_skull_mesh.stl
   # Uniform scale applied after loading -- 0.001 for a mesh authored in mm
   # (matches publish_skull_marker.py's own default/warning about this).
   scale: 0.001

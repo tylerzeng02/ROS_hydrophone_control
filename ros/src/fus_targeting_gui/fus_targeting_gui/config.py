@@ -3,11 +3,26 @@ every other module reads robot, mesh, registration, and targeting
 settings through. Nothing else in this package should read config.yaml
 directly or hardcode a frame or group name."""
 
+import os
 from dataclasses import dataclass
 
 import yaml
 
 from .registration import FixedPoseRegistration, TargetingConfig
+
+
+def _resolve_path(path: str, config_dir: str) -> str:
+    """A relative mesh.default_path/predefined_points_path is resolved
+    against the config file's own directory, not the process's current
+    working directory. This is what makes it possible to ship a real
+    default mesh with this package (meshes/, installed into the same
+    share/fus_targeting_gui/ directory as config/) instead of requiring
+    every machine to have some absolute, machine-specific mesh path
+    (e.g. /home/<user>/...) configured before the GUI can even start.
+    An absolute path is returned unchanged."""
+    if not path or os.path.isabs(path):
+        return path
+    return os.path.join(config_dir, path)
 
 
 @dataclass
@@ -46,6 +61,7 @@ class AppConfig:
 def load_config(path: str) -> AppConfig:
     with open(path) as f:
         raw = yaml.safe_load(f)
+    config_dir = os.path.dirname(os.path.abspath(path))
 
     joint_names = list(raw["robot"]["joint_names"])
     home_joint_positions = raw["robot"].get("home_joint_positions")
@@ -63,9 +79,11 @@ def load_config(path: str) -> AppConfig:
         ),
     )
     mesh = MeshConfig(
-        default_path=raw["mesh"]["default_path"],
+        default_path=_resolve_path(raw["mesh"]["default_path"], config_dir),
         scale=float(raw["mesh"]["scale"]),
-        predefined_points_path=raw["mesh"].get("predefined_points_path") or "",
+        predefined_points_path=_resolve_path(
+            raw["mesh"].get("predefined_points_path") or "", config_dir
+        ),
         collision_max_triangles=int(raw["mesh"].get("collision_max_triangles", 0) or 0),
     )
     targeting = TargetingConfig(

@@ -13,7 +13,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 
 JOBS="${JOBS:-$(nproc)}"
 
-echo "==> [1/6] Git submodules (DynamixelSDK, ndicapi, trac_ik)..."
+echo "==> [1/6] Git submodules (DynamixelSDK, ndicapi)..."
 git submodule update --init --recursive
 
 echo "==> [2/6] pymoveit2 (not vendored, cloned separately)..."

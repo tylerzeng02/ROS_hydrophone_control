@@ -211,6 +211,13 @@ target_link_libraries(record_hand_poses
 # existence-guard that used to live here. If TRAC-IK is populated again and
 # these are wanted back, restore this block from git history (see the
 # commit that removed it) alongside the archived .cpp files.
+#
+# external/trac_ik itself is no longer used by anything active in this
+# repo: the MoveIt TRAC-IK plugin (ros/src/cyton_trac_ik_kinematics_plugin)
+# now vendors its own modified copy of the needed source
+# (third_party/trac_ik_lib) instead of compiling from this submodule, so
+# a patched build works from a plain clone with no dependency on this
+# machine's local, uncommitted patches to a submodule.
 
 # NDI API
 

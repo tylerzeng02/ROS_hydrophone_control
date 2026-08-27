@@ -5,8 +5,9 @@
   <version>0.1.0</version>
   <description>
     MoveIt2-native TRAC-IK kinematics plugin for the Cyton Gamma 1500,
-    wrapping external/trac_ik's core solver (trac_ik_lib, compiled directly
-    from that submodule) behind a fresh implementation of MoveIt2's
+    wrapping a vendored, modified copy of trac_ik_lib's core solver
+    (third_party/trac_ik_lib, see its own README.md) behind a fresh
+    implementation of MoveIt2's
     kinematics::KinematicsBase interface -- built to A/B compare against the
     KDL plugin already used by cyton_moveit_config. Not a port of the
     original ROS1/catkin trac_ik_kinematics_plugin package (that one depends

@@ -24,6 +24,7 @@ nicer to actually look at interactively.
 """
 import argparse
 import math
+import os
 
 import rclpy
 from rclpy.node import Node
@@ -87,13 +88,18 @@ class SkullMarkerPublisher(Node):
         self.publisher.publish(m)
 
 
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_DEFAULT_MESH = os.path.join(_REPO_ROOT, "references", "CT5_DICOM_skull_mesh.stl")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--mesh", default="/home/temp/CT5_DICOM_skull_mesh.stl",
-        help="Absolute path to the mesh file. Full-resolution (206,983 tri) "
-        "version, not the old _decimated one (20,697 tri) -- same anatomy/"
-        "frame (bounds match to <0.1mm), just more detail; kept in sync "
+        "--mesh", default=_DEFAULT_MESH,
+        help="Path to the mesh file. Defaults to references/CT5_DICOM_"
+        "skull_mesh.stl in this repo (full-resolution, 206,983 tri), "
+        "resolved relative to this script's own location so this works "
+        "regardless of where the repo is checked out; kept in sync "
         "with fus_targeting_gui's own default_config.yaml mesh.default_path."
     )
     parser.add_argument(

@@ -8,13 +8,18 @@ those files. The Fourier term is pose-dependent and cannot be represented
 in a static URDF, so it is printed for reference but not deployed.
 """
 
+import os
+
 import numpy as np
 from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
 import calibrate_kinematics as ck
 
+# Resolved relative to this script's own location, not a fixed machine
+# path, so this runs regardless of where the repo is checked out.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CSV_PATHS = [
-    'C:/Users/ConformalUser/Desktop/cyton_setup/calibration/data/deployed_model_training_dataset_374pose.csv',
+    os.path.join(_REPO_ROOT, 'calibration', 'data', 'deployed_model_training_dataset_374pose.csv'),
 ]
 angles_list, pos_list, quat_list = [], [], []
 for p in CSV_PATHS:

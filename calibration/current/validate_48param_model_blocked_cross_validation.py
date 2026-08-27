@@ -15,7 +15,10 @@ from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
 import calibrate_kinematics as ck
 
-FIT_CSV = "C:/Users/ConformalUser/Desktop/cyton_setup/calibration/data/deployed_model_training_dataset_374pose.csv"
+# Resolved relative to this script's own location, not a fixed machine
+# path, so this runs regardless of where the repo is checked out.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+FIT_CSV = os.path.join(_REPO_ROOT, "calibration", "data", "deployed_model_training_dataset_374pose.csv")
 # Writes next to this script rather than a fixed external directory, so
 # the script runs regardless of which machine's calibration folder layout
 # is currently in use.

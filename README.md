@@ -113,13 +113,18 @@ sections below for what each step does and how to run them individually.
     application. See its own `README.md` for setup and usage.
 
   Loose files at the top level of `ros/` are collected accuracy data.
-- **`external/`**: vendored dependencies as git submodules
-  (`DynamixelSDK`, `ndicapi`, `trac_ik`). `trac_ik` is only needed if you
-  plan to build `cyton_trac_ik_kinematics_plugin`; the other two are
-  needed for everything else (see
-  [Software prerequisites](#software-prerequisites)).
-- **`references/`**: the robot's URDF (`cyton_gamma_1500_trac_ik.urdf`)
-  and the moving-marker mounting bracket CAD (`marker_mount.stl`).
+- **`external/`**: vendored dependencies as git submodules (`DynamixelSDK`,
+  `ndicapi`), both needed for the native tools (see
+  [Software prerequisites](#software-prerequisites)). TRAC-IK is not a
+  submodule here: `ros/src/cyton_trac_ik_kinematics_plugin/third_party/`
+  vendors its own modified copy of the core solver directly, so there is
+  nothing extra to populate for it.
+- **`references/`**: the robot's URDF (`cyton_gamma_1500_trac_ik.urdf`),
+  the moving-marker mounting bracket CAD (`marker_mount.stl`), and an
+  example skull mesh (`CT5_DICOM_skull_mesh.stl`) for `fus_targeting_gui`.
+  The same mesh is also bundled inside
+  `ros/src/fus_targeting_gui/meshes/` so the GUI has a real default to
+  load out of the box (see [Getting started: fus_targeting_gui](#getting-started-fus_targeting_gui)).
 
 ## Software prerequisites
 
@@ -137,13 +142,11 @@ sections below for what each step does and how to run them individually.
 
 **Submodules:** clone with `--recurse-submodules`, or run
 `git submodule update --init --recursive` after a plain clone, to
-populate all three of `external/DynamixelSDK`, `external/ndicapi`, and
-`external/trac_ik`. The root `CMakeLists.txt` and
-`ros/src/cyton_hardware`'s `CMakeLists.txt` both stop with a
-`FATAL_ERROR` if `external/DynamixelSDK` is missing. NDI and TRAC-IK
-targets are optional and are skipped if their `external/` directory is
-not populated, so `trac_ik` can be left uninitialized if you don't need
-`cyton_trac_ik_kinematics_plugin`.
+populate `external/DynamixelSDK` and `external/ndicapi`. The root
+`CMakeLists.txt` and `ros/src/cyton_hardware`'s `CMakeLists.txt` both
+stop with a `FATAL_ERROR` if `external/DynamixelSDK` is missing. NDI
+targets are optional and are skipped if `external/ndicapi` is not
+populated.
 
 ## Getting started: native C++ build
 
@@ -235,6 +238,12 @@ ros2 launch fus_targeting_gui targeting_gui.launch.py
 ```
 
 Or run the node directly with `ros2 run fus_targeting_gui targeting_gui`.
+No mesh loads automatically at startup (by design); use File > Load
+Mesh..., which starts in the directory of the example skull mesh bundled
+with this package (`ros/src/fus_targeting_gui/meshes/`, an installed
+copy of `references/CT5_DICOM_skull_mesh.stl`) so there is a real file to
+pick without needing anything machine-specific set up first.
+
 See `ros/src/fus_targeting_gui/README.md` for the app's architecture and
 `ros/src/fus_targeting_gui/config/default_config.yaml` for the one file
 that would need editing to point this at a different, already-calibrated

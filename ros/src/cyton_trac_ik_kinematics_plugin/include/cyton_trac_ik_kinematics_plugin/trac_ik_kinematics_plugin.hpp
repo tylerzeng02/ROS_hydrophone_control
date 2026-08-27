@@ -3,7 +3,8 @@
 /**
  * @file trac_ik_kinematics_plugin.hpp
  * @brief A fresh, MoveIt2-native kinematics::KinematicsBase implementation
- * wrapping TRAC-IK's core solver (external/trac_ik/trac_ik_lib).
+ * wrapping TRAC-IK's core solver (third_party/trac_ik_lib, vendored and
+ * modified -- see that directory's own README.md).
  *
  * This is not a mechanical port of trac_ik_kinematics_plugin.cpp (that
  * file, and trac_ik_ros.cpp, are ROS1/catkin code depending on
@@ -11,10 +12,9 @@
  * ROS2). The core solver itself (trac_ik.cpp/nlopt_ik.cpp/kdl_tl.cpp; see
  * TRAC_IK::TRAC_IK below) has no ROS dependency at all, just
  * KDL/Eigen/Boost/NLopt, and is compiled directly from
- * external/trac_ik/trac_ik_lib/src (this package's CMakeLists.txt), the
+ * third_party/trac_ik_lib/src (this package's CMakeLists.txt), the
  * same pattern as cyton_hardware compiling dynamixel_motor.cpp or
- * cyton_ndi_capture compiling ndicapi. It is not a copy, so it can never
- * drift from the vendored submodule.
+ * cyton_ndi_capture compiling ndicapi.
  *
  * The KDL::Chain and joint limits this solver needs are built directly
  * from the MoveIt RobotModel's own parsed URDF (via kdl_parser), the same

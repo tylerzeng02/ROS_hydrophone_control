@@ -44,6 +44,13 @@ ros/log/
 # dangling gitlink-with-no-.gitmodules-entry this project once had here.
 ros/src/pymoveit2/
 
+# external/trac_ik is no longer a submodule: the MoveIt TRAC-IK plugin
+# (ros/src/cyton_trac_ik_kinematics_plugin/third_party/) vendors its own
+# modified copy of the needed source instead. This directory may still
+# exist locally on a machine that populated it before that change;
+# ignored so it can't be accidentally re-tracked as a dangling gitlink.
+external/trac_ik/
+
 # Colcon build output accidentally left at repo root or inside
 # calibration/current/ from running colcon from the wrong directory --
 # these are pure regenerable artifacts, never meant to be tracked (one

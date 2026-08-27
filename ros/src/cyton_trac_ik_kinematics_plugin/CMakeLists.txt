@@ -22,13 +22,13 @@ pkg_check_modules(NLOPT REQUIRED nlopt)
 pkg_check_modules(OROCOS_KDL REQUIRED orocos-kdl)
 pkg_check_modules(EIGEN3 REQUIRED eigen3)
 
-# Compiles external/trac_ik/trac_ik_lib's core solver source DIRECTLY (same
-# pattern as cyton_hardware compiling dynamixel_motor.cpp, cyton_ndi_capture
-# compiling ndicapi -- not a copy, can never drift from the vendored
-# submodule). Deliberately excludes trac_ik_ros.cpp (ROS1/catkin-only, not
-# needed -- see this package's plugin header comment) -- only kdl_tl.cpp/
+# Compiles third_party/trac_ik_lib's core solver source, a vendored and
+# modified copy of trac_ik_lib (see third_party/trac_ik_lib/README.md for
+# what was changed and why this is vendored rather than a submodule).
+# Deliberately excludes trac_ik_ros.cpp (ROS1/catkin-only, not needed --
+# see this package's plugin header comment) -- only kdl_tl.cpp/
 # nlopt_ik.cpp/trac_ik.cpp, which have zero ROS dependency of any kind.
-get_filename_component(TRAC_IK_LIB_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/trac_ik/trac_ik_lib" ABSOLUTE)
+get_filename_component(TRAC_IK_LIB_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/trac_ik_lib" ABSOLUTE)
 
 add_library(cyton_trac_ik_kinematics_plugin SHARED
   src/trac_ik_kinematics_plugin.cpp

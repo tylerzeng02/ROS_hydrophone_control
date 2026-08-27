@@ -4,6 +4,3 @@
 [submodule "external/DynamixelSDK"]
 	path = external/DynamixelSDK
 	url = https://github.com/ROBOTIS-GIT/DynamixelSDK.git
-[submodule "external/trac_ik"]
-	path = external/trac_ik
-	url = https://github.com/HIRO-group/trac_ik.git
